@@ -22,7 +22,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY . .
 
-RUN npx prisma generate \
+RUN DATABASE_URL="file:/tmp/build.db" npx prisma generate \
   && npm run build
 
 # ---------- runner ----------
