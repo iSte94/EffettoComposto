@@ -2,7 +2,7 @@
 
 import { Suspense, lazy, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Flame, Building2, ShieldCheck, BarChart3, Calculator, Wallet, Loader2, Briefcase, TrendingUp } from "lucide-react";
+import { LineChart, Flame, Building2, ShieldCheck, BarChart3, Calculator, Wallet, Loader2, Briefcase, TrendingUp, Github } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/contexts/auth-context";
@@ -46,7 +46,17 @@ export default function CalculatorPage() {
           </div>
         </div>
 
-        <div className="flex justify-end items-center gap-4 w-full md:w-auto">
+        <div className="flex justify-end items-center gap-3 w-full md:w-auto">
+          <a
+            href="https://github.com/iSte94/EffettoComposto"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            title="Codice sorgente su GitHub"
+          >
+            <Github className="w-4 h-4" />
+            <span className="hidden sm:inline">Open Source</span>
+          </a>
           <ThemeToggle />
           <AuthModal
             user={user}
