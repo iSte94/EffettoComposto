@@ -78,7 +78,6 @@ export function MortgageComparison() {
         setScenarios(prev => prev.filter(s => s.id !== id));
     };
 
-    // Chart data: comparison bars
     const barData = [
         {
             name: "Rata Mensile",
@@ -94,7 +93,6 @@ export function MortgageComparison() {
         },
     ];
 
-    // Chart data: debt over time (yearly)
     const maxYears = Math.max(...results.map(r => r.years));
     const debtOverTime = Array.from({ length: maxYears + 1 }, (_, year) => {
         const point: Record<string, string | number> = { anno: `Anno ${year}` };
@@ -119,86 +117,82 @@ export function MortgageComparison() {
         return point;
     });
 
-    // Best scenario highlight
     const bestMonthly = results.reduce((best, r) => r.monthlyPayment < best.monthlyPayment ? r : best);
     const bestTotal = results.reduce((best, r) => r.totalPaid < best.totalPaid ? r : best);
 
     return (
         <div className="space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-950/50 rounded-xl">
-                        <Scale className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <div className="rounded-xl bg-blue-50 p-2 dark:bg-blue-950/50">
+                        <Scale className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
                         <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">Confronto Mutui</h3>
-                        <p className="text-xs text-slate-500">Confronta fino a 3 offerte fianco a fianco</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Confronta fino a 3 offerte fianco a fianco</p>
                     </div>
                 </div>
                 {scenarios.length < 3 && (
-                    <Button variant="outline" size="sm" className="rounded-xl text-xs" onClick={addScenario}>
-                        <Plus className="w-3.5 h-3.5 mr-1" /> Aggiungi Offerta
+                    <Button variant="outline" size="sm" className="h-11 rounded-xl text-xs" onClick={addScenario}>
+                        <Plus className="mr-1 h-3.5 w-3.5" /> Aggiungi Offerta
                     </Button>
                 )}
             </div>
 
-            {/* Scenario Input Cards */}
-            <div className={`grid gap-4 ${scenarios.length === 3 ? 'grid-cols-1 md:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
+            <div className={`grid gap-4 ${scenarios.length === 3 ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1 md:grid-cols-2"}`}>
                 {scenarios.map((s, idx) => (
-                    <Card key={s.id} className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border-2 rounded-2xl overflow-hidden"
-                        style={{ borderColor: COLORS[idx] + "40" }}>
-                        <CardContent className="p-5 space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
+                    <Card key={s.id} className="overflow-hidden rounded-2xl border-2 border-slate-200/80 bg-white/75 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75" style={{ borderColor: `${COLORS[idx]}40` }}>
+                        <CardContent className="space-y-4 p-4 sm:p-5">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <div className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[idx] }} />
                                     <Input
                                         value={s.label}
                                         onChange={e => updateScenario(s.id, "label", e.target.value)}
-                                        className="h-7 text-sm font-bold border-none p-0 bg-transparent focus-visible:ring-0 w-32"
+                                        className="h-10 w-32 border-none bg-transparent p-0 text-sm font-bold focus-visible:ring-0"
                                     />
                                 </div>
                                 {scenarios.length > 2 && (
-                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-red-500" onClick={() => removeScenario(s.id)}>
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                    <Button variant="ghost" size="sm" className="h-10 w-10 rounded-full p-0 text-slate-400 hover:text-red-500" onClick={() => removeScenario(s.id)} aria-label="Rimuovi offerta">
+                                        <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                 )}
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="space-y-1">
-                                    <Label className="text-xs text-slate-500">Prezzo Immobile</Label>
-                                    <Input type="number" value={s.propertyPrice || ""} onChange={e => updateScenario(s.id, "propertyPrice", e.target.value)} className="h-8 text-sm rounded-lg" />
+                                    <Label className="text-xs text-slate-500 dark:text-slate-400">Prezzo Immobile</Label>
+                                    <Input type="number" value={s.propertyPrice || ""} onChange={e => updateScenario(s.id, "propertyPrice", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-xs text-slate-500">Anticipo</Label>
-                                    <Input type="number" value={s.downpayment || ""} onChange={e => updateScenario(s.id, "downpayment", e.target.value)} className="h-8 text-sm rounded-lg" />
+                                    <Label className="text-xs text-slate-500 dark:text-slate-400">Anticipo</Label>
+                                    <Input type="number" value={s.downpayment || ""} onChange={e => updateScenario(s.id, "downpayment", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-xs text-slate-500">Tasso %</Label>
-                                    <Input type="number" step="0.1" value={s.rate || ""} onChange={e => updateScenario(s.id, "rate", e.target.value)} className="h-8 text-sm rounded-lg" />
+                                    <Label className="text-xs text-slate-500 dark:text-slate-400">Tasso %</Label>
+                                    <Input type="number" step="0.1" value={s.rate || ""} onChange={e => updateScenario(s.id, "rate", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                                 <div className="space-y-1">
-                                    <Label className="text-xs text-slate-500">Durata (anni)</Label>
-                                    <Input type="number" value={s.years || ""} onChange={e => updateScenario(s.id, "years", e.target.value)} className="h-8 text-sm rounded-lg" />
+                                    <Label className="text-xs text-slate-500 dark:text-slate-400">Durata (anni)</Label>
+                                    <Input type="number" value={s.years || ""} onChange={e => updateScenario(s.id, "years", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                             </div>
 
-                            {/* Quick Results */}
-                            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 space-y-2">
+                            <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Importo Mutuo</span>
+                                    <span className="text-slate-500 dark:text-slate-400">Importo Mutuo</span>
                                     <span className="font-bold text-slate-700 dark:text-slate-300">{formatEuro(results[idx].loanAmount)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Rata Mensile</span>
+                                    <span className="text-slate-500 dark:text-slate-400">Rata Mensile</span>
                                     <span className="font-bold" style={{ color: COLORS[idx] }}>{formatEuro(results[idx].monthlyPayment)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Totale Interessi</span>
+                                    <span className="text-slate-500 dark:text-slate-400">Totale Interessi</span>
                                     <span className="font-bold text-red-500">{formatEuro(results[idx].totalInterest)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
-                                    <span className="text-slate-500">Costo Totale</span>
+                                    <span className="text-slate-500 dark:text-slate-400">Costo Totale</span>
                                     <span className="font-bold text-slate-700 dark:text-slate-300">{formatEuro(results[idx].totalPaid)}</span>
                                 </div>
                             </div>
@@ -207,10 +201,9 @@ export function MortgageComparison() {
                 ))}
             </div>
 
-            {/* Winner Highlight */}
-            <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl p-5">
-                <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-300 mb-3">Riepilogo Confronto</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-5 dark:border-emerald-800 dark:bg-emerald-950/30">
+                <h4 className="mb-3 text-sm font-bold text-emerald-800 dark:text-emerald-300">Riepilogo Confronto</h4>
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
                     <div>
                         <span className="text-slate-600 dark:text-slate-400">Rata piu&apos; bassa: </span>
                         <span className="font-bold text-emerald-700 dark:text-emerald-400">{bestMonthly.label}</span>
@@ -232,23 +225,17 @@ export function MortgageComparison() {
                 </div>
             </div>
 
-            {/* Comparison Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Bar Chart: Key Metrics */}
-                <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl">
-                    <CardContent className="p-5">
-                        <h4 className="text-sm font-bold text-slate-600 dark:text-slate-400 mb-4">Confronto Costi</h4>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+                    <CardContent className="p-4 sm:p-5">
+                        <h4 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Confronto Costi</h4>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={barData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                                    <Tooltip
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        formatter={(value: any) => formatEuro(Number(value))}
-                                        contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)" }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} />
+                                    <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
+                                    <Tooltip formatter={(value: string | number | undefined) => formatEuro(Number(value ?? 0))} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
+                                    <Legend wrapperStyle={{ fontSize: 11, color: "#64748b" }} />
                                     {results.map((r, i) => (
                                         <Bar key={r.label} dataKey={r.label} fill={COLORS[i]} radius={[4, 4, 0, 0]} />
                                     ))}
@@ -258,21 +245,16 @@ export function MortgageComparison() {
                     </CardContent>
                 </Card>
 
-                {/* Line Chart: Remaining Debt Over Time */}
-                <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl">
-                    <CardContent className="p-5">
-                        <h4 className="text-sm font-bold text-slate-600 dark:text-slate-400 mb-4">Debito Residuo nel Tempo</h4>
+                <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+                    <CardContent className="p-4 sm:p-5">
+                        <h4 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Debito Residuo nel Tempo</h4>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={debtOverTime} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <XAxis dataKey="anno" tick={{ fontSize: 10 }} interval={Math.max(0, Math.floor(maxYears / 6))} />
-                                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                                    <Tooltip
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        formatter={(value: any) => formatEuro(Number(value))}
-                                        contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)" }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 11 }} />
+                                    <XAxis dataKey="anno" tick={{ fontSize: 10, fill: "#64748b" }} interval={Math.max(0, Math.floor(maxYears / 6))} />
+                                    <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
+                                    <Tooltip formatter={(value: string | number | undefined) => formatEuro(Number(value ?? 0))} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
+                                    <Legend wrapperStyle={{ fontSize: 11, color: "#64748b" }} />
                                     {results.map((r, i) => (
                                         <Line key={r.label} type="monotone" dataKey={r.label} stroke={COLORS[i]} strokeWidth={2.5} dot={false} />
                                     ))}

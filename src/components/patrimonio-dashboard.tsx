@@ -469,7 +469,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5 pt-6">
                     {/* Net Worth */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl overflow-hidden group hover:shadow-lg transition-all duration-500 shadow-md">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
                         <CardContent className="p-6 xl:p-8 text-center flex flex-col items-center justify-center h-full">
                             <div className="text-xs xl:text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">Net Worth Globale Attuale</div>
                             {loading ? <Skeleton className="h-12 w-48 rounded-xl" /> : (
@@ -479,8 +479,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     </Card>
 
                     {/* Immobili Netto */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden group hover:shadow-lg transition-all duration-500 flex flex-col justify-center">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 p-4 xl:p-6 text-center xl:text-left">
+            <Card className="flex flex-col justify-center overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
+            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-4 text-center xl:text-left dark:border-slate-800 dark:bg-slate-800/60 xl:p-6">
                             <CardTitle className="flex items-center text-sm xl:text-base text-slate-900 dark:text-slate-100 justify-center xl:justify-start">
                                 <HomeIcon className="w-5 h-5 mr-3 text-emerald-600 dark:text-emerald-400 shrink-0 hidden sm:block" /> Totale Immobili (Netto)
                             </CardTitle>
@@ -496,8 +496,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     </Card>
 
                     {/* Investimenti Finanziari */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden group hover:shadow-lg transition-all duration-500 flex flex-col justify-center">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 p-4 xl:p-6 text-center xl:text-left">
+            <Card className="flex flex-col justify-center overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
+            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-4 text-center xl:text-left dark:border-slate-800 dark:bg-slate-800/60 xl:p-6">
                             <CardTitle className="flex items-center text-sm xl:text-base text-slate-900 dark:text-slate-100 justify-center xl:justify-start">
                                 <PiggyBank className="w-5 h-5 mr-3 text-purple-600 dark:text-purple-400 shrink-0 hidden sm:block" /> Investimenti Finanziari
                             </CardTitle>
@@ -513,7 +513,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     </Card>
 
                     {/* Runway */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl overflow-hidden group hover:shadow-lg shadow-md transition-all duration-500 flex flex-col text-center xl:text-left">
+            <Card className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 text-center shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75 xl:text-left">
                         <div className={`h-1 w-full ${runwayBg.split(' ')[0]}`} />
                         <CardContent className="p-4 xl:p-6 flex flex-col justify-between h-full flex-grow">
                             <div>
@@ -537,7 +537,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     </Card>
 
                     {/* Bitcoin Live */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl overflow-hidden group hover:shadow-lg shadow-md transition-all duration-500 text-center xl:text-left">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 text-center shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75 xl:text-left">
                         <CardContent className="p-4 xl:p-6 flex flex-col justify-center h-full">
                             <div className="flex items-center justify-center xl:justify-start text-slate-700 dark:text-slate-300 mb-2">
                                 <Bitcoin className="w-5 h-5 mr-2 text-amber-500" />
@@ -553,7 +553,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     </Card>
 
                     {/* Cashflow */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl overflow-hidden group hover:shadow-lg shadow-md transition-all duration-500 text-center xl:text-left">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 text-center shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75 xl:text-left">
                         <CardContent className="p-4 xl:p-6 flex flex-col justify-center h-full">
                             <div className="flex items-center justify-center xl:justify-start text-slate-700 dark:text-slate-300 mb-3">
                                 <TrendingUp className="w-5 h-5 mr-2 text-blue-600 dark:text-blue-400" />
@@ -595,8 +595,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
             />
 
             {/* CHARTS SECTION */}
-            <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-xl overflow-hidden rounded-3xl">
-                <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 pb-8 pt-8 px-8">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-xl backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+            <CardHeader className="border-b border-slate-200/80 bg-white/60 px-8 pb-8 pt-8 dark:border-slate-800 dark:bg-slate-800/60">
                     <CardTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
                         <LineChartIcon className="w-6 h-6 mr-3 text-blue-600 dark:text-blue-400" /> Andamento nel Tempo
                     </CardTitle>
@@ -606,9 +606,9 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                 </CardHeader>
                 <CardContent className="p-2 md:p-8 pt-8">
                     {loading ? (
-                        <Skeleton className="w-full h-[400px] rounded-2xl bg-white/50 dark:bg-slate-800/50" />
+            <Skeleton className="h-[400px] w-full rounded-2xl bg-slate-100/80 dark:bg-slate-800/50" />
                     ) : history.length === 0 ? (
-                        <div role="status" className="h-[400px] flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-300 rounded-2xl bg-white/50 dark:bg-slate-800/50">
+            <div role="status" className="flex h-[400px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50">
                             <LineChartIcon className="w-12 h-12 mb-4 opacity-50 text-slate-400" aria-hidden="true" />
                             <p className="font-medium text-slate-700 dark:text-slate-300">Nessun dato storico.</p>
                             <p className="text-sm">Salva il tuo primo Snapshot per iniziare il tracciamento!</p>
@@ -631,7 +631,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
                                     <YAxis tickFormatter={(val) => `€${Math.round(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-10} />
                                     <Tooltip
-                                        contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)' }}
+            contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
                                         labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}
                                         itemStyle={{ color: '#334155', border: 'none' }}
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -653,7 +653,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
             </Card>
 
             {/* INPUT FORMS FOR SNAPSHOT */}
-            <div className="grid md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
                 {/* LEFT: Real Estate, Stocks, Other Assets */}
                 <div className="space-y-8">
                     <RealEstateSection
@@ -683,8 +683,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     />
 
                     {/* Other Assets */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 p-6">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
+            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
                             <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100">
                                 <Gem className="w-5 h-5 mr-3 text-indigo-600 dark:text-indigo-400" /> Altre Attività
                             </CardTitle>
@@ -692,13 +692,13 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                         <CardContent className="p-6 space-y-4">
                             <div className="space-y-2">
                                 <Label className="text-slate-500 text-xs uppercase font-bold tracking-wider">Beni Rifugio (Oro / Orologi / Arte)</Label>
-                                <Input type="number" value={safeHavens} onChange={e => setSafeHavens(Number(e.target.value))} onBlur={triggerSave} className="text-lg bg-white/70 dark:bg-slate-900/70 border-slate-200 text-slate-900 dark:text-slate-100 focus-visible:ring-indigo-500" />
+            <Input type="number" value={safeHavens} onChange={e => setSafeHavens(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500" />
                             </div>
                             <div className="space-y-2 pt-2">
                                 <Label className="text-slate-500 text-xs uppercase font-bold tracking-wider flex items-center">
                                     <Landmark className="w-4 h-4 mr-1 text-slate-500" /> TFR / Fondo Pensione
                                 </Label>
-                                <Input type="number" value={pensionFund} onChange={e => setPensionFund(Number(e.target.value))} onBlur={triggerSave} className="text-lg bg-white/70 dark:bg-slate-900/70 border-slate-200 text-slate-900 dark:text-slate-100 focus-visible:ring-indigo-500" />
+            <Input type="number" value={pensionFund} onChange={e => setPensionFund(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-indigo-500" />
                             </div>
                         </CardContent>
                     </Card>
@@ -707,8 +707,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                 {/* RIGHT: Bitcoin, Debts */}
                 <div className="space-y-8">
                     {/* Bitcoin */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 p-6">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
+            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
                             <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100">
                                 <Bitcoin className="w-5 h-5 mr-3 text-amber-500" /> Crypto
                             </CardTitle>
@@ -720,7 +720,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                             <div className="space-y-2">
                                 <Label className="text-slate-500 text-xs uppercase font-bold tracking-wider">Quantità Bitcoin Posseduta</Label>
                                 <div className="relative">
-                                    <Input type="number" step="0.001" value={bitcoinAmount} onChange={e => setBitcoinAmount(Number(e.target.value))} onBlur={triggerSave} className="text-xl bg-white/70 dark:bg-slate-900/70 border-slate-200 pl-14 text-slate-900 dark:text-slate-100 focus-visible:ring-amber-500" />
+            <Input type="number" step="0.001" value={bitcoinAmount} onChange={e => setBitcoinAmount(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 pl-14 text-xl text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-amber-500" />
                                     <div className="absolute left-4 top-1/2 transform -translate-y-1/2 text-amber-600 dark:text-amber-400 font-bold">BTC</div>
                                 </div>
                             </div>
@@ -728,19 +728,19 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     </Card>
 
                     {/* Debts */}
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden group hover:shadow-lg transition-all duration-500">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 p-6">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
+            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
                             <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100">
                                 <CreditCard className="w-5 h-5 mr-3 text-rose-600 dark:text-rose-400" /> Passività (Debiti)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-4">
-                            <div className="p-4 bg-rose-50 dark:bg-rose-950/50 rounded-2xl border border-rose-200 dark:border-rose-900 mb-4 shadow-sm">
+            <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm dark:border-rose-900 dark:bg-rose-950/50">
                                 <p className="text-sm font-medium text-rose-700 dark:text-rose-300">Gestisci qui i tuoi mutui, finanziamenti auto e altri debiti. Il debito residuo viene sottratto automaticamente dal tuo Patrimonio Netto.</p>
                             </div>
                             <div className="space-y-3">
                                 {existingLoansList.map((loan) => (
-                                    <div key={loan.id} className="p-3 bg-white/50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 flex items-center justify-between group-hover:border-slate-300 transition-all hover:shadow-md">
+            <div key={loan.id} className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/70 p-3 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-slate-800 dark:text-slate-200">{loan.name}</span>
@@ -765,16 +765,16 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                         </div>
                                     </div>
                                 ))}
-                                <Button variant="outline" className="w-full border-dashed border-2 py-6 text-slate-500 hover:text-rose-600 dark:text-rose-400 hover:border-rose-300 hover:bg-rose-50 dark:bg-rose-950/50 transition-colors" onClick={() => { setEditingLoan(null); setNewLoan(initialLoanState); setIsLoanModalOpen(true); }}>
+            <Button variant="outline" className="w-full border-2 border-dashed py-6 text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-400 dark:hover:bg-rose-950/70" onClick={() => { setEditingLoan(null); setNewLoan(initialLoanState); setIsLoanModalOpen(true); }}>
                                     <Plus className="w-4 h-4 mr-2" /> Aggiungi Debito / Mutuo
                                 </Button>
                             </div>
                             <div className="pt-4 border-t border-slate-200 space-y-4">
                                 <div className="space-y-2">
                                     <Label className="text-slate-500 text-xs uppercase font-bold tracking-wider">Altre Passività (Manuali)</Label>
-                                    <Input type="number" value={debtsTotal} onChange={e => setDebtsTotal(Number(e.target.value))} onBlur={triggerSave} className="text-xl bg-white/70 dark:bg-slate-900/70 border-slate-200 text-slate-900 dark:text-slate-100 focus-visible:ring-rose-500" />
+            <Input type="number" value={debtsTotal} onChange={e => setDebtsTotal(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 text-xl text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100 focus-visible:ring-rose-500" />
                                 </div>
-                                <div className="flex justify-between items-center bg-rose-50 dark:bg-rose-950/50 p-3 rounded-2xl border border-rose-100">
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 dark:border-rose-900 dark:bg-rose-950/50">
                                     <span className="font-bold text-slate-600 dark:text-slate-400 text-sm uppercase">Totale Passività</span>
                                     <span className="font-extrabold text-xl text-rose-600 dark:text-rose-400">{formatEuro(totalPassivita)}</span>
                                 </div>

@@ -20,14 +20,14 @@ export function InflationCalculator() {
     const data = useMemo(() => {
         const realReturn = ((1 + nominalReturn / 100) / (1 + inflationRate / 100) - 1) * 100;
         const points = [];
-        for (let y = 0; y <= years; y++) {
-            const inflationFactor = Math.pow(1 + inflationRate / 100, y);
+        for (let year = 0; year <= years; year++) {
+            const inflationFactor = Math.pow(1 + inflationRate / 100, year);
             const purchasingPower = amount / inflationFactor;
-            const nominalValue = amount * Math.pow(1 + nominalReturn / 100, y);
+            const nominalValue = amount * Math.pow(1 + nominalReturn / 100, year);
             const realValue = nominalValue / inflationFactor;
             points.push({
-                anno: y,
-                label: `Anno ${y}`,
+                anno: year,
+                label: `Anno ${year}`,
                 "Potere d'Acquisto": Math.round(purchasingPower),
                 "Valore Nominale Investito": Math.round(nominalValue),
                 "Valore Reale Investito": Math.round(realValue),
@@ -44,120 +44,120 @@ export function InflationCalculator() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-red-50 dark:bg-red-950/50 rounded-xl">
-                    <TrendingDown className="w-6 h-6 text-red-500 dark:text-red-400" />
+            <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-red-50 p-2.5 dark:bg-red-950/50">
+                    <TrendingDown className="h-6 w-6 text-red-500 dark:text-red-400" />
                 </div>
                 <div>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Calcolatore Inflazione</h2>
-                    <p className="text-xs text-slate-500">Analizza l&apos;impatto dell&apos;inflazione sul tuo capitale nel tempo</p>
+                    <h2 className="text-xl font-bold text-foreground">Calcolatore Inflazione</h2>
+                    <p className="text-xs text-muted-foreground">Analizza l&apos;impatto dell&apos;inflazione sul tuo capitale nel tempo</p>
                 </div>
             </div>
 
-            {/* Inputs */}
-            <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl shadow-md">
+            <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
                 <CardContent className="p-5">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500 flex items-center gap-1">
-                                <Euro className="w-3 h-3" /> Capitale Iniziale
+                            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Euro className="h-3 w-3" /> Capitale Iniziale
                             </Label>
                             <Input
                                 type="number"
                                 value={amount || ""}
-                                onChange={e => setAmount(Math.max(0, Number(e.target.value) || 0))}
-                                className="h-9 text-sm rounded-lg"
+                                onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+                                className="min-h-11 rounded-xl text-sm"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500 flex items-center gap-1">
-                                <Percent className="w-3 h-3" /> Inflazione Annua %
+                            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Percent className="h-3 w-3" /> Inflazione Annua %
                             </Label>
                             <Input
                                 type="number"
                                 step="0.1"
                                 value={inflationRate || ""}
-                                onChange={e => setInflationRate(Math.max(0, Number(e.target.value) || 0))}
-                                className="h-9 text-sm rounded-lg"
+                                onChange={(e) => setInflationRate(Math.max(0, Number(e.target.value) || 0))}
+                                className="min-h-11 rounded-xl text-sm"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500 flex items-center gap-1">
-                                <Calendar className="w-3 h-3" /> Orizzonte (anni)
+                            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Calendar className="h-3 w-3" /> Orizzonte (anni)
                             </Label>
                             <Input
                                 type="number"
                                 value={years || ""}
-                                onChange={e => setYears(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
-                                className="h-9 text-sm rounded-lg"
+                                onChange={(e) => setYears(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+                                className="min-h-11 rounded-xl text-sm"
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-xs text-slate-500 flex items-center gap-1">
-                                <TrendingDown className="w-3 h-3 rotate-180" /> Rendimento Nominale %
+                            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <TrendingDown className="h-3 w-3 rotate-180" /> Rendimento Nominale %
                             </Label>
                             <Input
                                 type="number"
                                 step="0.1"
                                 value={nominalReturn || ""}
-                                onChange={e => setNominalReturn(Number(e.target.value) || 0)}
-                                className="h-9 text-sm rounded-lg"
+                                onChange={(e) => setNominalReturn(Number(e.target.value) || 0)}
+                                className="min-h-11 rounded-xl text-sm"
                             />
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest">Potere d&apos;Acquisto Finale</p>
-                    <p className="text-lg font-extrabold text-red-600 dark:text-red-400 mt-1">{formatEuro(finalPurchasingPower)}</p>
-                    <p className="text-[10px] text-red-400 mt-0.5">-{formatPercent(lostPercent, 0)} in {years} anni</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-3xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Potere d&apos;Acquisto Finale</p>
+                    <p className="mt-1 text-lg font-extrabold text-red-600 dark:text-red-400">{formatEuro(finalPurchasingPower)}</p>
+                    <p className="mt-0.5 text-[10px] text-red-400">-{formatPercent(lostPercent, 0)} in {years} anni</p>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valore Perso</p>
-                    <p className="text-lg font-extrabold text-slate-700 dark:text-slate-300 mt-1">{formatEuro(lostValue)}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">erosione inflazionistica</p>
+                <div className="rounded-3xl border border-border/70 bg-muted/35 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Valore Perso</p>
+                    <p className="mt-1 text-lg font-extrabold text-foreground">{formatEuro(lostValue)}</p>
+                    <p className="mt-0.5 text-[10px] text-muted-foreground">erosione inflazionistica</p>
                 </div>
-                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Se Investito (Nominale)</p>
-                    <p className="text-lg font-extrabold text-blue-600 dark:text-blue-400 mt-1">{formatEuro(finalNominal)}</p>
-                    <p className="text-[10px] text-blue-400 mt-0.5">al {formatPercent(nominalReturn)} annuo</p>
+                <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Se Investito (Nominale)</p>
+                    <p className="mt-1 text-lg font-extrabold text-blue-600 dark:text-blue-400">{formatEuro(finalNominal)}</p>
+                    <p className="mt-0.5 text-[10px] text-blue-400">al {formatPercent(nominalReturn)} annuo</p>
                 </div>
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Valore Reale Investito</p>
-                    <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">{formatEuro(finalReal)}</p>
-                    <p className="text-[10px] text-emerald-400 mt-0.5">rendimento reale {formatPercent(data.realReturn)}</p>
+                <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Valore Reale Investito</p>
+                    <p className="mt-1 text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{formatEuro(finalReal)}</p>
+                    <p className="mt-0.5 text-[10px] text-emerald-400">rendimento reale {formatPercent(data.realReturn)}</p>
                 </div>
             </div>
 
-            {/* Chart */}
-            <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl shadow-md">
+            <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
                 <CardContent className="p-5">
-                    <h3 className="text-sm font-bold text-slate-600 dark:text-slate-400 mb-4">Evoluzione nel Tempo</h3>
+                    <h3 className="mb-4 text-sm font-bold text-muted-foreground">Evoluzione nel Tempo</h3>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={data.points} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                                 <XAxis
                                     dataKey="anno"
-                                    tick={{ fontSize: 10 }}
-                                    tickFormatter={(v: number) => `${v}a`}
+                                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                    tickFormatter={(value: number) => `${value}a`}
                                 />
                                 <YAxis
-                                    tick={{ fontSize: 10 }}
-                                    tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
+                                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                    tickFormatter={(value: number) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(value))}
                                 />
                                 <Tooltip
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    formatter={(value: any) => formatEuro(Number(value))}
-                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                    labelFormatter={(label: any) => `Anno ${label}`}
-                                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)" }}
+                                    formatter={(value: number | string | undefined) => formatEuro(Number(value ?? 0))}
+                                    labelFormatter={(label) => `Anno ${String(label ?? 0)}`}
+                                    contentStyle={{
+                                        borderRadius: "16px",
+                                        border: "1px solid var(--border)",
+                                        backgroundColor: "var(--popover)",
+                                        color: "var(--popover-foreground)",
+                                        boxShadow: "0 16px 40px -16px rgba(15, 23, 42, 0.45)",
+                                    }}
                                 />
-                                <Legend wrapperStyle={{ fontSize: 11 }} />
+                                <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted-foreground)" }} />
                                 <Area
                                     type="monotone"
                                     dataKey="Valore Nominale Investito"
@@ -189,13 +189,12 @@ export function InflationCalculator() {
                 </CardContent>
             </Card>
 
-            {/* Explanation */}
-            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-5 text-sm text-amber-800 dark:text-amber-300 space-y-2">
-                <p className="font-bold text-xs uppercase tracking-widest text-amber-600">Come leggere il grafico</p>
-                <ul className="text-xs space-y-1 list-disc list-inside text-amber-700 dark:text-amber-400">
-                    <li><span className="text-red-500 font-bold">Linea rossa tratteggiata</span>: quanto valgono i tuoi {formatEuro(amount)} se li tieni fermi (potere d&apos;acquisto reale)</li>
-                    <li><span className="text-blue-500 font-bold">Area blu</span>: valore nominale se investiti al {formatPercent(nominalReturn)} (quello che vedi sul conto)</li>
-                    <li><span className="text-emerald-500 font-bold">Area verde</span>: valore reale degli investimenti (al netto dell&apos;inflazione, il vero guadagno)</li>
+            <div className="space-y-2 rounded-3xl border border-amber-200 bg-amber-50/90 p-5 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Come leggere il grafico</p>
+                <ul className="list-inside list-disc space-y-1 text-xs text-amber-700 dark:text-amber-400">
+                    <li><span className="font-bold text-red-500">Linea rossa tratteggiata</span>: quanto valgono i tuoi {formatEuro(amount)} se li tieni fermi (potere d&apos;acquisto reale)</li>
+                    <li><span className="font-bold text-blue-500">Area blu</span>: valore nominale se investiti al {formatPercent(nominalReturn)} (quello che vedi sul conto)</li>
+                    <li><span className="font-bold text-emerald-500">Area verde</span>: valore reale degli investimenti (al netto dell&apos;inflazione, il vero guadagno)</li>
                 </ul>
             </div>
         </div>

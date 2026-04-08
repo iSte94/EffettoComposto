@@ -535,13 +535,13 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     <div className="space-y-8 animate-in fade-in-50 duration-500">
       {/* Header */}
       <div className="text-center space-y-4 pt-4 pb-6">
-        <div className="inline-flex items-center justify-center p-3 bg-white/70 dark:bg-slate-900/70 border border-white dark:border-slate-800 rounded-2xl shadow-sm mb-2 backdrop-blur-md">
+        <div className="inline-flex items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 p-3 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/75 mb-2">
           <ShieldCheck className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
         </div>
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 flex items-center justify-center gap-3">
+        <h1 className="flex flex-wrap items-center justify-center gap-2 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">
           Consulente <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-violet-600">Acquisti</span>
         </h1>
-        <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto leading-relaxed">
+        <p className="mx-auto max-w-3xl text-base leading-relaxed text-slate-600 dark:text-slate-400 md:text-xl">
           Simula un acquisto importante e ricevi un&apos;analisi professionale con consigli basati sulla tua situazione patrimoniale, reddito e principi di finanza comportamentale.
         </p>
         {!user && (
@@ -555,14 +555,14 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
 
       {/* Snapshot Patrimonio Sintetico */}
       {user && snapshot.netWorth > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
             { label: "Patrimonio Netto", value: formatEuro(snapshot.netWorth), icon: <Wallet className="w-4 h-4" />, color: "text-slate-900 dark:text-slate-100" },
             { label: "Liquidita Disponibile", value: formatEuro(snapshot.liquidAssets + snapshot.emergencyFund), icon: <PiggyBank className="w-4 h-4" />, color: "text-blue-600 dark:text-blue-400" },
             { label: "Reddito Mensile", value: formatEuro(snapshot.monthlyIncome), icon: <TrendingUp className="w-4 h-4" />, color: "text-emerald-600 dark:text-emerald-400" },
             { label: "Debiti Attuali", value: formatEuro(snapshot.totalDebts), icon: <CreditCard className="w-4 h-4" />, color: "text-red-500" },
           ].map((item, i) => (
-            <div key={i} className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 p-4 rounded-2xl shadow-sm">
+            <div key={i} className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
                 {item.icon} {item.label}
               </div>
@@ -572,7 +572,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <PurchaseForm sim={sim} onUpdateSim={updateSim} onAnalyze={() => setShowResults(true)} />
         <div className="lg:col-span-7">
           <AdvicePanel

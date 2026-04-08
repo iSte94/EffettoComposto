@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
-    BarChart3, Home, Wallet, Bitcoin, Package, AlertTriangle,
-    Flame, Target, ShieldAlert, TrendingUp, TrendingDown, FileDown, CheckCircle2, CircleDollarSign,
+    BarChart3, Home, Wallet, Bitcoin, Package,
+    Flame, Target, ShieldAlert, TrendingDown, FileDown, CheckCircle2,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { FinancialAlerts } from "@/components/financial-alerts";
@@ -24,24 +24,24 @@ function MetricCard({ icon, label, value, subtitle, color = "slate" }: {
     icon: React.ReactNode; label: string; value: string; subtitle?: string; color?: string;
 }) {
     const colorMap: Record<string, string> = {
-        slate: "bg-white/70 dark:bg-slate-900/70 border-white dark:border-slate-800",
-        blue: "bg-blue-50/70 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900",
-        purple: "bg-purple-50/70 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900",
-        amber: "bg-amber-50/70 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900",
-        emerald: "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900",
-        rose: "bg-rose-50/70 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900",
-        teal: "bg-teal-50/70 dark:bg-teal-950/30 border-teal-100 dark:border-teal-900",
-        orange: "bg-orange-50/70 dark:bg-orange-950/30 border-orange-100 dark:border-orange-900",
+        slate: "bg-card/80 border-border/70",
+        blue: "bg-blue-50/80 dark:bg-blue-950/25 border-blue-100/80 dark:border-blue-900/70",
+        purple: "bg-purple-50/80 dark:bg-purple-950/25 border-purple-100/80 dark:border-purple-900/70",
+        amber: "bg-amber-50/80 dark:bg-amber-950/25 border-amber-100/80 dark:border-amber-900/70",
+        emerald: "bg-emerald-50/80 dark:bg-emerald-950/25 border-emerald-100/80 dark:border-emerald-900/70",
+        rose: "bg-rose-50/80 dark:bg-rose-950/25 border-rose-100/80 dark:border-rose-900/70",
+        teal: "bg-teal-50/80 dark:bg-teal-950/25 border-teal-100/80 dark:border-teal-900/70",
+        orange: "bg-orange-50/80 dark:bg-orange-950/25 border-orange-100/80 dark:border-orange-900/70",
     };
     return (
-        <Card className={`${colorMap[color] || colorMap.slate} backdrop-blur-xl border shadow-md rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300`}>
-            <CardContent className="p-4">
+        <Card className={`${colorMap[color] || colorMap.slate} backdrop-blur-xl shadow-sm rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-md`}>
+            <CardContent className="p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-2">
                     {icon}
-                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</span>
+                    <span className="text-[10px] sm:text-xs font-bold text-muted-foreground uppercase tracking-[0.24em]">{label}</span>
                 </div>
-                <div className="text-xl font-extrabold text-slate-800 dark:text-slate-200">{value}</div>
-                {subtitle && <div className="text-xs text-slate-500 mt-0.5">{subtitle}</div>}
+                <div className="text-lg sm:text-xl font-extrabold text-card-foreground tabular-nums">{value}</div>
+                {subtitle && <div className="text-xs text-muted-foreground mt-1 leading-snug">{subtitle}</div>}
             </CardContent>
         </Card>
     );
@@ -55,7 +55,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [existingLoans, setExistingLoans] = useState<ExistingLoan[]>([]);
 
     useEffect(() => {
-        if (!user) { setLoading(false); return; } // eslint-disable-line react-hooks/set-state-in-effect
+        if (!user) { setLoading(false); return; }
 
         Promise.all([
             fetch('/api/patrimonio').then(r => r.json()),
@@ -184,7 +184,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     if (loading) {
         return (
             <div className="space-y-8">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                     {[...Array(8)].map((_, i) => (
                         <Skeleton key={i} className="h-32 rounded-2xl" />
                     ))}
@@ -196,11 +196,11 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     if (!metrics) {
         return (
             <div className="flex flex-col items-center justify-center py-24 px-4 text-center space-y-6">
-                <div className="p-6 bg-slate-100 dark:bg-slate-800 rounded-full">
-                    <BarChart3 className="w-12 h-12 text-slate-400" />
+                <div className="p-6 rounded-full bg-muted/80 border border-border/70">
+                    <BarChart3 className="w-12 h-12 text-muted-foreground" />
                 </div>
-                <h2 className="text-3xl font-extrabold text-slate-800 dark:text-slate-200">Riepilogo</h2>
-                <p className="text-slate-500 max-w-md">Nessun dato trovato. Salva il tuo primo snapshot nel tab Patrimonio per iniziare!</p>
+                <h2 className="text-3xl font-extrabold text-card-foreground">Riepilogo</h2>
+                <p className="text-muted-foreground max-w-md leading-relaxed">Nessun dato trovato. Salva il tuo primo snapshot nel tab Patrimonio per iniziare!</p>
             </div>
         );
     }
@@ -210,22 +210,22 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     return (
         <div className="space-y-8">
             {/* Hero */}
-            <div className="text-center space-y-2">
-                <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Patrimonio Netto</h2>
-                <div className="text-5xl font-extrabold text-slate-800 dark:text-slate-200 tabular-nums">
+            <div className="text-center space-y-3">
+                <h2 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.28em]">Patrimonio Netto</h2>
+                <div className="text-4xl sm:text-5xl font-extrabold text-card-foreground tabular-nums leading-none">
                     {formatEuro(metrics.currentNetWorth)}
                 </div>
-                <div className={`text-sm font-bold ${isPositiveChange ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <div className={`text-sm font-bold ${isPositiveChange ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                     {isPositiveChange ? '+' : ''}{formatEuro(metrics.netWorthChange)}
-                    <span className="text-slate-400 font-normal">({metrics.netWorthChangePercent >= 0 ? '+' : ''}{metrics.netWorthChangePercent.toFixed(1)}% vs snapshot precedente)</span>
+                    <span className="text-muted-foreground font-normal">({metrics.netWorthChangePercent >= 0 ? '+' : ''}{metrics.netWorthChangePercent.toFixed(1)}% vs snapshot precedente)</span>
                 </div>
-                <div className="text-xs text-slate-400">
+                <div className="text-xs text-muted-foreground">
                     {metrics.snapshotCount} snapshot totali &middot; ultimo: {new Date(metrics.latestDate).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
             </div>
 
             {/* Metric Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
                 <MetricCard
                     icon={<Home className="w-4 h-4 text-blue-500" />}
                     label="Immobili"
@@ -300,9 +300,9 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             }} />
 
             {/* Asset Allocation Bar */}
-            <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl shadow-md p-6">
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4">Allocazione Asset</h3>
-                <div className="w-full h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+            <div className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl shadow-sm p-5 sm:p-6">
+                <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em] mb-4">Allocazione Asset</h3>
+                <div className="w-full h-6 bg-muted rounded-full overflow-hidden flex">
                     {metrics.allocation.immobili > 0 && (
                         <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.immobili}%` }} title={`Immobili ${metrics.allocation.immobili.toFixed(1)}%`} />
                     )}
@@ -316,7 +316,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                         <div className="bg-slate-400 h-full transition-all duration-700" style={{ width: `${metrics.allocation.altro}%` }} title={`Altro ${metrics.allocation.altro.toFixed(1)}%`} />
                     )}
                 </div>
-                <div className="flex flex-wrap gap-4 mt-3 text-xs font-medium text-slate-600 dark:text-slate-400">
+                <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 text-xs font-medium text-muted-foreground">
                     <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Immobili</span>
                     <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Liquidità & ETF</span>
                     <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Crypto</span>
@@ -332,29 +332,29 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
 
             {/* Accepted Purchases Summary */}
             {acceptedPurchases.length > 0 && (
-                <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl shadow-md p-6">
-                    <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                <div className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl shadow-sm p-5 sm:p-6">
+                    <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em] mb-4 flex items-center gap-2">
                         <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Acquisti Accettati
                     </h3>
                     <div className="space-y-2">
                         {acceptedPurchases.map(p => (
-                            <div key={p.id} className="flex justify-between items-center text-sm p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                            <div key={p.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm p-3 bg-muted/60 rounded-xl">
                                 <div>
-                                    <span className="font-bold text-slate-700 dark:text-slate-300">{p.itemName}</span>
-                                    <span className="text-xs text-slate-400 ml-2">{p.category}</span>
+                                    <span className="font-bold text-card-foreground">{p.itemName}</span>
+                                    <span className="text-xs text-muted-foreground sm:ml-2">{p.category}</span>
                                 </div>
-                                <div className="text-right">
-                                    <span className="font-bold text-slate-700 dark:text-slate-300">{formatEuro(p.totalPrice)}</span>
+                                <div className="text-right sm:shrink-0">
+                                    <span className="font-bold text-card-foreground tabular-nums">{formatEuro(p.totalPrice)}</span>
                                     {p.isFinanced && (
-                                        <span className="text-xs text-rose-500 ml-2">-{formatEuro(p.monthlyPayment)}/m</span>
+                                        <span className="text-xs text-rose-500 dark:text-rose-400 sm:ml-2">-{formatEuro(p.monthlyPayment)}/m</span>
                                     )}
                                 </div>
                             </div>
                         ))}
                     </div>
-                    <div className="flex justify-between items-center mt-4 pt-3 border-t border-slate-200 text-sm">
-                        <span className="font-bold text-slate-500">Totale Rate Finanziate</span>
-                        <span className="font-extrabold text-rose-600">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mt-4 pt-3 border-t border-border text-sm">
+                        <span className="font-bold text-muted-foreground">Totale Rate Finanziate</span>
+                        <span className="font-extrabold text-rose-600 dark:text-rose-400 tabular-nums">
                             {formatEuro(acceptedPurchases.filter(p => p.isFinanced).reduce((s, p) => s + p.monthlyPayment, 0))}
                         </span>/mese
                     </div>
@@ -367,7 +367,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                     <Button
                         variant="outline"
                         size="sm"
-                        className="rounded-xl text-xs"
+                        className="rounded-xl text-xs min-h-10 px-4"
                         onClick={() => exportPatrimonioCSV(history)}
                     >
                         <FileDown className="w-3.5 h-3.5 mr-1.5" /> Esporta Storico CSV

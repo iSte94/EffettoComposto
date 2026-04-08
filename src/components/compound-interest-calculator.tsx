@@ -56,101 +56,103 @@ export function CompoundInterestCalculator() {
     }, [initialCapital, monthlyContribution, annualRate, years]);
 
     return (
-        <div className="space-y-8 animate-in fade-in-50 duration-500">
-            {/* Header */}
-            <div className="text-center space-y-4 pt-4 pb-6">
-                <div className="inline-flex items-center justify-center p-3 bg-white/70 dark:bg-slate-900/70 border border-white dark:border-slate-800 rounded-2xl shadow-sm mb-2 backdrop-blur-md">
-                    <Calculator className="w-8 h-8 text-teal-600 dark:text-teal-400" />
+        <div className="animate-in fade-in-50 space-y-8 duration-500">
+            <div className="space-y-4 pb-6 pt-4 text-center">
+                <div className="mb-2 inline-flex items-center justify-center rounded-2xl border border-border/70 bg-card/80 p-3 shadow-sm backdrop-blur-md">
+                    <Calculator className="h-8 w-8 text-teal-600 dark:text-teal-400" />
                 </div>
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 flex items-center justify-center gap-3">
-                    Interesse <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-600">Composto</span>
+                <h1 className="flex flex-wrap items-center justify-center gap-3 text-3xl font-extrabold tracking-tight text-foreground md:text-5xl">
+                    Interesse <span className="bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">Composto</span>
                 </h1>
-                <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto leading-relaxed">
+                <p className="mx-auto max-w-3xl text-base leading-relaxed text-muted-foreground md:text-xl">
                     Simula la crescita del tuo capitale nel tempo con contributi mensili regolari e il potere dell&apos;interesse composto.
                 </p>
             </div>
 
-            <div className="grid lg:grid-cols-12 gap-8">
-                {/* Input Panel */}
-                <div className="lg:col-span-4 space-y-6">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden">
-                        <CardContent className="p-6 space-y-6">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                                <PiggyBank className="w-5 h-5 text-teal-500" /> Parametri
+            <div className="grid gap-8 lg:grid-cols-12">
+                <div className="space-y-6 lg:col-span-4">
+                    <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+                        <CardContent className="space-y-6 p-6">
+                            <h3 className="flex items-center gap-2 text-lg font-bold text-foreground">
+                                <PiggyBank className="h-5 w-5 text-teal-500" /> Parametri
                             </h3>
 
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Capitale Iniziale</Label>
-                                <Input type="number" step={1000} value={initialCapital}
-                                    onChange={e => setInitialCapital(Number(e.target.value))}
-                                    className="text-lg font-bold text-teal-600 dark:text-teal-400 bg-teal-50/50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-900" />
-                                <Slider value={[initialCapital]} min={0} max={200000} step={1000}
-                                    onValueChange={v => setInitialCapital(v[0])} />
+                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Capitale Iniziale</Label>
+                                <Input
+                                    type="number"
+                                    step={1000}
+                                    value={initialCapital}
+                                    onChange={(e) => setInitialCapital(Number(e.target.value))}
+                                    className="min-h-11 border-teal-200 bg-teal-50/60 text-lg font-bold text-teal-700 dark:border-teal-900 dark:bg-teal-950/30 dark:text-teal-300"
+                                />
+                                <Slider value={[initialCapital]} min={0} max={200000} step={1000} onValueChange={(value) => setInitialCapital(value[0])} />
                             </div>
 
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Contributo Mensile</Label>
-                                <Input type="number" step={50} value={monthlyContribution}
-                                    onChange={e => setMonthlyContribution(Number(e.target.value))}
-                                    className="text-lg font-bold text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900" />
-                                <Slider value={[monthlyContribution]} min={0} max={5000} step={50}
-                                    onValueChange={v => setMonthlyContribution(v[0])} />
+                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contributo Mensile</Label>
+                                <Input
+                                    type="number"
+                                    step={50}
+                                    value={monthlyContribution}
+                                    onChange={(e) => setMonthlyContribution(Number(e.target.value))}
+                                    className="min-h-11 border-blue-200 bg-blue-50/60 text-lg font-bold text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300"
+                                />
+                                <Slider value={[monthlyContribution]} min={0} max={5000} step={50} onValueChange={(value) => setMonthlyContribution(value[0])} />
                             </div>
 
                             <div className="space-y-2">
-                                <div className="flex justify-between items-end">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Rendimento Annuo (%)</Label>
+                                <div className="flex items-end justify-between">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rendimento Annuo (%)</Label>
                                     <span className="font-bold text-purple-600 dark:text-purple-400">{annualRate.toFixed(1)}%</span>
                                 </div>
-                                <Slider value={[annualRate]} min={0} max={15} step={0.5}
-                                    onValueChange={v => setAnnualRate(v[0])} />
+                                <Slider value={[annualRate]} min={0} max={15} step={0.5} onValueChange={(value) => setAnnualRate(value[0])} />
                             </div>
 
                             <div className="space-y-2">
-                                <div className="flex justify-between items-end">
-                                    <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Durata (anni)</Label>
-                                    <span className="font-bold text-slate-900 dark:text-slate-100">{years}</span>
+                                <div className="flex items-end justify-between">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Durata (anni)</Label>
+                                    <span className="font-bold text-foreground">{years}</span>
                                 </div>
-                                <Slider value={[years]} min={1} max={50} step={1}
-                                    onValueChange={v => setYears(v[0])} />
+                                <Slider value={[years]} min={1} max={50} step={1} onValueChange={(value) => setYears(value[0])} />
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Summary Numbers */}
                     <div className="grid grid-cols-1 gap-3">
-                        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 p-5 rounded-2xl shadow-md text-center">
-                            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Capitale Finale</div>
+                        <div className="rounded-3xl border border-border/70 bg-card/80 p-5 text-center shadow-sm backdrop-blur-xl">
+                            <div className="mb-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Capitale Finale</div>
                             <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">{formatEuro(result.finalBalance)}</div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-4 rounded-2xl text-center">
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-center gap-1">
-                                    <Banknote className="w-3 h-3" /> Totale Versato
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="rounded-3xl border border-border/70 bg-card/80 p-4 text-center backdrop-blur-xl">
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    <Banknote className="h-3 w-3" /> Totale Versato
                                 </div>
                                 <div className="text-xl font-extrabold text-blue-600 dark:text-blue-400">{formatEuro(result.totalDeposited)}</div>
                             </div>
-                            <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200 dark:border-slate-800 p-4 rounded-2xl text-center">
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center justify-center gap-1">
-                                    <TrendingUp className="w-3 h-3" /> Interessi Guadagnati
+                            <div className="rounded-3xl border border-border/70 bg-card/80 p-4 text-center backdrop-blur-xl">
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    <TrendingUp className="h-3 w-3" /> Interessi Guadagnati
                                 </div>
                                 <div className="text-xl font-extrabold text-purple-600 dark:text-purple-400">{formatEuro(result.totalInterest)}</div>
                             </div>
                         </div>
-                        <div className="bg-slate-100/80 dark:bg-slate-800/80 p-3 rounded-xl text-center">
-                            <span className="text-xs text-slate-500">Il {((result.totalInterest / result.finalBalance) * 100).toFixed(0)}% del capitale finale proviene dagli interessi composti</span>
+                        <div className="rounded-2xl border border-border/60 bg-muted/50 p-3 text-center">
+                            <span className="text-xs text-muted-foreground">
+                                Il {((result.totalInterest / result.finalBalance) * 100).toFixed(0)}% del capitale finale proviene dagli interessi composti
+                            </span>
                         </div>
                     </div>
                 </div>
 
-                {/* Chart */}
                 <div className="lg:col-span-8">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl overflow-hidden">
+                    <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
                         <CardContent className="p-6">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
-                                <TrendingUp className="w-5 h-5 text-emerald-500" /> Crescita del Capitale
+                            <h3 className="mb-6 flex items-center gap-2 text-lg font-bold text-foreground">
+                                <TrendingUp className="h-5 w-5 text-emerald-500" /> Crescita del Capitale
                             </h3>
-                            <div className="h-[450px]">
+                            <div className="h-[380px] md:h-[450px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={result.chartData} margin={{ top: 10, right: 20, left: 20, bottom: 20 }}>
                                         <defs>
@@ -163,39 +165,44 @@ export function CompoundInterestCalculator() {
                                                 <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 11 }} dy={10} interval="preserveStartEnd" />
-                                        <YAxis tickFormatter={v => `\u20AC${Math.round(v / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 11 }} dx={-10} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={10} interval="preserveStartEnd" />
+                                        <YAxis tickFormatter={(value) => `€${Math.round(value / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dx={-10} />
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)' }}
-                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                            formatter={(value: any) => [formatEuro(Number(value)), undefined]}
+                                            contentStyle={{
+                                                backgroundColor: "var(--popover)",
+                                                backdropFilter: "blur(16px)",
+                                                borderRadius: "1rem",
+                                                border: "1px solid var(--border)",
+                                                boxShadow: "0 20px 40px -10px rgba(15,23,42,0.35)",
+                                                color: "var(--popover-foreground)",
+                                            }}
+                                            formatter={(value: number | string | undefined) => [formatEuro(Number(value ?? 0)), undefined]}
                                         />
-                                        <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569' }} />
+                                        <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: "var(--muted-foreground)" }} />
                                         <Area type="monotone" dataKey="Versato" stackId="1" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorVersato)" />
                                         <Area type="monotone" dataKey="Interessi" stackId="1" stroke="#a855f7" strokeWidth={2} fillOpacity={1} fill="url(#colorInteressi)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
 
-                            {/* Year-by-year table */}
-                            <div className="mt-6 max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                            <div className="mt-6 max-h-72 overflow-auto rounded-2xl border border-border/70">
+                                <table className="min-w-[560px] w-full text-sm">
+                                    <thead className="sticky top-0 bg-muted/90 backdrop-blur">
                                         <tr>
-                                            <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Anno</th>
-                                            <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Versato</th>
-                                            <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Interessi</th>
-                                            <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Totale</th>
+                                            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Anno</th>
+                                            <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Versato</th>
+                                            <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Interessi</th>
+                                            <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Totale</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {result.chartData.filter(d => d.anno > 0).map(d => (
-                                            <tr key={d.anno} className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                                <td className="px-3 py-2 font-bold text-slate-700 dark:text-slate-300">{d.anno}</td>
-                                                <td className="px-3 py-2 text-right font-mono text-blue-600 dark:text-blue-400">{formatEuro(d.Versato)}</td>
-                                                <td className="px-3 py-2 text-right font-mono text-purple-600 dark:text-purple-400">{formatEuro(d.Interessi)}</td>
-                                                <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatEuro(d.Totale)}</td>
+                                        {result.chartData.filter((point) => point.anno > 0).map((point) => (
+                                            <tr key={point.anno} className="border-t border-border/60 hover:bg-muted/35">
+                                                <td className="px-3 py-2 font-bold text-foreground">{point.anno}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-blue-600 dark:text-blue-400">{formatEuro(point.Versato)}</td>
+                                                <td className="px-3 py-2 text-right font-mono text-purple-600 dark:text-purple-400">{formatEuro(point.Interessi)}</td>
+                                                <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatEuro(point.Totale)}</td>
                                             </tr>
                                         ))}
                                     </tbody>

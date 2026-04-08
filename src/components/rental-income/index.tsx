@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, memo, useCallback, useEffect } from "react";
+import { useState, useMemo, memo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
-    Home, Euro, TrendingUp, BarChart3, Sparkles,
+    Home, TrendingUp, BarChart3, Sparkles,
     BedDouble, CalendarClock, Building2, ArrowRightLeft,
     Percent, ShieldCheck, Brush, Wifi, Users, Receipt,
     Save, FolderOpen, Trash2, Download, Upload,
@@ -657,15 +657,11 @@ export function RentalIncomeAnalyzer() {
     });
 
     // ── Salvataggio / Caricamento ──
-    const [saves, setSaves] = useState<RentalSaveEntry[]>([]);
+    const [saves, setSaves] = useState<RentalSaveEntry[]>(() => loadSaves());
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [showLoadDialog, setShowLoadDialog] = useState(false);
     const [saveName, setSaveName] = useState("");
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
-
-    useEffect(() => {
-        setSaves(loadSaves());
-    }, []);
 
     const handleSave = useCallback(() => {
         const name = saveName.trim();

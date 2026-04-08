@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -166,7 +166,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
         }
     };
 
-    const handleSavePreferences = async () => {
+    const handleSavePreferences = useCallback(async () => {
         if (!user) return; // Silent return for auto-save
         setSaving(true);
         try {
@@ -198,7 +198,12 @@ export function FireDashboard({ user }: FireDashboardProps) {
         } finally {
             setSaving(false);
         }
-    };
+    }, [
+        user,
+        birthYear, retirementAge, expectedMonthlyExpenses, fireWithdrawalRate,
+        fireExpectedReturn, fireVolatility, expectedInflation, enablePensionOptimizer,
+        grossIncome, pensionContribution, expectedPublicPension, publicPensionAge, applyTaxStamp,
+    ]);
 
     // --- AUTO-SAVE DEBOUNCE EFFECT ---
     useEffect(() => {
@@ -215,13 +220,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
         fireWithdrawalRate, fireExpectedReturn, fireVolatility,
         expectedInflation, enablePensionOptimizer, grossIncome, pensionContribution,
         expectedPublicPension, publicPensionAge, applyTaxStamp,
-        user, isLoadingUser
+        user, isLoadingUser, handleSavePreferences
     ]);
 
     if (!user) {
         return (
-            <div className="flex flex-col items-center justify-center py-24 px-4 text-center space-y-6">
-                <div className="p-6 bg-orange-100 rounded-full">
+            <div className="flex flex-col items-center justify-center space-y-6 px-4 py-24 text-center">
+                <div className="rounded-full bg-orange-100 p-6 dark:bg-orange-950/40">
                     <Flame className="w-12 h-12 text-orange-500" />
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-800 dark:text-slate-200">Financial Independence, Retire Early</h2>
@@ -538,7 +543,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-100/20 blur-[100px] -z-10 rounded-full" />
 
                 {/* Minimalist Auto-Save Indicator */}
-                <div className="absolute top-0 right-4 h-8 flex items-center px-3 py-1 bg-white/70 dark:bg-slate-900/70 border border-slate-200 rounded-full backdrop-blur-md shadow-sm">
+                <div className="absolute right-4 top-0 flex h-8 items-center rounded-full border border-slate-200 bg-white/75 px-3 py-1 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/75">
                     {saving ? (
                         <span className="text-xs font-medium text-slate-500 flex items-center">
                             <Loader2 className="w-3 h-3 mr-1.5 animate-spin" /> Salvataggio in corso...
@@ -551,7 +556,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 px-2">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-2xl overflow-hidden relative group hover:shadow-lg transition-all duration-300">
+            <Card className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-300 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
                         <div className="absolute top-0 left-0 w-full h-1 bg-blue-500 group-hover:bg-blue-600 transition-colors" />
                         <CardContent className="p-6">
                             <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Cash Buffer (Pre-FIRE)</div>
@@ -590,7 +595,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                         </CardContent>
                     </Card>
 
-                    <Card className={`backdrop-blur-xl border shadow-md rounded-2xl overflow-hidden relative group transition-all hover:shadow-lg ${isFireAlready ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-900' : 'bg-white/70 dark:bg-slate-900/70 border-white dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}>
+            <Card className={`relative overflow-hidden rounded-2xl border shadow-md backdrop-blur-xl transition-all hover:shadow-lg ${isFireAlready ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/50' : 'border-slate-200/80 bg-white/75 text-slate-900 dark:border-slate-800 dark:bg-slate-900/75 dark:text-slate-100'}`}>
                         <CardContent className="p-6">
                             <div className={`text-xs font-bold uppercase tracking-widest mb-1 ${isFireAlready ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-500'}`}>
                                 Anni al FIRE Medio
@@ -797,7 +802,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
                 {/* GRAPH AND STATS PANEL */}
                 <div className="lg:col-span-8">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-md rounded-3xl h-full overflow-hidden">
+            <Card className="h-full overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
                         <Tabs defaultValue="standard" className="w-full h-full flex flex-col">
 
                             <CardHeader className="pb-0 pt-6 px-4 md:px-8 border-b border-slate-200 bg-white/50 dark:bg-slate-800/50">
@@ -806,7 +811,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                         <CardTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">Analisi Avanzata</CardTitle>
                                         <CardDescription className="text-slate-500">Esplora il tuo futuro con modelli deterministici o stocastici.</CardDescription>
                                     </div>
-                                    <TabsList className="bg-white/50 dark:bg-slate-800/50 border border-slate-200 shadow-sm rounded-full p-1 self-start md:self-auto">
+            <TabsList className="self-start rounded-full border border-slate-200 bg-white/60 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 md:self-auto">
                                         <TabsTrigger value="standard" className="rounded-full text-xs font-bold px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-slate-900 dark:text-slate-100 text-slate-500 transition-all data-[state=active]:shadow-sm">
                                             Modello Fisso
                                         </TabsTrigger>
@@ -849,8 +854,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                         return [formatEuro(Number(value)), 'Capitale Stimato'];
                                                     }}
                                                     labelFormatter={(label) => `Età: ${label} anni`}
-                                                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
-                                                    labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}
+                                                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
+                                                    labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
                                                 />
                                                 <Line yAxisId="left" type="monotone" dataKey="Target" stroke="#f97316" strokeDasharray="5 5" strokeWidth={2} dot={false} activeDot={false} />
                                                 <Area yAxisId="left" type="monotone" dataKey="Capital" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorCapital)" activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981', style: { filter: 'drop-shadow(0px 0px 8px rgba(16,185,129,0.5))' } }} />
@@ -858,7 +863,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>
-                                    <div className={`mt-8 p-6 rounded-3xl border ${coastFireReached ? 'bg-teal-50 border-teal-200' : 'bg-white/70 dark:bg-slate-900/70 border-slate-200'}`}>
+            <div className={`mt-8 rounded-3xl border p-6 ${coastFireReached ? 'border-teal-200 bg-teal-50 dark:border-teal-900 dark:bg-teal-950/40' : 'border-slate-200 bg-white/75 dark:border-slate-800 dark:bg-slate-900/75'}`}>
                                         <h4 className={`text-lg font-bold flex items-center mb-2 ${coastFireReached ? 'text-teal-700' : 'text-slate-700 dark:text-slate-300'}`}>
                                             <Briefcase className={`w-5 h-5 mr-2 ${coastFireReached ? 'text-teal-600' : 'text-slate-500'}`} />
                                             {coastFireReached ? "Coast FIRE: Missione Compiuta! 🎉" : "Strategia Coast FIRE"}
@@ -878,7 +883,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                             <h3 className="font-bold text-slate-900 dark:text-slate-100">Simulazione Stocastica ({mcTargetRuns.toLocaleString()} Scenari)</h3>
                                             <p className="text-xs text-slate-500">Ipotizza variazioni casuali di mercato incluse le recessioni peggiori proprio nell&apos;anno in cui ti ritiri.</p>
                                         </div>
-                                        <div className={`text-center p-3 rounded-2xl border min-w-[120px] transition-colors duration-500 ${mcSuccessRate === 0 && !mcIsCalculating ? 'bg-white/70 dark:bg-slate-900/70 border-slate-200' : mcSuccessRate > 90 ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-900' : mcSuccessRate > 70 ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-200 dark:border-amber-900' : 'bg-rose-50 dark:bg-rose-950/50 border-rose-200 dark:border-rose-900'}`}>
+                <div className={`min-w-[120px] rounded-2xl border p-3 text-center transition-colors duration-500 ${mcSuccessRate === 0 && !mcIsCalculating ? 'border-slate-200 bg-white/75 dark:border-slate-800 dark:bg-slate-900/75' : mcSuccessRate > 90 ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/50' : mcSuccessRate > 70 ? 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/50' : 'border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/50'}`}>
                                             <div className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Success Rate</div>
                                             <div className={`text-2xl font-extrabold transition-colors duration-500 ${mcSuccessRate === 0 && !mcIsCalculating ? 'text-slate-400 dark:text-slate-400' : mcSuccessRate > 90 ? 'text-emerald-600 dark:text-emerald-400' : mcSuccessRate > 70 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
                                                 {mcRunsCompleted > 0 ? `${mcSuccessRate.toFixed(1)}%` : '--%'}
@@ -928,8 +933,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                                     return [formatEuro(Number(value)), labelMap[name] || name];
                                                                 }}
                                                                 labelFormatter={(label) => `Età: ${label} anni`}
-                                                                contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
-                                                                labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}
+                                                                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
+                                                                labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
                                                             />
                                                         )}
                                                         <ReferenceLine y={fireTarget} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1} label={{ position: 'top', value: 'Obiettivo FIRE', fill: '#f97316', fontSize: 10 }} />
@@ -982,8 +987,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any, name: any) => [name === 'Capital' ? formatEuro(Number(value)) : `${value}%`, name === 'Capital' ? 'Capitale Residuo' : 'Crac di Mercato']}
                                                     labelFormatter={(label, data) => `Età: ${label} (Simula un ${data[0]?.payload?.year})`}
-                                                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }}
-                                                    labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}
+                                                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
+                                                    labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
                                                 />
 
                                                 {/* Bar per mostrare i crolli o rialzi annuali (S&P500) */}

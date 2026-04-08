@@ -1,25 +1,25 @@
 "use client";
 
-import { Suspense, lazy, useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LineChart, Flame, Building2, ShieldCheck, BarChart3, Calculator, Wallet, Loader2, Briefcase, TrendingUp, Github } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { BarChart3, Briefcase, Building2, Calculator, Flame, Github, Loader2, LineChart, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/auth-context";
 
-const OverviewDashboard = lazy(() => import("@/components/overview-dashboard").then(m => ({ default: m.OverviewDashboard })));
-const PatrimonioDashboard = lazy(() => import("@/components/patrimonio-dashboard").then(m => ({ default: m.PatrimonioDashboard })));
-const FireDashboard = lazy(() => import("@/components/fire-dashboard").then(m => ({ default: m.FireDashboard })));
-const AdvisorDashboard = lazy(() => import("@/components/advisor-dashboard").then(m => ({ default: m.AdvisorDashboard })));
-const ProgressioneDashboard = lazy(() => import("@/components/progressione-dashboard").then(m => ({ default: m.ProgressioneDashboard })));
-const RealEstateAnalysis = lazy(() => import("@/components/real-estate-analysis").then(m => ({ default: m.RealEstateAnalysis })));
-const CalculatorsDashboard = lazy(() => import("@/components/calculators-dashboard").then(m => ({ default: m.CalculatorsDashboard })));
-const BudgetingDashboard = lazy(() => import("@/components/budgeting-dashboard").then(m => ({ default: m.BudgetingDashboard })));
+const OverviewDashboard = lazy(() => import("@/components/overview-dashboard").then((m) => ({ default: m.OverviewDashboard })));
+const PatrimonioDashboard = lazy(() => import("@/components/patrimonio-dashboard").then((m) => ({ default: m.PatrimonioDashboard })));
+const FireDashboard = lazy(() => import("@/components/fire-dashboard").then((m) => ({ default: m.FireDashboard })));
+const AdvisorDashboard = lazy(() => import("@/components/advisor-dashboard").then((m) => ({ default: m.AdvisorDashboard })));
+const ProgressioneDashboard = lazy(() => import("@/components/progressione-dashboard").then((m) => ({ default: m.ProgressioneDashboard })));
+const RealEstateAnalysis = lazy(() => import("@/components/real-estate-analysis").then((m) => ({ default: m.RealEstateAnalysis })));
+const CalculatorsDashboard = lazy(() => import("@/components/calculators-dashboard").then((m) => ({ default: m.CalculatorsDashboard })));
+const BudgetingDashboard = lazy(() => import("@/components/budgeting-dashboard").then((m) => ({ default: m.BudgetingDashboard })));
 
 function TabFallback() {
   return (
-    <div className="flex items-center justify-center py-32">
-      <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+    <div className="flex items-center justify-center rounded-2xl border border-border/70 bg-card/70 py-24 shadow-sm backdrop-blur-sm">
+      <Loader2 className="size-8 animate-spin text-muted-foreground" />
     </div>
   );
 }
@@ -28,70 +28,76 @@ export default function CalculatorPage() {
   const { user, login, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
 
-  const triggerClass = "rounded-xl py-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-slate-900 dark:text-slate-100 text-slate-500 font-semibold transition-all";
+  const triggerClass =
+    "min-h-11 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:shadow-black/5 dark:data-[state=active]:shadow-black/20";
 
   return (
-    <div className="space-y-12 pb-24">
-      {/* BRAND HEADER E AUTH */}
-      <div className="flex flex-col md:flex-row justify-between items-center pt-4 mb-8 gap-6 px-2">
+    <div className="space-y-8 pb-24">
+      <header className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-xl sm:p-5 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-br from-emerald-400 to-emerald-600 p-2.5 rounded-2xl shadow-lg shadow-emerald-500/20">
-            <TrendingUp className="w-6 h-6 md:w-8 md:h-8 text-white" />
+          <div className="rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-2.5 shadow-lg shadow-emerald-500/20">
+            <TrendingUp className="size-6 md:size-7 text-white" />
           </div>
           <div className="flex flex-col">
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-200 dark:to-white">
-              Effetto<span className="text-emerald-500 font-black">Composto</span>
+            <h1 className="bg-clip-text text-2xl font-extrabold tracking-tight text-transparent bg-gradient-to-r from-foreground via-foreground/80 to-foreground md:text-3xl">
+              Effetto<span className="font-black text-emerald-500">Composto</span>
             </h1>
-            <p className="text-xs text-slate-500 font-medium tracking-widest uppercase">Il cruscotto della tua libertà</p>
+            <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
+              Il cruscotto della tua libertà
+            </p>
           </div>
         </div>
 
-        <div className="flex justify-end items-center gap-3 w-full md:w-auto">
+        <div className="flex w-full flex-wrap items-center justify-start gap-2 md:w-auto md:justify-end">
           <a
             href="https://github.com/iSte94/EffettoComposto"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-secondary px-3 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             title="Codice sorgente su GitHub"
           >
-            <Github className="w-4 h-4" />
-            <span className="hidden sm:inline">Open Source</span>
+            <Github className="size-4" />
+            <span>Open Source</span>
           </a>
           <ThemeToggle />
-          <AuthModal
-            user={user}
-            onLogin={login}
-            onLogout={logout}
-          />
+          <AuthModal user={user} onLogin={login} onLogout={logout} />
         </div>
-      </div>
+      </header>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <div className="flex justify-center mb-8">
-          <TabsList className="grid w-full max-w-6xl grid-cols-4 md:grid-cols-8 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl">
+        <div className="flex justify-center">
+          <TabsList className="grid w-full max-w-6xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-4 md:grid-cols-8">
             <TabsTrigger value="overview" className={triggerClass}>
-              <BarChart3 className="w-4 h-4 md:mr-2 text-teal-500" /> <span className="hidden md:inline">Riepilogo</span>
+              <BarChart3 className="size-4 text-teal-500" />
+              <span>Riepilogo</span>
             </TabsTrigger>
             <TabsTrigger value="patrimonio" className={triggerClass}>
-              <LineChart className="w-4 h-4 md:mr-2" /> <span className="hidden md:inline">Patrimonio</span>
+              <LineChart className="size-4" />
+              <span>Patrimonio</span>
             </TabsTrigger>
             <TabsTrigger value="carriera" className={triggerClass}>
-              <Briefcase className="w-4 h-4 md:mr-2 text-violet-500" /> <span className="hidden md:inline">Carriera</span>
+              <Briefcase className="size-4 text-violet-500" />
+              <span>Carriera</span>
             </TabsTrigger>
             <TabsTrigger value="advisor" className={triggerClass}>
-              <ShieldCheck className="w-4 h-4 md:mr-2 text-indigo-500" /> <span className="hidden md:inline">Consulente</span>
+              <ShieldCheck className="size-4 text-indigo-500" />
+              <span>Consulente</span>
             </TabsTrigger>
             <TabsTrigger value="simulator" className={triggerClass}>
-              <Building2 className="w-4 h-4 md:mr-2 text-cyan-600" /> <span className="hidden md:inline">Immobiliare</span>
+              <Building2 className="size-4 text-cyan-600" />
+              <span>Immobiliare</span>
             </TabsTrigger>
             <TabsTrigger value="fire" className={triggerClass}>
-              <Flame className="w-4 h-4 md:mr-2 text-orange-500" /> <span className="hidden md:inline">FIRE</span>
+              <Flame className="size-4 text-orange-500" />
+              <span>FIRE</span>
             </TabsTrigger>
             <TabsTrigger value="budgeting" className={triggerClass}>
-              <Wallet className="w-4 h-4 md:mr-2 text-violet-500" /> <span className="hidden md:inline">Budget</span>
+              <Wallet className="size-4 text-violet-500" />
+              <span>Budget</span>
             </TabsTrigger>
             <TabsTrigger value="calculators" className={triggerClass}>
-              <Calculator className="w-4 h-4 md:mr-2 text-teal-500" /> <span className="hidden md:inline">Calcolatori</span>
+              <Calculator className="size-4 text-teal-500" />
+              <span>Calcolatori</span>
             </TabsTrigger>
           </TabsList>
         </div>

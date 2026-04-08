@@ -27,10 +27,9 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
         const alerts: Alert[] = [];
         const { netWorth, monthlyIncome, monthlyInstallment, emergencyFund, monthlyExpenses, savingsGoals, fireTarget, fireProgress } = data;
 
-        // DTI Alert
         if (monthlyIncome && monthlyIncome > 0 && monthlyInstallment && monthlyInstallment > 0) {
             const dti = monthlyInstallment / monthlyIncome;
-            if (dti > 0.40) {
+            if (dti > 0.4) {
                 alerts.push({
                     id: "dti-danger",
                     severity: "danger",
@@ -49,7 +48,6 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
             }
         }
 
-        // Emergency Fund Alert (runway)
         if (emergencyFund !== undefined && monthlyExpenses && monthlyExpenses > 0) {
             const months = emergencyFund / monthlyExpenses;
             if (months < 3) {
@@ -79,7 +77,6 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
             }
         }
 
-        // Savings Goals Deadline Alert
         if (savingsGoals && savingsGoals.length > 0) {
             const now = new Date();
             for (const goal of savingsGoals) {
@@ -95,7 +92,7 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                         severity: "danger",
                         icon: <Target className="w-4 h-4" />,
                         title: `Obiettivo "${goal.name}" scaduto`,
-                        message: `Mancano ancora €${remaining.toLocaleString('it-IT')} (${progress.toFixed(0)}% completato).`,
+                        message: `Mancano ancora €${remaining.toLocaleString("it-IT")} (${progress.toFixed(0)}% completato).`,
                     });
                 } else if (monthsLeft <= 3) {
                     alerts.push({
@@ -103,13 +100,12 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                         severity: "warning",
                         icon: <Clock className="w-4 h-4" />,
                         title: `Obiettivo "${goal.name}" in scadenza`,
-                        message: `${monthsLeft} mesi rimanenti, serve €${Math.round(remaining / monthsLeft).toLocaleString('it-IT')}/mese per raggiungerlo.`,
+                        message: `${monthsLeft} mesi rimanenti, serve €${Math.round(remaining / monthsLeft).toLocaleString("it-IT")}/mese per raggiungerlo.`,
                     });
                 }
             }
         }
 
-        // FIRE Progress Milestone
         if (fireTarget && fireTarget > 0 && fireProgress !== undefined) {
             if (fireProgress >= 100) {
                 alerts.push({
@@ -130,7 +126,6 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
             }
         }
 
-        // Negative Net Worth
         if (netWorth !== undefined && netWorth < 0) {
             alerts.push({
                 id: "negative-nw",
@@ -146,9 +141,9 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
 }
 
 const SEVERITY_STYLES = {
-    danger: "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300",
-    warning: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300",
-    success: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300",
+    danger: "border-red-200 bg-red-50/90 text-red-700 dark:border-red-800 dark:bg-red-950/35 dark:text-red-300",
+    warning: "border-amber-200 bg-amber-50/90 text-amber-700 dark:border-amber-800 dark:bg-amber-950/35 dark:text-amber-300",
+    success: "border-emerald-200 bg-emerald-50/90 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-300",
 };
 
 const ICON_STYLES = {
@@ -163,13 +158,21 @@ export function FinancialAlerts({ data }: { data: FinancialData }) {
     if (alerts.length === 0) return null;
 
     return (
-        <div className="space-y-2">
-            {alerts.map(alert => (
-                <div key={alert.id} className={`flex items-start gap-3 border rounded-xl p-3 ${SEVERITY_STYLES[alert.severity]}`}>
-                    <div className={`mt-0.5 shrink-0 ${ICON_STYLES[alert.severity]}`}>{alert.icon}</div>
-                    <div>
-                        <p className="text-sm font-bold">{alert.title}</p>
-                        <p className="text-xs opacity-80">{alert.message}</p>
+        <div className="grid gap-3">
+            {alerts.map((alert) => (
+                <div
+                    key={alert.id}
+                    role={alert.severity === "danger" ? "alert" : "status"}
+                    className={`rounded-2xl border px-4 py-3 shadow-sm backdrop-blur-sm ${SEVERITY_STYLES[alert.severity]}`}
+                >
+                    <div className="flex items-start gap-3">
+                        <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background/75 ${ICON_STYLES[alert.severity]}`}>
+                            {alert.icon}
+                        </div>
+                        <div className="min-w-0 space-y-1">
+                            <p className="text-sm font-bold leading-5">{alert.title}</p>
+                            <p className="text-xs leading-5 opacity-90">{alert.message}</p>
+                        </div>
                     </div>
                 </div>
             ))}

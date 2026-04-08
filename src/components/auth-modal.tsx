@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogContent,
@@ -7,10 +7,10 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 interface AuthModalProps {
     user: { username: string } | null;
@@ -21,19 +21,19 @@ interface AuthModalProps {
 export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isLogin, setIsLogin] = useState(true);
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+            const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
             const res = await fetch(endpoint, {
-                method: 'POST',
+                method: "POST",
                 headers: {
-                    'Content-Type': 'application/json',
+                    "Content-Type": "application/json",
                 },
                 body: JSON.stringify({ username, password }),
             });
@@ -44,13 +44,13 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
                 onLogin(data.user);
                 toast.success(data.message);
                 setIsOpen(false);
-                setUsername('');
-                setPassword('');
+                setUsername("");
+                setPassword("");
             } else {
-                toast.error(data.error || 'Autenticazione fallita');
+                toast.error(data.error || "Autenticazione fallita");
             }
-        } catch (err) {
-            toast.error('Errore di rete');
+        } catch {
+            toast.error("Errore di rete");
         } finally {
             setLoading(false);
         }
@@ -58,19 +58,26 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
 
     const handleLogout = async () => {
         try {
-            await fetch('/api/auth/me', { method: 'DELETE' });
+            await fetch("/api/auth/me", { method: "DELETE" });
             onLogout();
-            toast.success('Disconnesso con successo');
-        } catch (err) {
-            toast.error('Errore durante il logout');
+            toast.success("Disconnesso con successo");
+        } catch {
+            toast.error("Errore durante il logout");
         }
     };
 
     if (user) {
         return (
-            <div className="flex items-center space-x-4">
-                <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Ciao, <strong className="text-slate-900 dark:text-slate-100">{user.username}</strong></span>
-                <Button variant="outline" size="sm" onClick={handleLogout} className="bg-white/70 dark:bg-slate-900/70 border-slate-200 text-slate-700 dark:text-slate-300 hover:bg-white hover:text-slate-900 dark:text-slate-100 backdrop-blur-md">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <span className="text-sm font-medium text-muted-foreground">
+                    Ciao, <strong className="text-foreground">{user.username}</strong>
+                </span>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="min-h-10 bg-background/80 border-border text-foreground hover:bg-muted backdrop-blur-md"
+                >
                     Logout
                 </Button>
             </div>
@@ -80,53 +87,68 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
             <DialogTrigger asChild>
-                <Button variant="default" className="bg-blue-600 border border-blue-500 text-white hover:bg-blue-700 shadow-md">Accedi / Registrati</Button>
+                <Button
+                    variant="default"
+                    className="min-h-11 bg-blue-600 border border-blue-500 px-4 sm:px-5 text-white shadow-md hover:bg-blue-700"
+                >
+                    Accedi / Registrati
+                </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-white/80 backdrop-blur-2xl border border-white dark:border-slate-800 text-slate-900 dark:text-slate-100 rounded-3xl shadow-2xl">
+            <DialogContent className="w-[calc(100vw-1.5rem)] max-w-[28rem] sm:max-w-[425px] rounded-3xl border border-border bg-background/90 text-foreground shadow-2xl backdrop-blur-2xl">
                 <DialogHeader>
-                    <DialogTitle className="text-xl font-bold text-slate-900 dark:text-slate-100">{isLogin ? 'Accedi' : 'Crea un Account Locale'}</DialogTitle>
-                    <DialogDescription className="text-slate-500">
+                    <DialogTitle className="text-xl font-bold text-foreground">
+                        {isLogin ? "Accedi" : "Crea un Account Locale"}
+                    </DialogTitle>
+                    <DialogDescription className="text-muted-foreground">
                         {isLogin
-                            ? 'Inserisci le tue credenziali per caricare le preferenze.'
-                            : 'Inserisci un nome utente e una password per creare il tuo account locale e salvare le simulazioni.'}
+                            ? "Inserisci le tue credenziali per caricare le preferenze."
+                            : "Inserisci un nome utente e una password per creare il tuo account locale e salvare le simulazioni."}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                     <div className="space-y-2">
-                        <Label htmlFor="username" className="text-slate-700 dark:text-slate-300">Username</Label>
+                        <Label htmlFor="username" className="text-foreground">
+                            Username
+                        </Label>
                         <Input
                             id="username"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             placeholder="es: stefano_inv"
-                            className="bg-white/70 dark:bg-slate-900/70 border-slate-200 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:text-slate-400 focus-visible:ring-blue-500"
+                            className="min-h-11 bg-background/80 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-blue-500"
                             required
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="password" className="text-slate-700 dark:text-slate-300">Password</Label>
+                        <Label htmlFor="password" className="text-foreground">
+                            Password
+                        </Label>
                         <Input
                             id="password"
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="bg-white/70 dark:bg-slate-900/70 border-slate-200 text-slate-900 dark:text-slate-100 focus-visible:ring-blue-500"
+                            className="min-h-11 bg-background/80 border-border text-foreground focus-visible:ring-blue-500"
                             required
                         />
                     </div>
-                    <div className="flex flex-col space-y-3 pt-4 border-t border-slate-200">
-                        <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all">
-                            {loading ? 'Caricamento...' : isLogin ? 'Accedi' : 'Registrati'}
+                    <div className="flex flex-col space-y-3 pt-4 border-t border-border">
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full min-h-11 bg-blue-600 text-white shadow-md transition-all hover:bg-blue-700"
+                        >
+                            {loading ? "Caricamento..." : isLogin ? "Accedi" : "Registrati"}
                         </Button>
                         <Button
                             type="button"
                             variant="ghost"
                             onClick={() => setIsLogin(!isLogin)}
-                            className="text-slate-500 hover:text-slate-900 dark:text-slate-100 hover:bg-slate-100 dark:bg-slate-800"
+                            className="min-h-11 text-muted-foreground hover:bg-muted hover:text-foreground"
                         >
                             {isLogin
                                 ? "Non hai un account? Registrati"
-                                : 'Hai già un account? Accedi'}
+                                : "Hai già un account? Accedi"}
                         </Button>
                     </div>
                 </form>

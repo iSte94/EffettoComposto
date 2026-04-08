@@ -70,7 +70,7 @@ export async function GET(req: Request) {
                     return NextResponse.json({ ticker: symbol, price, currency: 'EUR', originalCurrency: currency, exchangeName, dividendYield, annualDividend });
                 }
             }
-        } catch (e) {
+        } catch {
             console.log(`Yahoo Finance failed for ${ticker}, trying fallback...`);
         }
 
@@ -110,7 +110,7 @@ export async function GET(req: Request) {
                     }
                 }
             }
-        } catch (e) {
+        } catch {
             console.log(`Stooq fallback failed for ${ticker}`);
         }
 

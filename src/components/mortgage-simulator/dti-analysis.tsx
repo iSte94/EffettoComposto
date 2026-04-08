@@ -18,49 +18,43 @@ export function DtiAnalysis({
     maxInstallment, maxNewMortgageAllowed
 }: DtiAnalysisProps) {
     return (
-        <div className="space-y-10">
-            <div className="grid grid-cols-2 gap-8 divide-x divide-slate-100">
+        <div className="space-y-8">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:divide-x sm:divide-slate-100 dark:sm:divide-slate-800">
                 <div className="space-y-3">
-                    <div className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest">Rata Fissa Nuovo Mutuo</div>
-                    <div className="text-5xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">{formatEuro(mortgagePayment)}</div>
-                    <div className="text-sm font-medium text-slate-500 mt-2">
-                        Importo Mutuo: {formatEuro(loanAmount)}
-                    </div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Rata Fissa Nuovo Mutuo</div>
+                    <div className="text-4xl font-bold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums sm:text-5xl">{formatEuro(mortgagePayment)}</div>
+                    <div className="text-sm font-medium text-slate-500">Importo Mutuo: {formatEuro(loanAmount)}</div>
                 </div>
-                <div className="space-y-3 pl-8">
-                    <div className="text-xs font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest">Debiti Mensili Totali</div>
-                    <div className="text-5xl font-bold tracking-tight text-red-500 tabular-nums">{formatEuro(totalMonthlyDebt)}</div>
-                    <div className="text-sm font-medium text-slate-500 mt-2">
-                        Include {formatEuro(calculatedExistingInstallment)} di prestiti pre-esistenti.
-                    </div>
+                <div className="space-y-3 sm:pl-8">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-400">Debiti Mensili Totali</div>
+                    <div className="text-4xl font-bold tracking-tight text-red-500 tabular-nums sm:text-5xl">{formatEuro(totalMonthlyDebt)}</div>
+                    <div className="text-sm font-medium text-slate-500">Include {formatEuro(calculatedExistingInstallment)} di prestiti pre-esistenti.</div>
                 </div>
             </div>
 
-            <div className={`p-8 rounded-3xl border border-slate-200 shadow-md transition-colors ${sustainabilityRatio > 33 ? 'bg-red-50/80' : 'bg-emerald-50 dark:bg-emerald-950/50/80'}`}>
-                <div className="flex justify-between items-end mb-4">
-                    <div className="font-bold text-lg text-slate-800 dark:text-slate-200 flex items-center">
-                        Indice Rata/Reddito Globale
-                    </div>
-                    <div className={`text-4xl font-extrabold ${sustainabilityRatio > 33 ? 'text-red-600' : 'text-emerald-600 dark:text-emerald-400'}`}>
+            <div className={`rounded-3xl border border-slate-200 p-5 shadow-md transition-colors sm:p-8 ${sustainabilityRatio > 33 ? "bg-red-50/90 dark:bg-red-950/30" : "bg-emerald-50/90 dark:bg-emerald-950/50"}`}>
+                <div className="mb-4 flex items-end justify-between gap-4">
+                    <div className="text-lg font-bold text-slate-800 dark:text-slate-200">Indice Rata/Reddito Globale</div>
+                    <div className={`text-4xl font-extrabold ${sustainabilityRatio > 33 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}>
                         {sustainabilityRatio.toFixed(1)}%
                     </div>
                 </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-700 h-4 rounded-full overflow-hidden mb-2">
+                <div className="mb-2 h-4 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     <div
-                        className={`h-full transition-all duration-700 ease-out ${sustainabilityRatio > 33 ? 'bg-red-500' : 'bg-emerald-50 dark:bg-emerald-950/500'}`}
+                        className={`h-full transition-all duration-700 ease-out ${sustainabilityRatio > 33 ? "bg-red-500" : "bg-emerald-500"}`}
                         style={{ width: `${Math.min(sustainabilityRatio, 100)}%` }}
                     />
                 </div>
 
-                <div className="flex justify-between text-sm font-medium text-slate-600 dark:text-slate-400 border-t border-slate-200 mt-6 pt-4">
+                <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm font-medium text-slate-600 dark:border-slate-800 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                     <span>Soglia Max Banca (33%): <strong className="text-slate-900 dark:text-slate-100">{formatEuro(maxInstallment)}</strong></span>
-                    <span>Spazio Resìduo per Mutuo: <strong className={`font-bold ${maxNewMortgageAllowed < mortgagePayment ? 'text-red-500' : 'text-emerald-500'}`}>{formatEuro(maxNewMortgageAllowed)}</strong></span>
+                    <span>Spazio Residuo per Mutuo: <strong className={`font-bold ${maxNewMortgageAllowed < mortgagePayment ? "text-red-500" : "text-emerald-500"}`}>{formatEuro(maxNewMortgageAllowed)}</strong></span>
                 </div>
 
-                <p className={`text-sm md:text-base mt-4 font-medium leading-relaxed ${sustainabilityRatio > 33 ? 'text-red-600' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                <p className={`mt-4 text-sm font-medium leading-relaxed sm:text-base ${sustainabilityRatio > 33 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}>
                     {sustainabilityRatio <= 33
-                        ? "Eccellente. I tuoi debiti combinati rientrano comodamente nei parametri. Questo nuovo mutuo ha alte probabilità di essere approvato."
-                        : "Attenzione Rischio Sofferenza. Sommando i prestiti pregressi, superi la soglia del 33%. La banca potrebbe chiederti garanzie o un anticipo maggiore per concedere l\u0027ipoteca."}
+                        ? "Eccellente. I tuoi debiti combinati rientrano comodamente nei parametri. Questo nuovo mutuo ha alte probabilita di essere approvato."
+                        : "Attenzione Rischio Sofferenza. Sommando i prestiti pregressi, superi la soglia del 33%. La banca potrebbe chiederti garanzie o un anticipo maggiore per concedere l'ipoteca."}
                 </p>
             </div>
         </div>

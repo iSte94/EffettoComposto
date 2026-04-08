@@ -47,141 +47,158 @@ export function BudgetTracker() {
     };
 
     const saveEdit = (idx: number) => {
-        const newCats = [...categories];
-        newCats[idx] = { ...newCats[idx], limit: Math.max(0, Number(editLimit) || 0) };
-        setCategories(newCats);
+        const newCategories = [...categories];
+        newCategories[idx] = { ...newCategories[idx], limit: Math.max(0, Number(editLimit) || 0) };
+        setCategories(newCategories);
         setEditingIdx(null);
     };
 
-    // Calculate average monthly spending per category from imported data
     const categorySpending = useMemo(() => {
         if (!importResult || importResult.monthlySummary.length === 0) return null;
 
-        const catTotals = new Map<string, number>();
-        for (const t of importResult.transactions) {
-            if (t.amount >= 0) continue;
-            const cat = t.category || "Altro";
-            catTotals.set(cat, (catTotals.get(cat) || 0) + Math.abs(t.amount));
+        const categoryTotals = new Map<string, number>();
+        for (const transaction of importResult.transactions) {
+            if (transaction.amount >= 0) continue;
+            const category = transaction.category || "Altro";
+            categoryTotals.set(category, (categoryTotals.get(category) || 0) + Math.abs(transaction.amount));
         }
 
         const months = importResult.monthlySummary.length;
         const monthlyAvg = new Map<string, number>();
-        for (const [cat, total] of catTotals) {
-            monthlyAvg.set(cat, Math.round(total / months));
+        for (const [category, total] of categoryTotals) {
+            monthlyAvg.set(category, Math.round(total / months));
         }
 
         return monthlyAvg;
     }, [importResult]);
 
-    // Build comparison data
     const comparisonData = useMemo(() => {
-        return categories.map(cat => {
-            const actual = categorySpending?.get(cat.name) || 0;
-            const overBudget = actual > cat.limit;
+        return categories.map((category) => {
+            const actual = categorySpending?.get(category.name) || 0;
+            const overBudget = actual > category.limit;
             return {
-                name: cat.name,
-                Budget: cat.limit,
+                name: category.name,
+                Budget: category.limit,
                 "Spesa Media": actual,
                 overBudget,
-                diff: cat.limit - actual,
             };
         });
     }, [categories, categorySpending]);
 
-    const totalBudget = categories.reduce((s, c) => s + c.limit, 0);
-    const totalActual = comparisonData.reduce((s, c) => s + c["Spesa Media"], 0);
-    const overBudgetCount = comparisonData.filter(c => c.overBudget && c["Spesa Media"] > 0).length;
+    const totalBudget = categories.reduce((sum, category) => sum + category.limit, 0);
+    const totalActual = comparisonData.reduce((sum, category) => sum + category["Spesa Media"], 0);
+    const overBudgetCount = comparisonData.filter((category) => category.overBudget && category["Spesa Media"] > 0).length;
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-violet-50 dark:bg-violet-950/50 rounded-xl">
-                        <Wallet className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                    <div className="rounded-xl bg-violet-50 p-2.5 dark:bg-violet-950/50">
+                        <Wallet className="h-6 w-6 text-violet-600 dark:text-violet-400" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">Budget Mensile</h2>
-                        <p className="text-xs text-slate-500">Imposta limiti per categoria e confrontali con le spese reali</p>
+                        <h2 className="text-xl font-bold text-foreground">Budget Mensile</h2>
+                        <p className="text-xs text-muted-foreground">Imposta limiti per categoria e confrontali con le spese reali</p>
                     </div>
                 </div>
-                <Button variant="outline" size="sm" className="rounded-xl text-xs" onClick={() => fileRef.current?.click()}>
-                    <Upload className="w-3.5 h-3.5 mr-1" /> {importResult ? "Aggiorna CSV" : "Importa CSV"}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="min-h-10 rounded-xl text-xs sm:self-auto"
+                    onClick={() => fileRef.current?.click()}
+                >
+                    <Upload className="mr-1 h-3.5 w-3.5" /> {importResult ? "Aggiorna CSV" : "Importa CSV"}
                 </Button>
                 <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleImport} />
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-3 gap-4">
-                <div className="bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold text-violet-400 uppercase tracking-widest">Budget Totale</p>
-                    <p className="text-xl font-extrabold text-violet-600 dark:text-violet-400 mt-1">{formatEuro(totalBudget)}</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="rounded-3xl border border-violet-200 bg-violet-50/90 p-4 dark:border-violet-800 dark:bg-violet-950/30">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400">Budget Totale</p>
+                    <p className="mt-1 text-xl font-extrabold text-violet-600 dark:text-violet-400">{formatEuro(totalBudget)}</p>
                     <p className="text-[10px] text-violet-400">/mese</p>
                 </div>
-                <div className={`border rounded-2xl p-4 ${totalActual > totalBudget ? 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800' : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800'}`}>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Spesa Media</p>
-                    <p className={`text-xl font-extrabold mt-1 ${totalActual > totalBudget ? 'text-red-600' : 'text-emerald-600'}`}>
+                <div className={`rounded-3xl border p-4 ${totalActual > totalBudget ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Spesa Media</p>
+                    <p className={`mt-1 text-xl font-extrabold ${totalActual > totalBudget ? "text-red-600" : "text-emerald-600"}`}>
                         {importResult ? formatEuro(totalActual) : "—"}
                     </p>
-                    <p className="text-[10px] text-slate-400">/mese</p>
+                    <p className="text-[10px] text-muted-foreground">/mese</p>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl p-4">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Categorie Oltre</p>
-                    <p className="text-xl font-extrabold text-slate-700 dark:text-slate-300 mt-1">{importResult ? overBudgetCount : "—"}</p>
-                    <p className="text-[10px] text-slate-400">su {categories.length}</p>
+                <div className="rounded-3xl border border-border/70 bg-muted/30 p-4">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Categorie Oltre</p>
+                    <p className="mt-1 text-xl font-extrabold text-foreground">{importResult ? overBudgetCount : "—"}</p>
+                    <p className="text-[10px] text-muted-foreground">su {categories.length}</p>
                 </div>
             </div>
 
-            {/* Category Budget List */}
-            <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl">
-                <CardContent className="p-5 space-y-3">
-                    <h3 className="text-sm font-bold text-slate-600 dark:text-slate-400">Budget per Categoria</h3>
+            <Card className="rounded-3xl border border-border/70 bg-card/80 backdrop-blur-xl">
+                <CardContent className="space-y-3 p-5">
+                    <h3 className="text-sm font-bold text-muted-foreground">Budget per Categoria</h3>
                     <div className="space-y-2">
                         {comparisonData.map((item, idx) => {
                             const pct = item.Budget > 0 ? Math.min(100, (item["Spesa Media"] / item.Budget) * 100) : 0;
                             const isEditing = editingIdx === idx;
 
                             return (
-                                <div key={item.name} className="space-y-1">
-                                    <div className="flex items-center justify-between">
+                                <div key={item.name} className="space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex items-center gap-2">
                                             {item.overBudget && item["Spesa Media"] > 0 ? (
-                                                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                                                <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
                                             ) : item["Spesa Media"] > 0 ? (
-                                                <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                                                <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
                                             ) : null}
-                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{item.name}</span>
+                                            <span className="text-sm font-medium text-foreground">{item.name}</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                                             {isEditing ? (
                                                 <div className="flex items-center gap-1">
                                                     <Input
                                                         type="number"
                                                         value={editLimit}
-                                                        onChange={e => setEditLimit(e.target.value)}
-                                                        className="h-6 w-20 text-xs rounded-lg"
+                                                        onChange={(e) => setEditLimit(e.target.value)}
+                                                        className="h-9 w-24 rounded-xl text-xs"
                                                         autoFocus
                                                     />
-                                                    <button onClick={() => saveEdit(idx)} className="text-emerald-500 hover:text-emerald-600"><Check className="w-3.5 h-3.5" /></button>
-                                                    <button onClick={() => setEditingIdx(null)} className="text-slate-400 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => saveEdit(idx)}
+                                                        className="rounded-lg p-1 text-emerald-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
+                                                    >
+                                                        <Check className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setEditingIdx(null)}
+                                                        className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/20"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
                                                 </div>
                                             ) : (
                                                 <div className="flex items-center gap-2">
                                                     {importResult && (
-                                                        <span className={`text-xs font-bold ${item.overBudget ? 'text-red-500' : 'text-emerald-600'}`}>
+                                                        <span className={`text-xs font-bold ${item.overBudget ? "text-red-500" : "text-emerald-600"}`}>
                                                             {formatEuro(item["Spesa Media"])}
                                                         </span>
                                                     )}
-                                                    <span className="text-xs text-slate-400">/ {formatEuro(item.Budget)}</span>
-                                                    <button onClick={() => startEdit(idx)} className="text-slate-300 hover:text-blue-500"><Pencil className="w-3 h-3" /></button>
+                                                    <span className="text-xs text-muted-foreground">/ {formatEuro(item.Budget)}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => startEdit(idx)}
+                                                        className="rounded-lg p-1 text-slate-300 transition-colors hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-950/20"
+                                                    >
+                                                        <Pencil className="h-3 w-3" />
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                     {importResult && (
-                                        <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/70">
                                             <div
-                                                className={`h-full rounded-full transition-all duration-500 ${item.overBudget ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                className={`h-full rounded-full transition-all duration-500 ${item.overBudget ? "bg-red-500" : "bg-emerald-500"}`}
                                                 style={{ width: `${pct}%` }}
                                             />
                                         </div>
@@ -193,21 +210,25 @@ export function BudgetTracker() {
                 </CardContent>
             </Card>
 
-            {/* Comparison Chart */}
             {importResult && (
-                <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl">
+                <Card className="rounded-3xl border border-border/70 bg-card/80 backdrop-blur-xl">
                     <CardContent className="p-5">
-                        <h3 className="text-sm font-bold text-slate-600 dark:text-slate-400 mb-4">Budget vs Spesa Reale</h3>
-                        <div className="h-64">
+                        <h3 className="mb-4 text-sm font-bold text-muted-foreground">Budget vs Spesa Reale</h3>
+                        <div className="h-72">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={comparisonData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 9 }} />
-                                    <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => `${v}`} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                                    <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(value: number) => `${value}`} />
                                     <Tooltip
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        formatter={(value: any) => formatEuro(Number(value))}
-                                        contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)" }}
+                                        formatter={(value: number | string | undefined) => formatEuro(Number(value ?? 0))}
+                                        contentStyle={{
+                                            borderRadius: "16px",
+                                            border: "1px solid var(--border)",
+                                            backgroundColor: "var(--popover)",
+                                            color: "var(--popover-foreground)",
+                                            boxShadow: "0 16px 40px -16px rgba(15, 23, 42, 0.45)",
+                                        }}
                                     />
                                     <Bar dataKey="Budget" fill="#c4b5fd" radius={[4, 4, 0, 0]} />
                                     <Bar dataKey="Spesa Media" radius={[4, 4, 0, 0]}>
@@ -223,7 +244,7 @@ export function BudgetTracker() {
             )}
 
             {!importResult && (
-                <div className="text-center py-8 text-slate-400 text-sm">
+                <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 py-8 text-center text-sm text-muted-foreground">
                     Importa un estratto conto CSV per confrontare le tue spese reali con il budget.
                 </div>
             )}

@@ -14,28 +14,28 @@ export function RealEstateAnalysis() {
         <div className="space-y-8">
             {/* Toggle Mutuo / Rendita */}
             <div className="flex justify-center">
-                <div className="inline-flex bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl shadow-sm">
+                <div className="grid w-full max-w-2xl grid-cols-2 gap-1.5 rounded-2xl bg-muted/80 p-1.5 shadow-sm ring-1 ring-border/70">
                     <button
                         onClick={() => setMode("mutuo")}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all ${
+                        className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             mode === "mutuo"
-                                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
-                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                         <Landmark className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                        Simulatore Mutuo
+                        <span className="whitespace-nowrap">Simulatore Mutuo</span>
                     </button>
                     <button
                         onClick={() => setMode("rendita")}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all ${
+                        className={`flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             mode === "rendita"
-                                ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm"
-                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
                         }`}
                     >
                         <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        Rendita Immobili
+                        <span className="whitespace-nowrap">Rendita Immobili</span>
                     </button>
                 </div>
             </div>

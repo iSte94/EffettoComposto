@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback, useEffect } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Landmark, Loader2, CheckCircle, Save, FolderOpen, Trash2, Upload, Download } from "lucide-react";
@@ -53,15 +53,11 @@ export function MortgageSimulator() {
     const { preferences, isSaving, updatePreference, updatePreferences } = usePreferences();
 
     // ── Salvataggio / Caricamento ──
-    const [saves, setSaves] = useState<MortgageSaveEntry[]>([]);
+    const [saves, setSaves] = useState<MortgageSaveEntry[]>(() => loadMortgageSaves());
     const [showSaveDialog, setShowSaveDialog] = useState(false);
     const [showLoadDialog, setShowLoadDialog] = useState(false);
     const [saveName, setSaveName] = useState("");
     const [saveMessage, setSaveMessage] = useState<string | null>(null);
-
-    useEffect(() => {
-        setSaves(loadMortgageSaves());
-    }, []);
 
     const handleSave = useCallback(() => {
         const name = saveName.trim();
@@ -207,7 +203,7 @@ export function MortgageSimulator() {
     return (
         <div className="space-y-12 animate-in fade-in-50 duration-500">
             <div className="text-center space-y-4 pt-4 pb-6 relative">
-                <div className="inline-flex items-center justify-center p-3 bg-white/70 dark:bg-slate-900/70 border border-white dark:border-slate-800 rounded-2xl shadow-sm mb-2 backdrop-blur-md">
+                <div className="inline-flex items-center justify-center rounded-2xl border border-slate-200/80 bg-white/75 p-3 shadow-sm backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/75 mb-2">
                     <Landmark className="w-8 h-8 text-blue-600 dark:text-blue-400" />
                 </div>
                 <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 flex items-center justify-center gap-3">
@@ -218,7 +214,7 @@ export function MortgageSimulator() {
                 </p>
 
                 {user && (
-                    <div className="absolute top-0 right-4 h-8 flex items-center px-3 py-1 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-full shadow-sm">
+                    <div className="absolute right-4 top-0 flex h-8 items-center rounded-full border border-slate-200/80 bg-white/75 px-3 py-1 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
                         {isSaving ? (
                             <span className="text-xs font-medium text-slate-600 dark:text-slate-400 flex items-center">
                                 <Loader2 className="w-3 h-3 mr-1.5 animate-spin text-slate-400" /> Salvataggio...
@@ -345,12 +341,12 @@ export function MortgageSimulator() {
                 </DialogContent>
             </Dialog>
 
-            <div className="grid lg:grid-cols-12 gap-10">
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
                 <MortgageInputs preferences={preferences} onUpdate={updatePreference} />
 
                 <div className="lg:col-span-12 xl:col-span-7">
-                    <div className="sticky top-8 space-y-8">
-                        <div className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200 p-6 rounded-3xl shadow-md flex justify-between items-center px-8">
+                    <div className="space-y-8 lg:sticky lg:top-8">
+                        <div className="flex items-center justify-between rounded-3xl border border-slate-200/80 bg-white/75 px-4 py-4 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75 sm:px-8">
                             <div className="space-y-1">
                                 <div className="text-slate-600 dark:text-slate-400 font-bold text-sm">Disponibilità Liquida Necessaria Subito</div>
                                 <div className="text-xs text-slate-500">Anticipo immobile + Spese Notarili, Tasse e Agenzia</div>
@@ -358,10 +354,10 @@ export function MortgageSimulator() {
                             <div className="text-3xl font-bold tracking-tight text-blue-600 dark:text-blue-400 tabular-nums">{formatEuro(calculations.totalCashNeeded)}</div>
                         </div>
 
-                        <Card className="border-none shadow-2xl bg-white/70 dark:bg-slate-900/70 backdrop-blur-3xl border border-white dark:border-slate-800 rounded-3xl overflow-hidden">
+                        <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-2xl backdrop-blur-3xl dark:border-slate-800 dark:bg-slate-900/75">
                             <CardContent className="p-2 md:p-4">
                                 <Tabs defaultValue="mortgage" className="w-full">
-                                    <TabsList className="grid w-full grid-cols-3 bg-slate-100/80 dark:bg-slate-800/80 p-1.5 rounded-2xl mb-6">
+                                    <TabsList className="mb-6 grid w-full grid-cols-3 rounded-2xl bg-slate-100/80 p-1.5 dark:bg-slate-800/80">
                                         <TabsTrigger value="mortgage" className="rounded-2xl py-3 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-sm data-[state=active]:text-slate-900 dark:text-slate-100 text-slate-500 font-semibold transition-all text-xs md:text-sm">
                                             Rata/Reddito
                                         </TabsTrigger>
@@ -373,7 +369,7 @@ export function MortgageSimulator() {
                                         </TabsTrigger>
                                     </TabsList>
 
-                                    <div className="px-4 md:px-8 pb-10 pt-4">
+                                    <div className="px-4 pb-10 pt-4 md:px-8">
                                         <TabsContent value="mortgage" className="animate-in fade-in-50 duration-500">
                                             <DtiAnalysis
                                                 mortgagePayment={calculations.mortgagePayment}

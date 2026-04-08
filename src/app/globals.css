@@ -32,75 +32,68 @@
 }
 
 :root {
-  --background: oklch(0.98 0.01 250);
-  /* Very light slate */
-  --foreground: oklch(0.14 0.05 250);
-  /* Dark text */
+  --background: oklch(0.985 0.006 250);
+  --foreground: oklch(0.185 0.03 250);
 
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.14 0.05 250);
+  --card-foreground: oklch(0.185 0.03 250);
 
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.14 0.05 250);
+  --popover-foreground: oklch(0.185 0.03 250);
 
-  --primary: oklch(0.60 0.15 250);
-  /* Primary blue */
-  --primary-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.56 0.16 250);
+  --primary-foreground: oklch(0.985 0 0);
 
-  --secondary: oklch(0.95 0.02 250);
-  --secondary-foreground: oklch(0.20 0.05 250);
+  --secondary: oklch(0.955 0.01 250);
+  --secondary-foreground: oklch(0.225 0.03 250);
 
-  --muted: oklch(0.95 0.02 250);
-  --muted-foreground: oklch(0.40 0.05 250);
+  --muted: oklch(0.955 0.01 250);
+  --muted-foreground: oklch(0.5 0.025 250);
 
-  --accent: oklch(0.95 0.02 250);
-  --accent-foreground: oklch(0.20 0.05 250);
+  --accent: oklch(0.95 0.012 250);
+  --accent-foreground: oklch(0.225 0.03 250);
 
-  --destructive: oklch(0.60 0.20 20);
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.59 0.19 25);
+  --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.90 0.02 250);
-  --input: oklch(0.90 0.02 250);
-  --ring: oklch(0.60 0.15 250);
+  --border: oklch(0.9 0.01 250);
+  --input: oklch(0.9 0.01 250);
+  --ring: oklch(0.56 0.16 250);
 
   --radius: 1rem;
 }
 
 .dark {
-  --background: oklch(0.14 0.05 250);
-  /* Dark slate background */
-  --foreground: oklch(0.98 0.01 250);
-  /* Light slate text */
+  --background: oklch(0.12 0.02 250);
+  --foreground: oklch(0.975 0.008 250);
 
-  --card: oklch(0.17 0.04 250);
-  --card-foreground: oklch(0.98 0.01 250);
+  --card: oklch(0.16 0.02 250);
+  --card-foreground: oklch(0.975 0.008 250);
 
-  --popover: oklch(0.14 0.05 250);
-  --popover-foreground: oklch(0.98 0.01 250);
+  --popover: oklch(0.15 0.02 250);
+  --popover-foreground: oklch(0.975 0.008 250);
 
-  --primary: oklch(0.65 0.15 250);
-  /* Slightly lighter primary for dark mode */
-  --primary-foreground: oklch(0.98 0 0);
+  --primary: oklch(0.69 0.14 248);
+  --primary-foreground: oklch(0.12 0.02 250);
 
-  --secondary: oklch(0.20 0.05 250);
-  --secondary-foreground: oklch(0.95 0.02 250);
+  --secondary: oklch(0.21 0.02 250);
+  --secondary-foreground: oklch(0.955 0.01 250);
 
-  --muted: oklch(0.20 0.05 250);
-  --muted-foreground: oklch(0.65 0.05 250);
+  --muted: oklch(0.2 0.02 250);
+  --muted-foreground: oklch(0.73 0.03 250);
 
-  --accent: oklch(0.20 0.05 250);
-  --accent-foreground: oklch(0.95 0.02 250);
+  --accent: oklch(0.22 0.02 250);
+  --accent-foreground: oklch(0.975 0.008 250);
 
-  --destructive: oklch(0.60 0.20 20);
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.62 0.2 25);
+  --destructive-foreground: oklch(0.985 0 0);
 
-  --border: oklch(0.25 0.03 250);
-  --input: oklch(0.25 0.03 250);
-  --ring: oklch(0.65 0.15 250);
+  --border: oklch(0.26 0.015 250);
+  --input: oklch(0.26 0.015 250);
+  --ring: oklch(0.69 0.14 248);
 }
 
 @keyframes slow-pulse {
-
   0%,
   100% {
     opacity: 0.4;
@@ -132,7 +125,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .animate-pulse,
   .animate-shimmer {
     animation: none !important;
@@ -140,25 +132,66 @@
 }
 
 @layer base {
+  html {
+    color-scheme: light;
+    font-size: 17px;
+    overflow-x: hidden;
+    background:
+      radial-gradient(circle at top left, rgb(59 130 246 / 0.08), transparent 30%),
+      radial-gradient(circle at top right, rgb(16 185 129 / 0.06), transparent 24%),
+      linear-gradient(180deg, oklch(0.99 0.005 250), oklch(0.975 0.006 250));
+  }
+
+  html.dark {
+    color-scheme: dark;
+    background:
+      radial-gradient(circle at top left, rgb(59 130 246 / 0.12), transparent 30%),
+      radial-gradient(circle at top right, rgb(16 185 129 / 0.08), transparent 24%),
+      linear-gradient(180deg, oklch(0.12 0.02 250), oklch(0.1 0.015 250));
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
 
-  html {
-    font-size: 17px;
-  }
-
   body {
-    @apply bg-background text-foreground;
+    @apply min-h-dvh bg-background text-foreground;
+    background-image:
+      radial-gradient(circle at top left, rgb(59 130 246 / 0.12), transparent 26%),
+      radial-gradient(circle at top right, rgb(16 185 129 / 0.08), transparent 22%);
   }
 }
 
-/* Tabular nums for financial data alignment */
+::selection {
+  background: color-mix(in oklab, var(--primary) 26%, transparent);
+  color: var(--foreground);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--border) 72%, var(--foreground) 10%) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--border) 68%, var(--foreground) 10%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
 
-/* Apply tabular nums to all number inputs */
 input[type="number"] {
   font-variant-numeric: tabular-nums;
 }

@@ -1,12 +1,13 @@
-"use client";
+﻿"use client";
+/* eslint-disable react/no-unescaped-entities */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
-import { Briefcase, TrendingUp, Plus, Trash2, Save, PiggyBank, GraduationCap, ArrowUpRight, Scale } from "lucide-react";
+import { Briefcase, TrendingUp, Plus, Trash2, Save, ArrowUpRight, Scale } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEuro } from "@/lib/format";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,6 +15,7 @@ import { usePreferences } from "@/hooks/usePreferences";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Flame } from "lucide-react";
+import { useTheme } from "next-themes";
 
 interface Bonus {
     id: string;
@@ -42,12 +44,14 @@ const DEFAULT_PROGRESSION: CareerProgressionData = {
 
 export function ProgressioneDashboard() {
     const { preferences, updatePreference, isLoaded, isSaving } = usePreferences();
+    const { resolvedTheme } = useTheme();
     const [progressionData, setProgressionData] = useState<CareerProgressionData>(DEFAULT_PROGRESSION);
     const [activePersonTab, setActivePersonTab] = useState<"person1" | "person2">("person1");
     const [showScenarios, setShowScenarios] = useState(false);
     const [currentNetWorth, setCurrentNetWorth] = useState<number>(0);
 
     const [initialLoadDone, setInitialLoadDone] = useState(false);
+    const isDark = resolvedTheme === "dark";
 
     useEffect(() => {
         // Fetch current NetWorth for accurate FIRE estimations
@@ -92,7 +96,7 @@ export function ProgressioneDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [progressionData, initialLoadDone]);
 
-    const handleUpdatePerson = (person: "person1" | "person2", field: keyof PersonProgression, value: any) => {
+    const handleUpdatePerson = <K extends keyof PersonProgression>(person: "person1" | "person2", field: K, value: PersonProgression[K]) => {
         setProgressionData(prev => ({
             ...prev,
             [person]: {
@@ -112,12 +116,12 @@ export function ProgressioneDashboard() {
         handleUpdatePerson(person, "promotions", progressionData[person].promotions.filter(p => p.id !== id));
     };
 
-    const updateBonus = (person: "person1" | "person2", id: string, field: keyof Bonus, value: any) => {
+    const updateBonus = <K extends keyof Bonus>(person: "person1" | "person2", id: string, field: K, value: Bonus[K]) => {
         handleUpdatePerson(person, "promotions", progressionData[person].promotions.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
 
     // Derived chart data
-    const generateChartData = () => {
+    const generateChartData = useCallback(() => {
         const currentYear = new Date().getFullYear();
         const data = [];
 
@@ -145,10 +149,6 @@ export function ProgressioneDashboard() {
             let pesIncomeC1 = currentIncome1, pesIncomeC2 = currentIncome2;
             
             if (i > 0) {
-                // Base raises
-                const baseP1 = preferences.person1Income > 0 ? preferences.person1Income * 12 : 0;
-                const baseP2 = preferences.person2Income > 0 ? preferences.person2Income * 12 : 0;
-                
                 // TOP: +3% extra raise per year + recurring job hopping (+15% every 4 years)
                 const isHopping = i % 4 === 0 && i > 0;
                 topIncomeC1 = data[i-1]["Top P1 (Nom)"] * (1 + (progressionData.person1.annualRaisePct + 3) / 100) * (isHopping ? 1.15 : 1) + p1Bonuses;
@@ -180,9 +180,9 @@ export function ProgressioneDashboard() {
             });
         }
         return data;
-    };
+    }, [progressionData, preferences.person1Income, preferences.person2Income]);
 
-    const chartData = useMemo(() => generateChartData(), [progressionData, preferences.person1Income, preferences.person2Income]);
+    const chartData = useMemo(() => generateChartData(), [generateChartData]);
 
     if (!isLoaded) {
         return (
@@ -227,13 +227,12 @@ export function ProgressioneDashboard() {
     };
 
     const fireBase = calculateFireYear("Totale Reale Famiglia");
-    const firePes = calculateFireYear("Pes Reale Famiglia");
     const fireTop = calculateFireYear("Top Reale Famiglia");
     const hasPromotions = progressionData.person1.promotions.length > 0 || progressionData.person2.promotions.length > 0;
 
     return (
         <div className="space-y-10 animate-in fade-in duration-700 pb-20 pt-6">
-            <div className="text-center space-y-4 relative">
+            <div className="relative space-y-4 text-center">
                 <div className={`absolute top-0 right-4 md:right-8 transition-all duration-500 flex items-center bg-white px-3 py-1.5 rounded-full shadow-sm border ${isSaving ? 'border-amber-200 opacity-100 transform translate-y-0 text-amber-600' : 'border-emerald-200 opacity-100 transform translate-y-0 text-emerald-600'}`}>
                     {isSaving ? (
                         <div className="flex items-center text-xs font-bold gap-1.5">
@@ -246,47 +245,47 @@ export function ProgressioneDashboard() {
                     )}
                 </div>
 
-                <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-slate-100 flex items-center justify-center">
+                <h2 className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-3xl font-extrabold tracking-tight text-foreground md:text-5xl">
                     Simula la tua <span className="text-violet-600 dark:text-violet-400 ml-3">Carriera</span>
                 </h2>
-                <p className="text-slate-500 max-w-2xl mx-auto">
+                <p className="mx-auto max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground sm:text-base">
                     Prevedi l'evoluzione del tuo reddito nel corso degli anni considerandone l'inflazione e i probabili aumenti salariali.
                 </p>
 
                 {/* Hero Stats */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-5 pt-8">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-3xl overflow-hidden group hover:shadow-lg shadow-md transition-all duration-500 text-center flex flex-col justify-center">
-                        <CardContent className="p-6">
-                            <div className="text-xs xl:text-sm font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center justify-center"><Briefcase className="w-4 h-4 mr-2 text-blue-500" /> Reddito Familiare Base (Annuo)</div>
-                            <div className="text-3xl lg:text-4xl font-extrabold text-slate-800 dark:text-slate-100 tabular-nums">{formatEuro(startingTotalIncome)}</div>
+                <div className="grid grid-cols-1 gap-4 pt-8 md:grid-cols-3 lg:gap-5">
+                    <Card className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl overflow-hidden text-center transition-all duration-300 hover:shadow-md">
+                        <CardContent className="p-5 sm:p-6">
+                            <div className="mb-3 flex items-center justify-center text-[11px] font-bold uppercase tracking-[0.22em] text-muted-foreground"><Briefcase className="w-4 h-4 mr-2 text-blue-500" /> Reddito Familiare Base (Annuo)</div>
+                            <div className="tabular-nums text-3xl font-extrabold text-card-foreground lg:text-4xl">{formatEuro(startingTotalIncome)}</div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-violet-50 dark:bg-violet-900/20 backdrop-blur-xl border border-violet-100 dark:border-violet-800 rounded-3xl overflow-hidden group hover:shadow-lg shadow-md transition-all duration-500 text-center flex flex-col justify-center">
-                        <CardContent className="p-6">
-                            <div className="text-xs xl:text-sm font-bold text-violet-600 dark:text-violet-400 uppercase tracking-widest mb-3 flex items-center justify-center"><TrendingUp className="w-4 h-4 mr-2" /> Reddito Futuro Atteso (Tra {progressionData.yearsToSimulate} anni)</div>
-                            <div className="text-3xl lg:text-4xl font-extrabold text-violet-700 dark:text-violet-300 tabular-nums mb-1">{formatEuro(endingTotalNominal)}</div>
-                            <div className="text-[10px] bg-violet-100 text-violet-600 font-bold px-2 py-1 rounded-full inline-block">+{totalGrowthPct.toFixed(1)}% Nominale</div>
+                    <Card className="overflow-hidden rounded-3xl border border-violet-100/80 bg-violet-50/80 text-center shadow-sm transition-all duration-300 hover:shadow-md dark:border-violet-900/70 dark:bg-violet-950/25">
+                        <CardContent className="p-5 sm:p-6">
+                            <div className="mb-3 flex items-center justify-center text-[11px] font-bold uppercase tracking-[0.22em] text-violet-600 dark:text-violet-400"><TrendingUp className="w-4 h-4 mr-2" /> Reddito Futuro Atteso (Tra {progressionData.yearsToSimulate} anni)</div>
+                            <div className="mb-1 tabular-nums text-3xl font-extrabold text-violet-700 dark:text-violet-300 lg:text-4xl">{formatEuro(endingTotalNominal)}</div>
+                            <div className="inline-block rounded-full bg-violet-100 px-2 py-1 text-[10px] font-bold text-violet-600 dark:bg-violet-900/40 dark:text-violet-300">+{totalGrowthPct.toFixed(1)}% Nominale</div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-amber-50 dark:bg-amber-900/20 backdrop-blur-xl border border-amber-100 dark:border-amber-800 rounded-3xl overflow-hidden group hover:shadow-lg shadow-md transition-all duration-500 text-center flex flex-col justify-center">
-                        <CardContent className="p-6">
-                            <div className="text-xs xl:text-sm font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-3 flex items-center justify-center"><Scale className="w-4 h-4 mr-2" /> Potere d'Acquisto Reale</div>
-                            <div className="text-3xl lg:text-4xl font-extrabold text-amber-700 dark:text-amber-300 tabular-nums">{formatEuro(endingTotalReal)}</div>
+                    <Card className="overflow-hidden rounded-3xl border border-amber-100/80 bg-amber-50/80 text-center shadow-sm transition-all duration-300 hover:shadow-md dark:border-amber-900/70 dark:bg-amber-950/25">
+                        <CardContent className="p-5 sm:p-6">
+                            <div className="mb-3 flex items-center justify-center text-[11px] font-bold uppercase tracking-[0.22em] text-amber-600 dark:text-amber-400"><Scale className="w-4 h-4 mr-2" /> Potere d'Acquisto Reale</div>
+                            <div className="tabular-nums text-3xl font-extrabold text-amber-700 dark:text-amber-300 lg:text-4xl">{formatEuro(endingTotalReal)}</div>
                             <p className="text-[10px] text-amber-600/80 mt-2 font-medium leading-tight">Al netto dell'inflazione, questo è il VERO valore che percepirai tra {progressionData.yearsToSimulate} anni.</p>
                         </CardContent>
                     </Card>
                 </div>
 
                 {/* FIRE IMPACT WIDGET */}
-                <div className="bg-gradient-to-r from-orange-500 to-rose-500 rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center md:justify-between shadow-lg text-white text-left mt-8">
-                    <div className="flex-1 w-full">
-                        <h3 className="text-xl md:text-2xl font-extrabold flex items-center mb-2 md:mb-3">
-                            <div className="p-2 bg-white/20 rounded-xl mr-4"><Flame className="w-6 h-6 text-white fill-white animate-pulse" /></div>
+                <div className="mt-8 rounded-3xl bg-gradient-to-r from-orange-500 to-rose-500 p-5 text-left text-white shadow-lg md:flex md:items-center md:justify-between md:p-8">
+                    <div className="w-full flex-1">
+                        <h3 className="mb-2 flex items-center text-xl font-extrabold md:mb-3 md:text-2xl">
+                            <div className="mr-4 rounded-xl bg-white/20 p-2"><Flame className="w-6 h-6 text-white fill-white animate-pulse" /></div>
                             Impatto sul tuo FIRE
                         </h3>
-                        <p className="text-orange-50 font-medium max-w-2xl text-sm md:text-base opacity-90 leading-relaxed pl-1">
+                        <p className="max-w-2xl pl-1 text-sm font-medium leading-relaxed text-orange-50 opacity-90 md:text-base">
                             {fireBase === new Date().getFullYear() ? (
                                 <>Includendo i tuoi asset e balzi di carriera, <strong>sei già finanziariamente libero o lo sarai entro la fine di quest'anno!</strong> 🎉</>
                             ) : (
@@ -294,7 +293,7 @@ export function ProgressioneDashboard() {
                             )}
                         </p>
                         {hasPromotions && fireBase !== new Date().getFullYear() && (
-                            <p className="text-orange-100 mt-2 text-xs font-bold uppercase tracking-wider">
+                            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-100">
                                 Boom! 🚀 Hai accelerato il traguardo rispetto alla crescita organica liscia.
                             </p>
                         )}
@@ -311,46 +310,46 @@ export function ProgressioneDashboard() {
             {/* Inputs & Settings */}
             <div className="grid lg:grid-cols-3 gap-8">
                 {/* Person Settings */}
-                <div className="lg:col-span-1 space-y-6">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-xl overflow-hidden rounded-3xl">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 pb-6 pt-6">
-                            <CardTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 flex justify-between items-center">
+                <div className="space-y-6 lg:col-span-1">
+                    <Card className="overflow-hidden rounded-3xl bg-card/80 backdrop-blur-xl border border-border/70 shadow-sm">
+                        <CardHeader className="border-b border-border/70 bg-muted/40 pb-5 pt-5 sm:pb-6 sm:pt-6">
+                            <CardTitle className="flex flex-col gap-3 text-xl font-bold text-foreground sm:flex-row sm:items-center sm:justify-between">
                                 Configuratore
                                 <div className="space-x-2">
-                                    <Label className="text-xs text-slate-500 mr-2">Anni Proiezione</Label>
+                                    <Label className="mr-2 text-xs text-muted-foreground">Anni Proiezione</Label>
                                     <Input 
                                         type="number" 
                                         value={progressionData.yearsToSimulate} 
                                         onChange={e => setProgressionData(p => ({...p, yearsToSimulate: Number(e.target.value)}))}
-                                        className="inline-block w-16 text-center text-xs h-7"
+                                        className="inline-block h-9 w-20 text-center text-xs tabular-nums"
                                     />
                                 </div>
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <Tabs value={activePersonTab} onValueChange={(v) => setActivePersonTab(v as any)} className="w-full">
-                                <TabsList className="w-full grid justify-center grid-cols-2 rounded-none bg-slate-100 dark:bg-slate-800/50 p-0 h-14 border-b border-slate-200 dark:border-slate-700">
-                                    <TabsTrigger value="person1" className="h-full rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-violet-500 font-bold">
+                            <Tabs value={activePersonTab} onValueChange={(v) => setActivePersonTab(v as "person1" | "person2") } className="w-full">
+                                <TabsList className="grid h-auto w-full grid-cols-2 justify-center rounded-none border-b border-border/70 bg-muted/60 p-0">
+                                    <TabsTrigger value="person1" className="min-h-12 rounded-none font-bold data-[state=active]:border-b-2 data-[state=active]:border-violet-500 data-[state=active]:bg-background data-[state=active]:shadow-none">
                                         {person1Name || "Persona 1"}
                                     </TabsTrigger>
-                                    <TabsTrigger value="person2" className="h-full rounded-none data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-violet-500 font-bold" disabled={!person2Income}>
+                                    <TabsTrigger value="person2" className="min-h-12 rounded-none font-bold data-[state=active]:border-b-2 data-[state=active]:border-violet-500 data-[state=active]:bg-background data-[state=active]:shadow-none" disabled={!person2Income}>
                                         {person2Name || "Persona 2"}
                                     </TabsTrigger>
                                 </TabsList>
-                                <TabsContent value={activePersonTab} className="p-6 m-0 space-y-6">
+                                <TabsContent value={activePersonTab} className="m-0 space-y-6 p-4 sm:p-6">
                                     {activeIncome === 0 ? (
-                                        <div className="text-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-dashed border-slate-300">
+                                        <div className="rounded-2xl border border-dashed border-border/70 bg-muted/50 p-4 text-center">
                                             <p className="text-sm text-slate-500">Nessun reddito base configurato per {activeName}. Inserisci il reddito nella scheda Patrimonio.</p>
                                         </div>
                                     ) : (
                                         <>
-                                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl flex items-center justify-between border border-slate-100 dark:border-slate-800">
-                                                <span className="text-sm font-bold text-slate-500 uppercase tracking-widest">Base P.C.</span>
-                                                <span className="text-xl font-extrabold text-slate-800 dark:text-slate-200">{formatEuro(activeIncome * 12)} <span className="text-xs font-medium text-slate-400">/anno (netto)</span></span>
+                                            <div className="flex flex-col gap-2 rounded-2xl border border-border/70 bg-muted/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                                <span className="text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">Base P.C.</span>
+                                                <span className="text-xl font-extrabold text-foreground tabular-nums">{formatEuro(activeIncome * 12)} <span className="text-xs font-medium text-muted-foreground">/anno (netto)</span></span>
                                             </div>
 
                                             <div className="space-y-3">
-                                                <Label className="text-xs uppercase font-bold tracking-wider text-slate-500 flex items-center justify-between">
+                                                <Label className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                     Aumento Annuo Costante (%)
                                                     <span className="text-violet-600 font-extrabold">{activePersonData.annualRaisePct}%</span>
                                                 </Label>
@@ -363,11 +362,11 @@ export function ProgressioneDashboard() {
                                                     onChange={e => handleUpdatePerson(activePersonTab, "annualRaisePct", Number(e.target.value))}
                                                     className="w-full accent-violet-600" 
                                                 />
-                                                <p className="text-[10px] text-slate-400 leading-tight">Previsione di crescita organica annua (scatti di anzianità, rinnovi CCNL).</p>
+                                                <p className="text-[10px] leading-tight text-muted-foreground">Previsione di crescita organica annua (scatti di anzianità, rinnovi CCNL).</p>
                                             </div>
 
                                             <div className="space-y-3">
-                                                <Label className="text-xs uppercase font-bold tracking-wider text-slate-500 flex items-center justify-between">
+                                                <Label className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                                     Inflazione Stimata (%)
                                                     <span className="text-amber-500 font-extrabold">{activePersonData.expectedInflationPct}%</span>
                                                 </Label>
@@ -380,37 +379,37 @@ export function ProgressioneDashboard() {
                                                     onChange={e => handleUpdatePerson(activePersonTab, "expectedInflationPct", Number(e.target.value))}
                                                     className="w-full accent-amber-500" 
                                                 />
-                                                <p className="text-[10px] text-slate-400 leading-tight">L'inflazione erode il "Potere d'Acquisto Reale" mostrato nel grafico.</p>
+                                                <p className="text-[10px] leading-tight text-muted-foreground">L'inflazione erode il "Potere d'Acquisto Reale" mostrato nel grafico.</p>
                                             </div>
 
                                             {/* Salti di Carriera */}
-                                            <div className="pt-6 border-t border-slate-100 dark:border-slate-800">
-                                                <h4 className="flex items-center text-sm font-bold text-slate-800 dark:text-slate-200 mb-4">
+                                            <div className="border-t border-border/70 pt-6">
+                                                <h4 className="mb-4 flex items-center text-sm font-bold text-foreground">
                                                     <ArrowUpRight className="w-4 h-4 mr-2 text-emerald-500" /> Salti di Carriera / Promozioni
                                                 </h4>
                                                 
                                                 <div className="space-y-3">
                                                     {activePersonData.promotions.length === 0 ? (
-                                                        <p className="text-xs text-slate-400 text-center font-medium italic">Nessun salto previsto.</p>
+                                                        <p className="text-center text-xs font-medium italic text-muted-foreground">Nessun salto previsto.</p>
                                                     ) : activePersonData.promotions.map(promo => (
-                                                        <div key={promo.id} className="p-3 bg-white border border-slate-200 dark:bg-slate-800/50 dark:border-slate-700 rounded-xl relative group hover:border-emerald-300">
-                                                            <Button variant="ghost" size="icon" onClick={() => removeBonus(activePersonTab, promo.id)} className="h-6 w-6 absolute -top-2 -right-2 bg-white text-rose-500 opacity-0 group-hover:opacity-100 border border-slate-200 rounded-full hover:bg-rose-50 transition-all">
+                                                        <div key={promo.id} className="group relative rounded-xl border border-border/70 bg-background/80 p-3">
+                                                            <Button variant="ghost" size="icon" onClick={() => removeBonus(activePersonTab, promo.id)} className="absolute -right-2 -top-2 h-7 w-7 rounded-full border border-border bg-background text-rose-500 opacity-0 transition-all hover:bg-rose-50 group-hover:opacity-100">
                                                                 <Trash2 className="w-3 h-3" />
                                                             </Button>
                                                             <div className="grid grid-cols-2 gap-2 mb-2">
                                                                 <div>
-                                                                    <Label className="text-[9px] uppercase font-bold text-slate-400">Anno Previsto</Label>
-                                                                    <Input type="number" value={promo.targetYear} onChange={e => updateBonus(activePersonTab, promo.id, "targetYear", Number(e.target.value))} className="h-7 text-xs bg-slate-50 focus-visible:ring-emerald-500" />
+                                                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Anno Previsto</Label>
+                                                                    <Input type="number" value={promo.targetYear} onChange={e => updateBonus(activePersonTab, promo.id, "targetYear", Number(e.target.value))} className="h-9 text-xs bg-background/80 focus-visible:ring-emerald-500 tabular-nums" />
                                                                 </div>
                                                                 <div>
-                                                                    <Label className="text-[9px] uppercase font-bold text-slate-400">Aumento Netto Annuo</Label>
-                                                                    <Input type="number" value={promo.amount} onChange={e => updateBonus(activePersonTab, promo.id, "amount", Number(e.target.value))} className="h-7 text-xs bg-slate-50 focus-visible:ring-emerald-500 font-bold text-emerald-600" />
+                                                                    <Label className="text-[9px] font-bold uppercase text-muted-foreground">Aumento Netto Annuo</Label>
+                                                                    <Input type="number" value={promo.amount} onChange={e => updateBonus(activePersonTab, promo.id, "amount", Number(e.target.value))} className="h-9 text-xs bg-background/80 font-bold text-emerald-600 focus-visible:ring-emerald-500 tabular-nums" />
                                                                 </div>
                                                             </div>
-                                                            <Input value={promo.description} onChange={e => updateBonus(activePersonTab, promo.id, "description", e.target.value)} placeholder="Es. Promozione Quadro" className="h-7 text-xs border-transparent hover:border-slate-200 bg-transparent px-1 focus-visible:ring-emerald-500" />
+                                                            <Input value={promo.description} onChange={e => updateBonus(activePersonTab, promo.id, "description", e.target.value)} placeholder="Es. Promozione Quadro" className="h-9 border-transparent bg-transparent px-1 text-xs focus-visible:ring-emerald-500 hover:border-border/70" />
                                                         </div>
                                                     ))}
-                                                    <Button variant="outline" onClick={() => addBonus(activePersonTab)} className="w-full text-xs py-1 h-8 border-dashed border-2 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-500">
+                                                    <Button variant="outline" onClick={() => addBonus(activePersonTab)} className="h-10 w-full border-2 border-dashed text-xs text-muted-foreground hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700">
                                                         <Plus className="w-3 h-3 mr-1" /> Aggiungi Scatto
                                                     </Button>
                                                 </div>
@@ -425,21 +424,21 @@ export function ProgressioneDashboard() {
 
                 {/* Big Chart */}
                 <div className="lg:col-span-2">
-                    <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 shadow-xl overflow-hidden rounded-3xl h-full flex flex-col">
-                        <CardHeader className="bg-white/50 dark:bg-slate-800/50 border-b border-white dark:border-slate-800 pb-6 pt-6 flex flex-col md:flex-row md:items-center justify-between">
+                    <Card className="h-full flex flex-col overflow-hidden rounded-3xl bg-card/80 backdrop-blur-xl border border-border/70 shadow-sm">
+                        <CardHeader className="flex flex-col justify-between border-b border-border/70 bg-muted/40 pb-5 pt-5 sm:pb-6 sm:pt-6 md:flex-row md:items-center">
                             <div>
-                                <CardTitle className="text-xl font-bold text-slate-900 dark:text-slate-100 flex items-center">
+                                <CardTitle className="flex items-center text-xl font-bold text-foreground">
                                     <TrendingUp className="w-5 h-5 mr-3 text-violet-500" /> Andamento Cumulativo
                                 </CardTitle>
                                 <CardDescription>Confronto tra crescita Nominale (soldi percepiti) e Potere d'Acquisto Reale.</CardDescription>
                             </div>
-                            <div className="flex items-center space-x-3 mt-4 md:mt-0 bg-violet-50 dark:bg-slate-800 p-2 px-4 rounded-full border border-violet-100 dark:border-slate-700">
-                                <Label htmlFor="scenario-mode" className="text-sm font-bold text-violet-700 dark:text-violet-400 cursor-pointer">Mostra Scenari Paralleli</Label>
+                            <div className="mt-4 flex items-center gap-3 rounded-full border border-violet-100/80 bg-violet-50/80 px-4 py-2 md:mt-0 dark:border-slate-700 dark:bg-slate-800/70">
+                                <Label htmlFor="scenario-mode" className="cursor-pointer text-sm font-bold text-violet-700 dark:text-violet-400">Mostra Scenari Paralleli</Label>
                                 <Switch id="scenario-mode" checked={showScenarios} onCheckedChange={setShowScenarios} />
                             </div>
                         </CardHeader>
-                        <CardContent className="p-4 md:p-8 flex-grow">
-                            <div className="h-[400px] lg:h-[500px] w-full mt-4">
+                        <CardContent className="flex-grow p-4 sm:p-6 md:p-8">
+                            <div className="mt-4 h-[320px] w-full sm:h-[380px] lg:h-[500px]">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                         <defs>
@@ -453,17 +452,17 @@ export function ProgressioneDashboard() {
                                             </linearGradient>
                                         </defs>
 
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                        <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }} dy={10} minTickGap={20} />
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(148,163,184,0.16)" : "rgba(15,23,42,0.06)"} />
+                                        <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: isDark ? "#cbd5e1" : "#64748b", fontSize: 12, fontWeight: 600 }} dy={10} minTickGap={20} />
                                         <YAxis tickFormatter={(val) => `€${Math.round(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-10} width={60} />
                                         
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)' }}
-                                            labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px', borderBottom: '1px solid rgba(0,0,0,0.05)', paddingBottom: '4px' }}
-                                            itemStyle={{ color: '#334155', border: 'none', fontWeight: 600, fontSize: '13px' }}
-                                            formatter={(value: any, name: string | number | undefined) => [formatEuro(Number(value)), name]}
+                                            contentStyle={{ backgroundColor: isDark ? "rgba(15, 23, 42, 0.96)" : "rgba(255, 255, 255, 0.96)", backdropFilter: "blur(16px)", borderRadius: "1rem", border: isDark ? "1px solid rgba(51, 65, 85, 0.9)" : "1px solid rgba(148, 163, 184, 0.24)", boxShadow: "0 20px 40px -10px rgba(0,0,0,0.15)" }}
+                                            labelStyle={{ fontWeight: "bold", color: isDark ? "#f8fafc" : "#0f172a", marginBottom: "8px", borderBottom: `1px solid ${isDark ? "rgba(148,163,184,0.18)" : "rgba(15,23,42,0.06)"}`, paddingBottom: "4px" }}
+                                            itemStyle={{ color: isDark ? "#cbd5e1" : "#334155", border: "none", fontWeight: 600, fontSize: "13px" }}
+                                            formatter={(value: string | number | undefined, name: string | number | undefined) => [formatEuro(Number(value ?? 0)), name]}
                                         />
-                                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', paddingBottom: '10px' }} />
+                                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: isDark ? "#cbd5e1" : "#475569", paddingBottom: "10px" }} />
 
                                         <Area type="monotone" dataKey="Totale Nominale Famiglia" name="Reddito Nominale Famiglia" stroke="#8b5cf6" strokeWidth={4} fillOpacity={1} fill="url(#colorNominal)" activeDot={{ r: 6, strokeWidth: 0, fill: '#8b5cf6' }} />
                                         <Area type="monotone" dataKey="Totale Reale Famiglia" name="P. Acq. Reale Famiglia" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" fillOpacity={showScenarios ? 0 : 1} fill="url(#colorReal)" activeDot={false} />
@@ -489,3 +488,7 @@ export function ProgressioneDashboard() {
         </div>
     );
 }
+
+
+
+
