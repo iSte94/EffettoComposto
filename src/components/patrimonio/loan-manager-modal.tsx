@@ -94,11 +94,16 @@ export function LoanManagerModal({
                             </div>
                         </div>
                     </div>
+                    <div className="space-y-2">
+                        <Label className="text-xs">Debito Residuo Manuale (&euro;)</Label>
+                        <Input type="number" placeholder="Lascia vuoto per calcolo automatico" value={loan.currentRemainingDebt || ''} onChange={(e) => updateField("currentRemainingDebt", Number(e.target.value))} className="h-9 bg-slate-50 border-slate-200 text-xs" />
+                        <p className="text-[10px] text-slate-400">Se inserito, sovrascrive il calcolo automatico del debito residuo.</p>
+                    </div>
                     <div className="pt-2">
                         <div className="flex items-center justify-between p-3 bg-blue-50/50 rounded-xl border border-blue-100">
                             <div className="space-y-0.5">
                                 <Label className="text-xs font-bold text-blue-800 uppercase tracking-wide">Rata Crescente?</Label>
-                                <p className="text-[10px] text-blue-600 dark:text-blue-400">Se attivo, la rata cresce geometricamente nel tempo.</p>
+                                <p className="text-[10px] text-blue-600 dark:text-blue-400">Se attivo, la rata cresce linearmente nel tempo.</p>
                             </div>
                             <Switch checked={loan.isVariable || false} onCheckedChange={(checked) => updateField("isVariable", checked)} className="data-[state=checked]:bg-blue-600" />
                         </div>

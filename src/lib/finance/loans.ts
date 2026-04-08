@@ -40,12 +40,31 @@ export const calculateRemainingDebt = (loan?: ExistingLoan): number => {
 
     if (monthsPassed < 0) return loan.originalAmount || (loan.installment * totalMonths); // Not started yet
 
-    // Ammortamento Francese Esatto
+    // Ammortamento Francese Esatto (o simulazione rata crescente)
     if (loan.originalAmount && loan.interestRate && loan.interestRate > 0) {
         const P = loan.originalAmount;
         const i = (loan.interestRate / 100) / 12;
         const n = totalMonths;
         const k = monthsPassed;
+
+        // Rata crescente: la prima rata copre quasi solo gli interessi,
+        // poi cresce linearmente. Simuliamo mese per mese.
+        if (loan.isVariable && loan.installment && k > 0) {
+            const firstPayment = P * i; // La prima rata copre solo interessi
+            const delta = (loan.installment - firstPayment) / k; // Incremento lineare mensile
+            if (delta > 0) {
+                let balance = P;
+                for (let m = 0; m < k; m++) {
+                    const rata = firstPayment + delta * m;
+                    const interest = balance * i;
+                    const capital = rata - interest;
+                    if (capital > 0) {
+                        balance -= capital;
+                    }
+                }
+                return Math.max(0, balance);
+            }
+        }
 
         // D_k = P * [ (1+i)^n - (1+i)^k ] / [ (1+i)^n - 1 ]
         const factorN = Math.pow(1 + i, n);
