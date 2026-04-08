@@ -12,7 +12,7 @@ COPY package.json package-lock.json ./
 COPY prisma/schema.prisma prisma/schema.prisma
 COPY prisma.config.ts prisma.config.ts
 
-RUN npm ci --no-audit --no-fund
+RUN npm install --no-audit --no-fund
 
 # ---------- build ----------
 FROM deps AS builder
