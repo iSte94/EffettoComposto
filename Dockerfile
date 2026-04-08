@@ -39,14 +39,15 @@ RUN apt-get update \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 --home /home/nextjs nextjs
 
+# Standalone output + static assets
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+
+# Prisma: schema, migrations, config, and full node_modules for CLI
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules ./node_modules
 
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
@@ -54,4 +55,4 @@ USER nextjs
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "node node_modules/prisma/build/index.js migrate deploy && node server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
