@@ -122,6 +122,37 @@ Apri [http://localhost:3000](http://localhost:3000) nel browser.
 
 ---
 
+## Sicurezza e Privacy
+
+**I tuoi dati sono solo tuoi.** Effetto Composto e' progettato con la privacy al centro:
+
+- **Nessun tracking, nessuna analytics, nessun cookie di terze parti** — zero dati inviati a servizi esterni
+- **Database locale** — tutti i dati finanziari restano nel database SQLite sul server, mai condivisi
+- **Nessuna email richiesta** — la registrazione usa solo username e password, niente dati personali
+- **Codice open-source** — chiunque puo' verificare esattamente cosa fa l'applicazione
+
+### Protezione dei dati
+
+| Misura | Dettaglio |
+|---|---|
+| **Password** | Hash con bcrypt (12 rounds, irreversibile). La password in chiaro non viene mai salvata |
+| **Autenticazione** | Token JWT firmati con HMAC-SHA256, durata 24h, cookie HttpOnly + Secure + SameSite=Strict |
+| **Brute-force** | Rate limiting: max 5 tentativi ogni 15 minuti per IP |
+| **Trasporto** | HTTPS obbligatorio con TLS 1.2+ (Let's Encrypt), HSTS preload attivo |
+| **Headers** | X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, Referrer-Policy, Permissions-Policy |
+| **Validazione** | Ogni input API validato con Zod schema prima dell'elaborazione |
+| **API protette** | Tutte le route dati richiedono autenticazione JWT valida |
+
+### Cosa NON facciamo
+
+- Non raccogliamo email, numeri di telefono o dati identificativi
+- Non vendiamo, condividiamo o analizziamo i dati degli utenti
+- Non usiamo Google Analytics, Facebook Pixel o altri tracker
+- Non inviamo i dati finanziari a servizi di terze parti
+- Le uniche chiamate esterne sono per i prezzi di mercato (Yahoo Finance, Binance) e non contengono dati utente
+
+---
+
 ## Deploy
 
 Il progetto e' containerizzato con Docker e pensato per girare dietro Traefik con HTTPS automatico. Vedi **[DEPLOY.md](DEPLOY.md)** per la guida completa.

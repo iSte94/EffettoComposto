@@ -35,8 +35,14 @@ describe('registerSchema', () => {
     });
 
     it('requires password at least 8 chars', () => {
-        expect(registerSchema.safeParse({ username: 'user123', password: '1234567' }).success).toBe(false);
-        expect(registerSchema.safeParse({ username: 'user123', password: '12345678' }).success).toBe(true);
+        expect(registerSchema.safeParse({ username: 'user123', password: 'pass12' }).success).toBe(false);
+        expect(registerSchema.safeParse({ username: 'user123', password: 'password8' }).success).toBe(true);
+    });
+
+    it('requires password with at least one letter and one number', () => {
+        expect(registerSchema.safeParse({ username: 'user123', password: 'abcdefgh' }).success).toBe(false);
+        expect(registerSchema.safeParse({ username: 'user123', password: '12345678' }).success).toBe(false);
+        expect(registerSchema.safeParse({ username: 'user123', password: 'abcdef12' }).success).toBe(true);
     });
 
     it('rejects usernames with special characters', () => {
@@ -52,7 +58,7 @@ describe('registerSchema', () => {
     });
 
     it('rejects passwords over 128 chars', () => {
-        const longPassword = 'a'.repeat(129);
+        const longPassword = 'a'.repeat(128) + '1';
         expect(registerSchema.safeParse({ username: 'user123', password: longPassword }).success).toBe(false);
     });
 });

@@ -12,5 +12,7 @@ export const registerSchema = z.object({
         .regex(/^[a-zA-Z0-9_.-]+$/, 'Username puo\' contenere solo lettere, numeri, _, . e -'),
     password: z.string()
         .min(8, 'Password deve essere almeno 8 caratteri')
-        .max(128, 'Password troppo lunga'),
+        .max(128, 'Password troppo lunga')
+        .regex(/[a-zA-Z]/, 'Password deve contenere almeno una lettera')
+        .regex(/[0-9]/, 'Password deve contenere almeno un numero'),
 });

@@ -2,7 +2,7 @@
 const attempts = new Map<string, { count: number; resetAt: number }>();
 
 const WINDOW_MS = 15 * 60 * 1000; // 15 minuti
-const MAX_ATTEMPTS = 10; // max 10 tentativi per finestra
+const MAX_ATTEMPTS = 5; // max 5 tentativi per finestra
 
 export function checkRateLimit(key: string): { allowed: boolean; retryAfterMs?: number } {
     const now = Date.now();

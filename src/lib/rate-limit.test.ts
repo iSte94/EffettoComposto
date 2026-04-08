@@ -15,15 +15,15 @@ describe('checkRateLimit', () => {
         expect(result.allowed).toBe(true);
     });
 
-    it('allows up to 10 requests', () => {
-        for (let i = 0; i < 10; i++) {
+    it('allows up to 5 requests', () => {
+        for (let i = 0; i < 5; i++) {
             const result = checkRateLimit('test-key-2');
             expect(result.allowed).toBe(true);
         }
     });
 
-    it('blocks the 11th request', () => {
-        for (let i = 0; i < 10; i++) {
+    it('blocks the 6th request', () => {
+        for (let i = 0; i < 5; i++) {
             checkRateLimit('test-key-3');
         }
         const result = checkRateLimit('test-key-3');
@@ -32,7 +32,7 @@ describe('checkRateLimit', () => {
     });
 
     it('resets after 15 minutes', () => {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             checkRateLimit('test-key-4');
         }
         expect(checkRateLimit('test-key-4').allowed).toBe(false);
@@ -45,7 +45,7 @@ describe('checkRateLimit', () => {
     });
 
     it('tracks different keys independently', () => {
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             checkRateLimit('key-a');
         }
         expect(checkRateLimit('key-a').allowed).toBe(false);
