@@ -322,7 +322,6 @@ export function ProgressioneDashboard() {
                                         type="number" 
                                         value={progressionData.yearsToSimulate} 
                                         onChange={e => setProgressionData(p => ({...p, yearsToSimulate: Number(e.target.value)}))}
-                                        onBlur={handleSave}
                                         className="inline-block w-16 text-center text-xs h-7"
                                     />
                                 </div>
@@ -362,8 +361,6 @@ export function ProgressioneDashboard() {
                                                     step="0.5" 
                                                     value={activePersonData.annualRaisePct} 
                                                     onChange={e => handleUpdatePerson(activePersonTab, "annualRaisePct", Number(e.target.value))}
-                                                    onMouseUp={handleSave}
-                                                    onTouchEnd={handleSave}
                                                     className="w-full accent-violet-600" 
                                                 />
                                                 <p className="text-[10px] text-slate-400 leading-tight">Previsione di crescita organica annua (scatti di anzianità, rinnovi CCNL).</p>
@@ -381,8 +378,6 @@ export function ProgressioneDashboard() {
                                                     step="0.5" 
                                                     value={activePersonData.expectedInflationPct} 
                                                     onChange={e => handleUpdatePerson(activePersonTab, "expectedInflationPct", Number(e.target.value))}
-                                                    onMouseUp={handleSave}
-                                                    onTouchEnd={handleSave}
                                                     className="w-full accent-amber-500" 
                                                 />
                                                 <p className="text-[10px] text-slate-400 leading-tight">L'inflazione erode il "Potere d'Acquisto Reale" mostrato nel grafico.</p>
@@ -399,23 +394,23 @@ export function ProgressioneDashboard() {
                                                         <p className="text-xs text-slate-400 text-center font-medium italic">Nessun salto previsto.</p>
                                                     ) : activePersonData.promotions.map(promo => (
                                                         <div key={promo.id} className="p-3 bg-white border border-slate-200 dark:bg-slate-800/50 dark:border-slate-700 rounded-xl relative group hover:border-emerald-300">
-                                                            <Button variant="ghost" size="icon" onClick={() => { removeBonus(activePersonTab, promo.id); handleSave(); }} className="h-6 w-6 absolute -top-2 -right-2 bg-white text-rose-500 opacity-0 group-hover:opacity-100 border border-slate-200 rounded-full hover:bg-rose-50 transition-all">
+                                                            <Button variant="ghost" size="icon" onClick={() => removeBonus(activePersonTab, promo.id)} className="h-6 w-6 absolute -top-2 -right-2 bg-white text-rose-500 opacity-0 group-hover:opacity-100 border border-slate-200 rounded-full hover:bg-rose-50 transition-all">
                                                                 <Trash2 className="w-3 h-3" />
                                                             </Button>
                                                             <div className="grid grid-cols-2 gap-2 mb-2">
                                                                 <div>
                                                                     <Label className="text-[9px] uppercase font-bold text-slate-400">Anno Previsto</Label>
-                                                                    <Input type="number" value={promo.targetYear} onChange={e => updateBonus(activePersonTab, promo.id, "targetYear", Number(e.target.value))} onBlur={handleSave} className="h-7 text-xs bg-slate-50 focus-visible:ring-emerald-500" />
+                                                                    <Input type="number" value={promo.targetYear} onChange={e => updateBonus(activePersonTab, promo.id, "targetYear", Number(e.target.value))} className="h-7 text-xs bg-slate-50 focus-visible:ring-emerald-500" />
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-[9px] uppercase font-bold text-slate-400">Aumento Netto Annuo</Label>
-                                                                    <Input type="number" value={promo.amount} onChange={e => updateBonus(activePersonTab, promo.id, "amount", Number(e.target.value))} onBlur={handleSave} className="h-7 text-xs bg-slate-50 focus-visible:ring-emerald-500 font-bold text-emerald-600" />
+                                                                    <Input type="number" value={promo.amount} onChange={e => updateBonus(activePersonTab, promo.id, "amount", Number(e.target.value))} className="h-7 text-xs bg-slate-50 focus-visible:ring-emerald-500 font-bold text-emerald-600" />
                                                                 </div>
                                                             </div>
-                                                            <Input value={promo.description} onChange={e => updateBonus(activePersonTab, promo.id, "description", e.target.value)} onBlur={handleSave} placeholder="Es. Promozione Quadro" className="h-7 text-xs border-transparent hover:border-slate-200 bg-transparent px-1 focus-visible:ring-emerald-500" />
+                                                            <Input value={promo.description} onChange={e => updateBonus(activePersonTab, promo.id, "description", e.target.value)} placeholder="Es. Promozione Quadro" className="h-7 text-xs border-transparent hover:border-slate-200 bg-transparent px-1 focus-visible:ring-emerald-500" />
                                                         </div>
                                                     ))}
-                                                    <Button variant="outline" onClick={() => { addBonus(activePersonTab); handleSave(); }} className="w-full text-xs py-1 h-8 border-dashed border-2 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-500">
+                                                    <Button variant="outline" onClick={() => addBonus(activePersonTab)} className="w-full text-xs py-1 h-8 border-dashed border-2 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 text-slate-500">
                                                         <Plus className="w-3 h-3 mr-1" /> Aggiungi Scatto
                                                     </Button>
                                                 </div>

@@ -25,6 +25,9 @@ export interface MortgagePreferences {
     rentInflation: number;
     extraMaintenance: number;
     careerProgression: string;
+    expectedMonthlyExpenses: number;
+    fireWithdrawalRate: number;
+    fireExpectedReturn: number;
 }
 
 const DEFAULT_PREFERENCES: MortgagePreferences = {
@@ -48,6 +51,9 @@ const DEFAULT_PREFERENCES: MortgagePreferences = {
     rentInflation: 1.5,
     extraMaintenance: 10000,
     careerProgression: "[]",
+    expectedMonthlyExpenses: 2500,
+    fireWithdrawalRate: 3.25,
+    fireExpectedReturn: 6,
 };
 
 export function usePreferences() {
@@ -85,6 +91,9 @@ export function usePreferences() {
                     rentInflation: p.rentInflation ?? DEFAULT_PREFERENCES.rentInflation,
                     extraMaintenance: p.extraMaintenance ?? DEFAULT_PREFERENCES.extraMaintenance,
                     careerProgression: p.careerProgression ?? "[]",
+                    expectedMonthlyExpenses: p.expectedMonthlyExpenses ?? DEFAULT_PREFERENCES.expectedMonthlyExpenses,
+                    fireWithdrawalRate: p.fireWithdrawalRate ?? DEFAULT_PREFERENCES.fireWithdrawalRate,
+                    fireExpectedReturn: p.fireExpectedReturn ?? DEFAULT_PREFERENCES.fireExpectedReturn,
                 });
                 toast.success("Preferenze caricate dal tuo account");
             }
