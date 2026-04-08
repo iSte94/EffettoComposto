@@ -79,6 +79,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     // Loan Management State
     const [isLoanModalOpen, setIsLoanModalOpen] = useState(false);
     const [editingLoan, setEditingLoan] = useState<ExistingLoan | null>(null);
+    const [editingDebtId, setEditingDebtId] = useState<string | null>(null);
+    const [editingDebtValue, setEditingDebtValue] = useState<string>('');
 
     const initialLoanState: ExistingLoan = {
         id: '', name: '', category: 'Auto', installment: 0,
@@ -753,7 +755,25 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                         </div>
                                         <div className="flex flex-col items-end gap-1 px-3 border-l border-slate-100">
                                             <div className="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-bold tracking-wider">Debito Residuo</div>
-                                            <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400">{formatEuro(calculateRemainingDebt(loan))}</div>
+                                            {editingDebtId === loan.id ? (
+                                                <Input type="number" autoFocus value={editingDebtValue} onChange={(e) => setEditingDebtValue(e.target.value)}
+                                                    onBlur={() => {
+                                                        const val = Number(editingDebtValue);
+                                                        const updated = existingLoansList.map(l => l.id === loan.id ? { ...l, currentRemainingDebt: val || 0 } : l);
+                                                        setExistingLoansList(updated);
+                                                        savePreferences(updated);
+                                                        setEditingDebtId(null);
+                                                        if (val > 0) toast.success("Debito residuo aggiornato");
+                                                    }}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditingDebtId(null); }}
+                                                    className="h-7 w-28 text-xs text-right font-bold text-rose-600 dark:text-rose-400 border-rose-200 bg-rose-50/50" />
+                                            ) : (
+                                                <div className="text-sm font-extrabold text-rose-600 dark:text-rose-400 cursor-pointer hover:underline decoration-dashed underline-offset-2"
+                                                    title="Clicca per modificare"
+                                                    onClick={() => { setEditingDebtId(loan.id); setEditingDebtValue(loan.currentRemainingDebt ? String(loan.currentRemainingDebt) : String(Math.round(calculateRemainingDebt(loan)))); }}>
+                                                    {formatEuro(calculateRemainingDebt(loan))}
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="flex items-center gap-1 ml-2">
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 dark:text-slate-400 hover:text-blue-600 dark:text-blue-400" onClick={() => { setEditingLoan(loan); setIsLoanModalOpen(true); }}>
