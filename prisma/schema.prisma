@@ -127,3 +127,14 @@ model StockHistoryCache {
   history   String   // JSON string of the [{timestamp, date, price, originalCurrency}] array
   updatedAt DateTime @updatedAt
 }
+
+model MortgageMarketCache {
+  id        String   @id @default(uuid())
+  tipoTasso String   // "F" (fisso) or "V" (variabile)
+  durata    Int      // 15, 20, 30
+  data      String   // JSON array of mortgage offers
+  scrapedAt DateTime @default(now())
+
+  @@unique([tipoTasso, durata])
+  @@index([scrapedAt])
+}
