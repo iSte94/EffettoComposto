@@ -1,6 +1,5 @@
-const CACHE_NAME = 'fi-cache-v1';
+const CACHE_NAME = 'fi-cache-v2';
 const STATIC_ASSETS = [
-  '/',
   '/manifest.json',
   '/icons/icon.svg',
 ];
@@ -23,7 +22,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for API, cache-first for static
+// Fetch: network-first for navigations and API, cache-first for static assets
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -31,16 +30,29 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET and cross-origin
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // API routes: network-first
-  if (url.pathname.startsWith('/api/')) {
+  // HTML documents and API routes should prefer the network so releases appear immediately.
+  const isNavigationRequest =
+    request.mode === 'navigate' || request.destination === 'document';
+
+  if (isNavigationRequest || url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          if (response && response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          if (isNavigationRequest) {
+            return caches.match('/');
+          }
+
+          return Response.error();
+        })
     );
     return;
   }
@@ -50,8 +62,10 @@ self.addEventListener('fetch', (event) => {
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        if (response && response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
         return response;
       });
     })
