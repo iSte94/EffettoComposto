@@ -44,6 +44,9 @@ prisma/dev.db-journal
 # claude code
 .claude/
 
+# deploy docs (contiene info sensibili)
+DEPLOY.md
+
 # vercel
 .vercel
 

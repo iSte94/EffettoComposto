@@ -9,7 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Tailwind](https://img.shields.io/badge/Tailwind_CSS_4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![License: MIT](https://img.shields.io/badge/Licenza-MIT-green?style=for-the-badge)](LICENSE)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/Licenza-CC_BY--NC_4.0-green?style=for-the-badge)](https://creativecommons.org/licenses/by-nc/4.0/)
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
@@ -153,12 +153,6 @@ Apri [http://localhost:3000](http://localhost:3000) nel browser.
 
 ---
 
-## Deploy
-
-Il progetto e' containerizzato con Docker e pensato per girare dietro Traefik con HTTPS automatico. Vedi **[DEPLOY.md](DEPLOY.md)** per la guida completa.
-
----
-
 ## Contribuire
 
 I contributi sono benvenuti! Apri una issue per segnalare bug o proporre nuove funzionalita', oppure invia una pull request.
@@ -173,13 +167,11 @@ I contributi sono benvenuti! Apri una issue per segnalare bug o proporre nuove f
 
 ## Licenza
 
-Distribuito con licenza [MIT](LICENSE). Libero per uso personale e commerciale.
+Distribuito con licenza [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Libero per uso personale e non commerciale.
 
 ---
 
 <div align="center">
-
-Fatto con massa di mass da mass in Italia
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
