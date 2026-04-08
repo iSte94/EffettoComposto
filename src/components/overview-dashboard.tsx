@@ -11,7 +11,7 @@ import {
 import { formatEuro } from "@/lib/format";
 import { FinancialAlerts } from "@/components/financial-alerts";
 import { NetWorthProjection } from "@/components/patrimonio/net-worth-projection";
-import { DebtStrategy } from "@/components/debt-strategy";
+
 import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
 import type { AssetRecord, AcceptedPurchase, ExistingLoan } from "@/types";
@@ -325,10 +325,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             </div>
 
             {/* Net Worth Projection */}
-            {history.length >= 2 && <NetWorthProjection history={history} monthlySavings={monthlySavings} />}
-
-            {/* Debt Strategy */}
-            {existingLoans.length >= 2 && <DebtStrategy />}
+            <NetWorthProjection history={history} monthlySavings={monthlySavings} currentNetWorth={metrics?.currentNetWorth} />
 
             {/* Accepted Purchases Summary */}
             {acceptedPurchases.length > 0 && (

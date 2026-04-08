@@ -63,23 +63,3 @@ export async function GET(req: Request) {
     );
   }
 }
-
-/**
- * POST /api/mutui-market
- * Forza il refresh della cache (scraping di tutte le combinazioni).
- */
-export async function POST() {
-  try {
-    const result = await scrapeAllCombinations();
-    return NextResponse.json({
-      message: "Scraping completato",
-      ...result,
-    });
-  } catch (error) {
-    console.error("Mutui Market POST error:", error);
-    return NextResponse.json(
-      { error: "Errore durante lo scraping" },
-      { status: 500 }
-    );
-  }
-}

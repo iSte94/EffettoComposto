@@ -5,7 +5,6 @@ import {
   Building2,
   TrendingDown,
   TrendingUp,
-  RefreshCw,
   Clock,
   Award,
   Shield,
@@ -303,18 +302,12 @@ export function MutuiMarket() {
   // Stato dati
   const [data, setData] = useState<CachedData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch dati
   const fetchData = useCallback(
-    async (forceRefresh = false) => {
+    async () => {
       try {
-        if (forceRefresh) {
-          setIsRefreshing(true);
-          await fetch("/api/mutui-market", { method: "POST" });
-        }
-
         const res = await fetch(
           `/api/mutui-market?tipoTasso=${tipoTasso}&durata=${durata}`
         );
@@ -337,7 +330,6 @@ export function MutuiMarket() {
         );
       } finally {
         setIsLoading(false);
-        setIsRefreshing(false);
       }
     },
     [tipoTasso, durata]
@@ -483,13 +475,11 @@ export function MutuiMarket() {
                 type="number"
                 value={importoUtente}
                 onChange={(e) =>
-                  setImportoUtente(
-                    Math.max(10000, parseInt(e.target.value) || 0)
-                  )
+                  setImportoUtente(parseInt(e.target.value) || 0)
                 }
                 className="h-11 rounded-xl text-base font-semibold tabular-nums"
                 step={5000}
-                min={10000}
+                min={0}
               />
             </div>
 
@@ -542,26 +532,12 @@ export function MutuiMarket() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {lastUpdated && (
-              <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
-                <Clock className="size-3" />
-                {lastUpdated}
-              </span>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl gap-1.5 text-xs"
-              onClick={() => fetchData(true)}
-              disabled={isRefreshing}
-            >
-              <RefreshCw
-                className={`size-3 ${isRefreshing ? "animate-spin" : ""}`}
-              />
-              {isRefreshing ? "Aggiornamento..." : "Aggiorna"}
-            </Button>
-          </div>
+          {lastUpdated && (
+            <span className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+              <Clock className="size-3" />
+              {lastUpdated}
+            </span>
+          )}
         </div>
       )}
 

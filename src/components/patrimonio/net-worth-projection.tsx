@@ -19,27 +19,33 @@ interface HistoryPoint {
 interface NetWorthProjectionProps {
     history: HistoryPoint[];
     monthlySavings?: number;
+    currentNetWorth?: number;
 }
 
-export const NetWorthProjection = memo(function NetWorthProjection({ history, monthlySavings }: NetWorthProjectionProps) {
+export const NetWorthProjection = memo(function NetWorthProjection({ history, monthlySavings, currentNetWorth: currentNetWorthProp }: NetWorthProjectionProps) {
     const [projectionYears, setProjectionYears] = useState(10);
     const [useHistoricalTrend, setUseHistoricalTrend] = useState(false);
 
     const data = useMemo(() => {
-        if (history.length < 2) return null;
-
         const points = history
             .filter(h => h.totalNetWorth !== undefined)
             .map(h => ({ date: new Date(h.date), value: h.totalNetWorth! }))
             .sort((a, b) => a.date.getTime() - b.date.getTime());
 
-        if (points.length < 2) return null;
+        const hasHistory = points.length >= 2;
+        const baseValue = hasHistory ? points[points.length - 1].value : (currentNetWorthProp ?? 0);
+        const baseDate = hasHistory ? points[points.length - 1].date : new Date();
 
-        const first = points[0];
-        const last = points[points.length - 1];
-        const monthsElapsed = Math.max(1, (last.date.getTime() - first.date.getTime()) / (30.44 * 24 * 60 * 60 * 1000));
-        const totalGrowth = last.value - first.value;
-        const historicalMonthlyGrowth = totalGrowth / monthsElapsed;
+        // Se non c'è storico e non c'è patrimonio corrente, non mostrare nulla
+        if (!hasHistory && (currentNetWorthProp === undefined || currentNetWorthProp === 0) && !monthlySavings) return null;
+
+        let historicalMonthlyGrowth = 0;
+        if (hasHistory) {
+            const first = points[0];
+            const last = points[points.length - 1];
+            const monthsElapsed = Math.max(1, (last.date.getTime() - first.date.getTime()) / (30.44 * 24 * 60 * 60 * 1000));
+            historicalMonthlyGrowth = (last.value - first.value) / monthsElapsed;
+        }
 
         // Usa risparmio netto mensile (default) o trend storico (toggle)
         const effectiveMonthlyGrowth = useHistoricalTrend ? historicalMonthlyGrowth : (monthlySavings ?? historicalMonthlyGrowth);
@@ -47,32 +53,40 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
         // Build historical + projected data
         const chartData: { label: string; Storico?: number; Proiezione?: number; "Caso Ottimista"?: number; "Caso Pessimista"?: number }[] = [];
 
-        // Historical points (sample up to 24)
-        const step = Math.max(1, Math.floor(points.length / 24));
-        for (let i = 0; i < points.length; i += step) {
-            const p = points[i];
-            const yearStr = `${p.date.getFullYear()}-${String(p.date.getMonth() + 1).padStart(2, '0')}`;
-            chartData.push({ label: yearStr, Storico: Math.round(p.value) });
-        }
-        // Ensure last point is included
-        if (chartData.length === 0 || chartData[chartData.length - 1].Storico !== Math.round(last.value)) {
-            const yearStr = `${last.date.getFullYear()}-${String(last.date.getMonth() + 1).padStart(2, '0')}`;
-            chartData.push({ label: yearStr, Storico: Math.round(last.value) });
+        if (hasHistory) {
+            // Historical points (sample up to 24)
+            const step = Math.max(1, Math.floor(points.length / 24));
+            for (let i = 0; i < points.length; i += step) {
+                const p = points[i];
+                const yearStr = `${p.date.getFullYear()}-${String(p.date.getMonth() + 1).padStart(2, '0')}`;
+                chartData.push({ label: yearStr, Storico: Math.round(p.value) });
+            }
+            // Ensure last point is included
+            const last = points[points.length - 1];
+            if (chartData.length === 0 || chartData[chartData.length - 1].Storico !== Math.round(last.value)) {
+                const yearStr = `${last.date.getFullYear()}-${String(last.date.getMonth() + 1).padStart(2, '0')}`;
+                chartData.push({ label: yearStr, Storico: Math.round(last.value) });
+            }
+        } else {
+            // No history: start from current point
+            const now = new Date();
+            const yearStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            chartData.push({ label: yearStr, Storico: Math.round(baseValue) });
         }
 
         // Projected points (yearly)
         const bridgeLabel = chartData[chartData.length - 1].label;
-        chartData[chartData.length - 1].Proiezione = Math.round(last.value);
-        chartData[chartData.length - 1]["Caso Ottimista"] = Math.round(last.value);
-        chartData[chartData.length - 1]["Caso Pessimista"] = Math.round(last.value);
+        chartData[chartData.length - 1].Proiezione = Math.round(baseValue);
+        chartData[chartData.length - 1]["Caso Ottimista"] = Math.round(baseValue);
+        chartData[chartData.length - 1]["Caso Pessimista"] = Math.round(baseValue);
 
         for (let y = 1; y <= projectionYears; y++) {
-            const futureDate = new Date(last.date);
+            const futureDate = new Date(baseDate);
             futureDate.setFullYear(futureDate.getFullYear() + y);
             const months = y * 12;
-            const projected = last.value + effectiveMonthlyGrowth * months;
-            const optimistic = last.value + effectiveMonthlyGrowth * months * 1.5;
-            const pessimistic = last.value + effectiveMonthlyGrowth * months * 0.5;
+            const projected = baseValue + effectiveMonthlyGrowth * months;
+            const optimistic = baseValue + effectiveMonthlyGrowth * months * 1.5;
+            const pessimistic = baseValue + effectiveMonthlyGrowth * months * 0.5;
 
             chartData.push({
                 label: `${futureDate.getFullYear()}`,
@@ -82,23 +96,24 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
             });
         }
 
-        const projectedFinal = last.value + effectiveMonthlyGrowth * projectionYears * 12;
+        const projectedFinal = baseValue + effectiveMonthlyGrowth * projectionYears * 12;
         const annualizedGrowth = effectiveMonthlyGrowth * 12;
 
         return {
             chartData,
-            currentNetWorth: last.value,
+            currentNetWorth: baseValue,
             projectedNetWorth: projectedFinal,
             monthlyGrowth: effectiveMonthlyGrowth,
             annualizedGrowth,
             bridgeLabel,
             historicalMonthlyGrowth,
         };
-    }, [history, projectionYears, useHistoricalTrend, monthlySavings]);
+    }, [history, projectionYears, useHistoricalTrend, monthlySavings, currentNetWorthProp]);
 
     if (!data) return null;
 
     const hasMonthlySavings = monthlySavings !== undefined;
+    const hasHistory = history.filter(h => h.totalNetWorth !== undefined).length >= 2;
 
     return (
         <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl shadow-md">
@@ -122,7 +137,7 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
                 </div>
 
                 {/* Toggle trend storico / risparmio netto */}
-                {hasMonthlySavings && (
+                {hasMonthlySavings && hasHistory && (
                     <div className="flex items-center gap-2 text-xs">
                         <button
                             onClick={() => setUseHistoricalTrend(false)}
