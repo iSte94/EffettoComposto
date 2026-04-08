@@ -1,0 +1,129 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  preferences  Preference?
+  assets       AssetRecord[]
+  savingsGoals SavingsGoal[]
+}
+
+model Preference {
+  id                       String   @id @default(uuid())
+  propertyPrice            Float    @default(300000)
+  downpayment              Float    @default(60000)
+  purchaseTaxes            Float    @default(6000)
+  notaryFees               Float    @default(3000)
+  agencyFees               Float    @default(9000)
+  netIncome                Float    @default(4000)
+  person1Name              String   @default("Persona 1")
+  person1Income            Float    @default(2000)
+  person2Name              String   @default("Persona 2")
+  person2Income            Float    @default(2000)
+  expensesList             String   @default("[]") // JSON string of [{id, name, amount}]
+  hasExistingLoan          Boolean  @default(false)
+  knowsExistingInstallment Boolean  @default(true)
+  existingInstallment      Float    @default(0)
+  existingRemainingCapital Float    @default(15000)
+  existingRate             Float    @default(6.5)
+  existingYearsLeft        Float    @default(5)
+  rate                     Float    @default(3.5)
+  years                    Float    @default(30)
+  expectedRent             Float    @default(1200)
+  maintenanceTaxes         Float    @default(300)
+  marketReturn             Float    @default(7)
+  vacancyRate              Float    @default(5)
+  rentInflation            Float    @default(1.5)
+  extraMaintenance         Float    @default(10000)
+  realEstateList           String   @default("[]") // JSON string of Real Estate Properties
+  existingLoansList        String   @default("[]") // JSON string of Existing Loans (Auto, etc.)
+  customStocksList         String   @default("[]") // JSON string of Stocks/ETFs {ticker, shares, lastPrice}
+  acceptedPurchases        String   @default("[]") // JSON string of accepted purchase simulations
+  careerProgression        String   @default("[]") // JSON string of career progression predictions
+
+  // FIRE Parameters
+  birthYear                Int?
+  retirementAge            Int?
+  expectedMonthlyExpenses  Float?
+  fireWithdrawalRate       Float    @default(3.25)
+  fireExpectedReturn       Float    @default(6.0)
+  fireVolatility           Float    @default(15.0)
+  expectedPublicPension    Float    @default(0)
+  publicPensionAge         Int      @default(67)
+  applyTaxStamp            Boolean  @default(true)
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AssetRecord {
+  id                 String   @id @default(uuid())
+  date               DateTime @default(now())
+  
+  // Real Estate
+  realEstateValue    Float    @default(0)
+  realEstateCosts    Float    @default(0) // Costo annuale mantenimento
+  realEstateRent     Float    @default(0) // Rendita presunta/effettiva annuale
+  realEstateList     String   @default("[]") // Lista dettagliata
+  
+  // Liquid Assets (Stocks, Bonds, ETFs)
+  liquidStockValue   Float    @default(0)
+  customStocksList   String   @default("[]") // Snapshot of custom stocks holding
+  
+  // Safe Haven (Oro, Orologi, Arte)
+  safeHavens         Float    @default(0)
+  
+  // Emergency Fund (Liquidità in Conto)
+  emergencyFund      Float    @default(0)
+
+  // Pension Fund (TFR)
+  pensionFund        Float    @default(0)
+  
+  // Crypto
+  bitcoinAmount      Float    @default(0)
+  bitcoinPrice       Float    @default(0) // Snapshot del prezzo in EUR al momento del salvataggio
+  
+  // Passività (Mutui, Prestiti, Carte)
+  debtsTotal         Float    @default(0)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model SavingsGoal {
+  id           String   @id @default(uuid())
+  name         String
+  targetAmount Float
+  currentAmount Float   @default(0)
+  deadline     String?  // YYYY-MM format
+  category     String   @default("general") // general, emergency, house, investment, travel, other
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model StockHistoryCache {
+  ticker    String   @id
+  history   String   // JSON string of the [{timestamp, date, price, originalCurrency}] array
+  updatedAt DateTime @updatedAt
+}

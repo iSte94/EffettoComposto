@@ -1,0 +1,164 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@plugin "tailwindcss-animate";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --background: oklch(0.98 0.01 250);
+  /* Very light slate */
+  --foreground: oklch(0.14 0.05 250);
+  /* Dark text */
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.14 0.05 250);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.14 0.05 250);
+
+  --primary: oklch(0.60 0.15 250);
+  /* Primary blue */
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.95 0.02 250);
+  --secondary-foreground: oklch(0.20 0.05 250);
+
+  --muted: oklch(0.95 0.02 250);
+  --muted-foreground: oklch(0.40 0.05 250);
+
+  --accent: oklch(0.95 0.02 250);
+  --accent-foreground: oklch(0.20 0.05 250);
+
+  --destructive: oklch(0.60 0.20 20);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.90 0.02 250);
+  --input: oklch(0.90 0.02 250);
+  --ring: oklch(0.60 0.15 250);
+
+  --radius: 1rem;
+}
+
+.dark {
+  --background: oklch(0.14 0.05 250);
+  /* Dark slate background */
+  --foreground: oklch(0.98 0.01 250);
+  /* Light slate text */
+
+  --card: oklch(0.17 0.04 250);
+  --card-foreground: oklch(0.98 0.01 250);
+
+  --popover: oklch(0.14 0.05 250);
+  --popover-foreground: oklch(0.98 0.01 250);
+
+  --primary: oklch(0.65 0.15 250);
+  /* Slightly lighter primary for dark mode */
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.20 0.05 250);
+  --secondary-foreground: oklch(0.95 0.02 250);
+
+  --muted: oklch(0.20 0.05 250);
+  --muted-foreground: oklch(0.65 0.05 250);
+
+  --accent: oklch(0.20 0.05 250);
+  --accent-foreground: oklch(0.95 0.02 250);
+
+  --destructive: oklch(0.60 0.20 20);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.25 0.03 250);
+  --input: oklch(0.25 0.03 250);
+  --ring: oklch(0.65 0.15 250);
+}
+
+@keyframes slow-pulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.animate-pulse {
+  animation: slow-pulse 8s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  animation: shimmer 3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .animate-pulse,
+  .animate-shimmer {
+    animation: none !important;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  html {
+    font-size: 17px;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Tabular nums for financial data alignment */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Apply tabular nums to all number inputs */
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
+}

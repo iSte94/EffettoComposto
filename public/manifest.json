@@ -1,0 +1,21 @@
+{
+  "name": "Effetto Composto - Indipendenza Finanziaria",
+  "short_name": "Effetto Composto",
+  "description": "Simulatore mutuo, calcolatore FIRE, tracker patrimonio e budget. Strumenti gratuiti per pianificare la tua indipendenza finanziaria.",
+  "id": "effettocomposto",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "utilities"],
+  "lang": "it",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
