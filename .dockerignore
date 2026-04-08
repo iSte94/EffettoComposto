@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.claude
+*.db
+*.db-journal
+.env
+.env.local
+.env.*.local
+*.ppk
+*_openssh
+*.pub
+id_rsa
+id_ed25519

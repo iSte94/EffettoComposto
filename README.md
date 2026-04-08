@@ -1,36 +1,81 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Effetto Composto
 
-## Getting Started
+Strumenti gratuiti e open-source per pianificare la tua **indipendenza finanziaria**.
 
-First, run the development server:
+Simulatore mutuo, calcolatore FIRE, tracker patrimonio, budget mensile e molto altro. Tutto in italiano, tutto in un'unica webapp.
+
+**[effettocomposto.it](https://effettocomposto.it)**
+
+## Funzionalita'
+
+- **Simulatore Mutuo** — Calcolo rata, ammortamento francese, confronto mutui, analisi DTI
+- **Calcolatore FIRE** — Monte Carlo (10.000 simulazioni via Web Worker), proiezione patrimonio
+- **Tracker Patrimonio** — Snapshot giornalieri, immobili, portafoglio titoli con dividendi, prestiti
+- **Budget & Spese** — Budget mensile per categoria, import CSV estratto conto (Fineco, Intesa)
+- **Obiettivi di Risparmio** — Tracking progressi verso obiettivi personalizzati
+- **Abbonamenti** — Tracker costi ricorrenti con totale mensile/annuale
+- **Strategia Debiti** — Confronto snowball vs avalanche
+- **Calcolatore Inflazione** — Impatto dell'inflazione sul potere d'acquisto
+- **Interesse Composto** — Simulazione crescita capitale nel tempo
+- **Advisor Acquisti** — Analisi impatto acquisti sul percorso FIRE
+- **Riepilogo** — KPI, asset allocation, alert automatici (DTI, fondo emergenza, FIRE)
+
+## Tech Stack
+
+- **Next.js 16** (App Router) + React 19 + TypeScript
+- **Tailwind CSS 4** + Shadcn/UI
+- **Prisma + SQLite** per la persistenza
+- **Recharts** per i grafici
+- **Framer Motion** per le animazioni
+- **Web Workers** per calcoli pesanti (Monte Carlo)
+- **PWA** con Service Worker (installabile su mobile)
+- **Vitest** per i test
+
+## Sviluppo locale
 
 ```bash
+# Installa dipendenze
+npm install
+
+# Genera Prisma client e applica schema
+npx prisma generate
+npx prisma db push
+
+# Avvia il dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Apri [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Comandi utili
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run dev          # Dev server
+npm run build        # Build produzione
+npm run lint         # ESLint
+npm test             # Test (run once)
+npm run test:watch   # Test in watch mode
+npx prisma studio    # GUI database
+```
 
-## Learn More
+### Variabili d'ambiente
 
-To learn more about Next.js, take a look at the following resources:
+Copia `.env.example` in `.env`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+cp .env.example .env
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Variabile      | Descrizione                          | Obbligatoria |
+| -------------- | ------------------------------------ | ------------ |
+| `DATABASE_URL` | Path al database SQLite              | Si           |
+| `JWT_SECRET`   | Secret per i token JWT               | In produzione|
+| `NODE_ENV`     | `development` / `production`         | No           |
 
-## Deploy on Vercel
+## Deploy
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Il progetto e' pensato per girare su un VPS con Docker e Traefik. Vedi [DEPLOY.md](DEPLOY.md) per la guida completa.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Licenza
+
+MIT

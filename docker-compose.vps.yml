@@ -1,0 +1,56 @@
+services:
+  app:
+    image: effetto-composto:latest
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: effetto-composto
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "file:/app/data/prod.db"
+      JWT_SECRET: "${JWT_SECRET}"
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+    volumes:
+      - effetto_composto_data:/app/data
+    expose:
+      - "3000"
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # Dominio principale
+      - "traefik.http.routers.effettocomposto.rule=Host(`effettocomposto.it`) || Host(`www.effettocomposto.it`)"
+      - "traefik.http.routers.effettocomposto.entrypoints=websecure"
+      - "traefik.http.routers.effettocomposto.tls=true"
+      - "traefik.http.routers.effettocomposto.tls.certresolver=myresolver"
+      - "traefik.http.routers.effettocomposto.priority=10"
+      - "traefik.http.services.effettocomposto.loadbalancer.server.port=3000"
+      # Redirect www -> apex
+      - "traefik.http.routers.effettocomposto-www.rule=Host(`www.effettocomposto.it`)"
+      - "traefik.http.routers.effettocomposto-www.entrypoints=websecure"
+      - "traefik.http.routers.effettocomposto-www.tls=true"
+      - "traefik.http.routers.effettocomposto-www.tls.certresolver=myresolver"
+      - "traefik.http.routers.effettocomposto-www.priority=20"
+      - "traefik.http.routers.effettocomposto-www.middlewares=effettocomposto-www-redirect"
+      - "traefik.http.routers.effettocomposto-www.service=noop@internal"
+      - "traefik.http.middlewares.effettocomposto-www-redirect.redirectregex.regex=^https://www\\.effettocomposto\\.it/?(.*)"
+      - "traefik.http.middlewares.effettocomposto-www-redirect.redirectregex.replacement=https://effettocomposto.it/$${1}"
+      - "traefik.http.middlewares.effettocomposto-www-redirect.redirectregex.permanent=true"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+networks:
+  proxy:
+    external: true
+    name: proxy
+
+volumes:
+  effetto_composto_data:

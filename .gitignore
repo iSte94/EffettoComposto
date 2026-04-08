@@ -52,3 +52,16 @@ prisma/dev.db-journal
 next-env.d.ts
 
 /src/generated/prisma
+
+# SSH keys (mai committare!)
+*.ppk
+*_openssh
+*.pub
+id_rsa
+id_ed25519
+
+# Production database
+prisma/prod.db
+prisma/prod.db-journal
+dev.db
+dev.db-journal
