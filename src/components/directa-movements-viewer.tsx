@@ -153,6 +153,56 @@ function monthLabel(key: string): string {
   return `${months[parseInt(m!) - 1]} ${y!.slice(2)}`;
 }
 
+// ---------- IRR (MWR) Calculator ----------
+
+interface CashFlow {
+  date: Date;
+  amount: number; // negative = outflow (buy), positive = inflow (sell/dividend)
+}
+
+function daysBetween(a: Date, b: Date): number {
+  return (b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24);
+}
+
+/** XIRR: find annualized rate r such that sum( cf / (1+r)^(days/365) ) = 0 */
+function computeXIRR(cashFlows: CashFlow[], guess = 0.1, maxIter = 200, tol = 1e-7): number | null {
+  if (cashFlows.length < 2) return null;
+  const d0 = cashFlows[0]!.date;
+
+  const npv = (r: number) => {
+    let s = 0;
+    for (const cf of cashFlows) {
+      const t = daysBetween(d0, cf.date) / 365;
+      s += cf.amount / Math.pow(1 + r, t);
+    }
+    return s;
+  };
+
+  const dnpv = (r: number) => {
+    let s = 0;
+    for (const cf of cashFlows) {
+      const t = daysBetween(d0, cf.date) / 365;
+      if (t === 0) continue;
+      s += -t * cf.amount / Math.pow(1 + r, t + 1);
+    }
+    return s;
+  };
+
+  let r = guess;
+  for (let i = 0; i < maxIter; i++) {
+    const f = npv(r);
+    const df = dnpv(r);
+    if (Math.abs(df) < 1e-14) break;
+    const rNew = r - f / df;
+    if (Math.abs(rNew - r) < tol) return rNew;
+    r = rNew;
+    if (r < -0.99) r = -0.99; // clamp
+    if (r > 10) r = 10;
+  }
+  // fallback: check if it converged reasonably
+  return Math.abs(npv(r)) < 1 ? r : null;
+}
+
 const PIE_COLORS = [
   "#10b981", "#6366f1", "#f59e0b", "#ef4444", "#8b5cf6",
   "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#14b8a6",
@@ -333,36 +383,74 @@ export function DirectaMovementsViewer() {
       .map(([key, val]) => ({ month: monthLabel(key), ...val }));
   }, [filteredMovements]);
 
-  // By ticker breakdown (top invested)
+  // By ticker breakdown with cash flows for IRR
   const tickerBreakdown = useMemo(() => {
-    const map = new Map<string, { investito: number; ricavato: number; descrizione: string; qty: number }>();
+    const map = new Map<string, {
+      investito: number; ricavato: number; descrizione: string; qty: number;
+      cashFlows: CashFlow[]; firstDate: Date; lastDate: Date; dividendi: number;
+    }>();
     for (const m of filteredMovements) {
       if (!m.ticker || m.ticker.startsWith("LX.")) continue;
-      const entry = map.get(m.ticker) ?? { investito: 0, ricavato: 0, descrizione: m.descrizione, qty: 0 };
+      const entry = map.get(m.ticker) ?? {
+        investito: 0, ricavato: 0, descrizione: m.descrizione, qty: 0,
+        cashFlows: [], firstDate: m.dataOperazione, lastDate: m.dataOperazione, dividendi: 0,
+      };
       if (!entry.descrizione && m.descrizione) entry.descrizione = m.descrizione;
+      if (m.dataOperazione < entry.firstDate) entry.firstDate = m.dataOperazione;
+      if (m.dataOperazione > entry.lastDate) entry.lastDate = m.dataOperazione;
+
       if (m.tipoOperazione === "Acquisto") {
         entry.investito += Math.abs(m.importoEuro);
         entry.qty += m.quantita;
+        entry.cashFlows.push({ date: m.dataOperazione, amount: m.importoEuro }); // negative
       } else if (m.tipoOperazione === "Vendita") {
         entry.ricavato += m.importoEuro;
         entry.qty -= m.quantita;
+        entry.cashFlows.push({ date: m.dataOperazione, amount: m.importoEuro }); // positive
+      } else if (categorize(m.tipoOperazione) === "Dividendi & Cedole") {
+        entry.dividendi += m.importoEuro;
+        entry.cashFlows.push({ date: m.dataOperazione, amount: m.importoEuro });
+      } else if (m.tipoOperazione === "Commissioni" || categorize(m.tipoOperazione) === "Tasse & Ritenute") {
+        entry.cashFlows.push({ date: m.dataOperazione, amount: m.importoEuro }); // negative
       }
       map.set(m.ticker, entry);
     }
     return Array.from(map.entries())
-      .map(([ticker, val]) => ({ ticker, ...val, pl: val.ricavato - val.investito }))
+      .map(([ticker, val]) => {
+        const pl = val.ricavato - val.investito;
+        const holdingDays = Math.max(1, daysBetween(val.firstDate, val.lastDate));
+        const holdingYears = holdingDays / 365;
+        const simpleReturn = val.investito > 0 ? (pl / val.investito) * 100 : 0;
+        // Annualized simple return (TWR approximation for closed positions)
+        const annualizedReturn = val.ricavato > 0 && val.investito > 0 && holdingYears > 0
+          ? (Math.pow(val.ricavato / val.investito, 1 / holdingYears) - 1) * 100
+          : null;
+        // MWR (XIRR) using actual cash flows
+        const sortedCf = [...val.cashFlows].sort((a, b) => a.date.getTime() - b.date.getTime());
+        const mwr = sortedCf.length >= 2 ? computeXIRR(sortedCf) : null;
+        return {
+          ticker, ...val, pl, simpleReturn, annualizedReturn,
+          mwr: mwr !== null ? mwr * 100 : null,
+          holdingYears,
+        };
+      })
       .sort((a, b) => b.investito - a.investito);
   }, [filteredMovements]);
 
-  // Ranking: only closed positions (ricavato > 0), sorted by % return
+  // Ranking: only closed positions (ricavato > 0), sorted by MWR then simple %
   const tickerRanking = useMemo(() => {
     return tickerBreakdown
       .filter((t) => t.ricavato > 0 && t.investito > 0)
-      .map((t) => ({ ...t, pctReturn: ((t.ricavato - t.investito) / t.investito) * 100 }))
-      .sort((a, b) => b.pctReturn - a.pctReturn);
+      .map((t) => ({ ...t, pctReturn: t.simpleReturn }))
+      .sort((a, b) => {
+        // sort by MWR if available, otherwise simple return
+        const aMwr = a.mwr ?? a.pctReturn;
+        const bMwr = b.mwr ?? b.pctReturn;
+        return bMwr - aMwr;
+      });
   }, [tickerBreakdown]);
 
-  // P/L totals
+  // P/L totals + portfolio-level MWR
   const plSummary = useMemo(() => {
     const closed = tickerBreakdown.filter((t) => t.ricavato > 0 && t.investito > 0);
     const totalGain = closed.filter((t) => t.pl >= 0).reduce((s, t) => s + t.pl, 0);
@@ -371,7 +459,20 @@ export function DirectaMovementsViewer() {
     const totalReturned = closed.reduce((s, t) => s + t.ricavato, 0);
     const netPL = totalReturned - totalInvested;
     const pctReturn = totalInvested > 0 ? ((totalReturned - totalInvested) / totalInvested) * 100 : 0;
-    return { totalGain, totalLoss, netPL, totalInvested, totalReturned, pctReturn, count: closed.length };
+
+    // Portfolio-level XIRR (MWR): all cash flows from all closed positions
+    const allCf: CashFlow[] = [];
+    for (const t of closed) {
+      allCf.push(...t.cashFlows);
+    }
+    allCf.sort((a, b) => a.date.getTime() - b.date.getTime());
+    const portfolioMwr = allCf.length >= 2 ? computeXIRR(allCf) : null;
+
+    return {
+      totalGain, totalLoss, netPL, totalInvested, totalReturned, pctReturn,
+      count: closed.length,
+      portfolioMwr: portfolioMwr !== null ? portfolioMwr * 100 : null,
+    };
   }, [tickerBreakdown]);
 
   // Pie chart for operation categories
@@ -685,7 +786,7 @@ export function DirectaMovementsViewer() {
       </div>
 
       {/* P/L Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <KpiCard
           icon={TrendingUp} label="Guadagni totali"
           value={fmtEuroSigned(plSummary.totalGain)}
@@ -701,15 +802,50 @@ export function DirectaMovementsViewer() {
           icon={Wallet} label="P/L netto"
           value={fmtEuroSigned(plSummary.netPL)}
           color={plSummary.netPL >= 0 ? "bg-emerald-500" : "bg-rose-500"}
-          sub={`${plSummary.pctReturn >= 0 ? "+" : ""}${plSummary.pctReturn.toFixed(1)}% sul capitale chiuso`}
+        />
+        <KpiCard
+          icon={BadgePercent} label="Rendimento semplice"
+          value={`${plSummary.pctReturn >= 0 ? "+" : ""}${plSummary.pctReturn.toFixed(1)}%`}
+          color="bg-indigo-500"
+          sub="sul capitale chiuso"
+        />
+        <KpiCard
+          icon={TrendingUp} label="MWR (XIRR annuo)"
+          value={plSummary.portfolioMwr !== null ? `${plSummary.portfolioMwr >= 0 ? "+" : ""}${plSummary.portfolioMwr.toFixed(1)}%` : "N/D"}
+          color="bg-violet-500"
+          sub="rendimento ponderato per capitale"
         />
         <KpiCard
           icon={ArrowDownUp} label="Capitale chiuso"
           value={fmtEuro(plSummary.totalInvested)}
-          color="bg-indigo-500"
+          color="bg-cyan-600"
           sub={`ricavato ${fmtEuro(plSummary.totalReturned)}`}
         />
       </div>
+
+      {/* Nota MWR vs TWR */}
+      <Card className="border-border/60 bg-card/80 backdrop-blur-sm shadow-sm">
+        <CardContent className="p-4">
+          <div className="flex gap-3 text-xs text-muted-foreground leading-relaxed">
+            <BadgePercent className="size-5 text-violet-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p>
+                <span className="font-semibold text-foreground">MWR (Money-Weighted Return)</span> &mdash;
+                XIRR annualizzato: tiene conto di <em>quando</em> e <em>quanto</em> hai investito.
+                Riflette il rendimento effettivo del tuo capitale. Calcolato su acquisti, vendite, dividendi, commissioni e tasse.
+              </p>
+              <p>
+                <span className="font-semibold text-foreground">Rendimento semplice</span> &mdash;
+                (Ricavato &minus; Investito) / Investito. Non considera il tempo di detenzione.
+              </p>
+              <p>
+                <span className="font-semibold text-foreground">Rend. annualizzato</span> &mdash;
+                Rendimento semplice ricalcolato su base annua in base alla durata dell&apos;investimento.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Classifica investimenti */}
       {tickerRanking.length > 0 && (
@@ -724,33 +860,66 @@ export function DirectaMovementsViewer() {
                   <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Investito</th>
                   <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Ricavato</th>
                   <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">P/L</th>
-                  <th className="px-4 sm:px-5 py-2.5 font-semibold text-muted-foreground text-right">Rendimento %</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Rend. semplice</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Rend. annualizzato</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">MWR (XIRR)</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Durata</th>
+                  <th className="px-4 sm:px-5 py-2.5 font-semibold text-muted-foreground text-right">Contrib. al P/L</th>
                 </tr>
               </thead>
               <tbody>
-                {tickerRanking.map((t, i) => (
-                  <tr key={t.ticker} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
-                    <td className="px-4 sm:px-5 py-2.5 font-bold text-muted-foreground">{i + 1}</td>
-                    <td className="px-3 py-2.5">
-                      <span className="font-mono font-bold text-xs bg-muted/50 rounded px-1.5 py-0.5">{t.ticker}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-muted-foreground max-w-48 truncate">{t.descrizione}</td>
-                    <td className="px-3 py-2.5 text-right font-medium">{fmtEuro(t.investito)}</td>
-                    <td className="px-3 py-2.5 text-right font-medium">{fmtEuro(t.ricavato)}</td>
-                    <td className={`px-3 py-2.5 text-right font-bold ${t.pl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                      {fmtEuroSigned(t.pl)}
-                    </td>
-                    <td className={`px-4 sm:px-5 py-2.5 text-right font-bold ${t.pctReturn >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                      <div className="flex items-center justify-end gap-1.5">
-                        {t.pctReturn >= 0
-                          ? <ArrowUpRight className="size-3.5" />
-                          : <ArrowDownRight className="size-3.5" />
-                        }
+                {tickerRanking.map((t, i) => {
+                  const contribPct = plSummary.netPL !== 0 ? (t.pl / Math.abs(plSummary.netPL)) * 100 : 0;
+                  const durationLabel = t.holdingYears >= 1
+                    ? `${t.holdingYears.toFixed(1)}a`
+                    : `${Math.round(t.holdingYears * 12)}m`;
+                  return (
+                    <tr key={t.ticker} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                      <td className="px-4 sm:px-5 py-2.5 font-bold text-muted-foreground">{i + 1}</td>
+                      <td className="px-3 py-2.5">
+                        <span className="font-mono font-bold text-xs bg-muted/50 rounded px-1.5 py-0.5">{t.ticker}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-muted-foreground max-w-40 truncate">{t.descrizione}</td>
+                      <td className="px-3 py-2.5 text-right font-medium">{fmtEuro(t.investito)}</td>
+                      <td className="px-3 py-2.5 text-right font-medium">{fmtEuro(t.ricavato)}</td>
+                      <td className={`px-3 py-2.5 text-right font-bold ${t.pl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                        {fmtEuroSigned(t.pl)}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right font-semibold ${t.pctReturn >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
                         {t.pctReturn >= 0 ? "+" : ""}{t.pctReturn.toFixed(1)}%
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className={`px-3 py-2.5 text-right font-semibold ${t.annualizedReturn !== null ? (t.annualizedReturn >= 0 ? "text-emerald-500" : "text-rose-500") : "text-muted-foreground"}`}>
+                        {t.annualizedReturn !== null
+                          ? `${t.annualizedReturn >= 0 ? "+" : ""}${t.annualizedReturn.toFixed(1)}%/a`
+                          : "-"
+                        }
+                      </td>
+                      <td className={`px-3 py-2.5 text-right font-bold ${t.mwr !== null ? (t.mwr >= 0 ? "text-emerald-500" : "text-rose-500") : "text-muted-foreground"}`}>
+                        {t.mwr !== null
+                          ? <div className="flex items-center justify-end gap-1">
+                              {t.mwr >= 0 ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
+                              {t.mwr >= 0 ? "+" : ""}{t.mwr.toFixed(1)}%
+                            </div>
+                          : "-"
+                        }
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-muted-foreground">{durationLabel}</td>
+                      <td className="px-4 sm:px-5 py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <div className="w-14 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${t.pl >= 0 ? "bg-emerald-500" : "bg-rose-500"}`}
+                              style={{ width: `${Math.min(100, Math.abs(contribPct))}%` }}
+                            />
+                          </div>
+                          <span className={`font-semibold ${t.pl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                            {contribPct >= 0 ? "+" : ""}{contribPct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
