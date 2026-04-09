@@ -130,12 +130,12 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
             if (patData.history && patData.history.length > 0) {
                 const last: AssetRecord = patData.history[patData.history.length - 1];
-                const totalAssets = last.liquidStockValue +
+                const totalAssets = last.liquidStockValue + (last.stocksSnapshotValue || 0) +
                     (last.bitcoinAmount * last.bitcoinPrice) + last.safeHavens + last.emergencyFund + last.pensionFund;
                 const netW = totalAssets - last.debtsTotal;
                 setCurrentNetWorth(netW);
 
-                const liquid = last.liquidStockValue + (last.bitcoinAmount * last.bitcoinPrice) + last.emergencyFund + last.pensionFund;
+                const liquid = last.liquidStockValue + (last.stocksSnapshotValue || 0) + (last.bitcoinAmount * last.bitcoinPrice) + last.emergencyFund + last.pensionFund;
                 setCurrentLiquidAssets(liquid);
 
                 // NEW: Calcola la rendita passiva dagli immobili a rendita attiva

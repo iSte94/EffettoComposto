@@ -10,6 +10,7 @@ export interface AssetRecord {
     realEstateCosts: number;
     realEstateRent: number;
     liquidStockValue: number;
+    stocksSnapshotValue: number;
     safeHavens: number;
     emergencyFund: number;
     pensionFund: number;

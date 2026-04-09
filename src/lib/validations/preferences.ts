@@ -31,6 +31,7 @@ export const preferencesSchema = z.object({
     customStocksList: z.string().optional(),
     acceptedPurchases: z.string().optional(),
     careerProgression: z.string().optional(),
+    salaryCalculationHistory: z.string().optional(),
     // FIRE
     birthYear: z.number().int().min(1900).max(2100).nullable().optional(),
     retirementAge: z.number().int().min(20).max(100).nullable().optional(),
@@ -41,4 +42,5 @@ export const preferencesSchema = z.object({
     expectedPublicPension: z.number().min(0).optional(),
     publicPensionAge: z.number().int().min(50).max(100).optional(),
     applyTaxStamp: z.boolean().optional(),
+    separateEmergencyFund: z.boolean().optional(),
 });

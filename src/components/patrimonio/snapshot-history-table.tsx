@@ -44,7 +44,7 @@ export const SnapshotHistoryTable = memo(function SnapshotHistoryTable({ history
                                         {format(parseISO(item.date), "dd/MM/yyyy")}
                                     </td>
                                     <td className="px-4 py-4 text-slate-600 dark:text-slate-400 sm:px-6">{formatEuro(item.realEstateValue)}</td>
-                                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400 sm:px-6">{formatEuro(item.liquidStockValue)}</td>
+                                    <td className="px-4 py-4 text-slate-600 dark:text-slate-400 sm:px-6">{formatEuro((item.liquidStockValue || 0) + (item.stocksSnapshotValue || 0))}</td>
                                     <td className="px-4 py-4 text-slate-600 dark:text-slate-400 sm:px-6">
                                         <span className="font-medium">{item.bitcoinAmount} BTC</span>
                                         <br />

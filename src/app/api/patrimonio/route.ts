@@ -58,6 +58,7 @@ export async function POST(req: Request) {
             realEstateCosts: data.realEstateCosts || 0,
             realEstateRent: data.realEstateRent || 0,
             liquidStockValue: data.liquidStockValue || 0,
+            stocksSnapshotValue: data.stocksSnapshotValue || 0,
             safeHavens: data.safeHavens || 0,
             emergencyFund: data.emergencyFund || 0,
             pensionFund: data.pensionFund || 0,

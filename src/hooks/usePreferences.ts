@@ -25,10 +25,13 @@ export interface MortgagePreferences {
     rentInflation: number;
     extraMaintenance: number;
     careerProgression: string;
+    salaryCalculationHistory: string;
     expectedMonthlyExpenses: number;
     fireWithdrawalRate: number;
     fireExpectedReturn: number;
 }
+
+const LOCAL_PREFERENCES_KEY = "effetto-composto:career-preferences";
 
 const DEFAULT_PREFERENCES: MortgagePreferences = {
     propertyPrice: 300000,
@@ -51,6 +54,7 @@ const DEFAULT_PREFERENCES: MortgagePreferences = {
     rentInflation: 1.5,
     extraMaintenance: 10000,
     careerProgression: "[]",
+    salaryCalculationHistory: "[]",
     expectedMonthlyExpenses: 2500,
     fireWithdrawalRate: 3.25,
     fireExpectedReturn: 6,
@@ -63,60 +67,87 @@ export function usePreferences() {
     const [isLoaded, setIsLoaded] = useState(false);
     const isFirstLoad = useRef(true);
 
+    const normalizePreferences = useCallback((raw: Partial<MortgagePreferences> | null | undefined): MortgagePreferences => ({
+        propertyPrice: raw?.propertyPrice ?? DEFAULT_PREFERENCES.propertyPrice,
+        downpayment: raw?.downpayment ?? DEFAULT_PREFERENCES.downpayment,
+        purchaseTaxes: raw?.purchaseTaxes ?? DEFAULT_PREFERENCES.purchaseTaxes,
+        notaryFees: raw?.notaryFees ?? DEFAULT_PREFERENCES.notaryFees,
+        agencyFees: raw?.agencyFees ?? DEFAULT_PREFERENCES.agencyFees,
+        netIncome: raw?.netIncome ?? DEFAULT_PREFERENCES.netIncome,
+        person1Name: raw?.person1Name ?? DEFAULT_PREFERENCES.person1Name,
+        person1Income: raw?.person1Income ?? DEFAULT_PREFERENCES.person1Income,
+        person2Name: raw?.person2Name ?? DEFAULT_PREFERENCES.person2Name,
+        person2Income: raw?.person2Income ?? DEFAULT_PREFERENCES.person2Income,
+        existingLoansList: raw?.existingLoansList ?? DEFAULT_PREFERENCES.existingLoansList,
+        rate: raw?.rate ?? DEFAULT_PREFERENCES.rate,
+        years: raw?.years ?? DEFAULT_PREFERENCES.years,
+        expectedRent: raw?.expectedRent ?? DEFAULT_PREFERENCES.expectedRent,
+        maintenanceTaxes: raw?.maintenanceTaxes ?? DEFAULT_PREFERENCES.maintenanceTaxes,
+        marketReturn: raw?.marketReturn ?? DEFAULT_PREFERENCES.marketReturn,
+        vacancyRate: raw?.vacancyRate ?? DEFAULT_PREFERENCES.vacancyRate,
+        rentInflation: raw?.rentInflation ?? DEFAULT_PREFERENCES.rentInflation,
+        extraMaintenance: raw?.extraMaintenance ?? DEFAULT_PREFERENCES.extraMaintenance,
+        careerProgression: raw?.careerProgression ?? DEFAULT_PREFERENCES.careerProgression,
+        salaryCalculationHistory: raw?.salaryCalculationHistory ?? DEFAULT_PREFERENCES.salaryCalculationHistory,
+        expectedMonthlyExpenses: raw?.expectedMonthlyExpenses ?? DEFAULT_PREFERENCES.expectedMonthlyExpenses,
+        fireWithdrawalRate: raw?.fireWithdrawalRate ?? DEFAULT_PREFERENCES.fireWithdrawalRate,
+        fireExpectedReturn: raw?.fireExpectedReturn ?? DEFAULT_PREFERENCES.fireExpectedReturn,
+    }), []);
+
     // Load preferences when user logs in
     const loadPreferences = useCallback(async () => {
+        if (!user) {
+            try {
+                if (typeof window === "undefined") {
+                    setPreferences(DEFAULT_PREFERENCES);
+                } else {
+                    const stored = window.localStorage.getItem(LOCAL_PREFERENCES_KEY);
+                    const parsed = stored ? JSON.parse(stored) as Partial<MortgagePreferences> : null;
+                    setPreferences(normalizePreferences(parsed));
+                }
+            } catch (error) {
+                console.error("Errore nel caricamento preferenze locali:", error);
+                setPreferences(DEFAULT_PREFERENCES);
+            } finally {
+                setIsLoaded(true);
+            }
+            return;
+        }
+
         try {
             const res = await fetch('/api/preferences');
             const data = await res.json();
             if (data.preferences) {
-                const p = data.preferences;
-                setPreferences({
-                    propertyPrice: p.propertyPrice ?? DEFAULT_PREFERENCES.propertyPrice,
-                    downpayment: p.downpayment ?? DEFAULT_PREFERENCES.downpayment,
-                    purchaseTaxes: p.purchaseTaxes ?? DEFAULT_PREFERENCES.purchaseTaxes,
-                    notaryFees: p.notaryFees ?? DEFAULT_PREFERENCES.notaryFees,
-                    agencyFees: p.agencyFees ?? DEFAULT_PREFERENCES.agencyFees,
-                    netIncome: p.netIncome ?? DEFAULT_PREFERENCES.netIncome,
-                    person1Name: p.person1Name ?? DEFAULT_PREFERENCES.person1Name,
-                    person1Income: p.person1Income ?? DEFAULT_PREFERENCES.person1Income,
-                    person2Name: p.person2Name ?? DEFAULT_PREFERENCES.person2Name,
-                    person2Income: p.person2Income ?? DEFAULT_PREFERENCES.person2Income,
-                    existingLoansList: p.existingLoansList ?? "[]",
-                    rate: p.rate ?? DEFAULT_PREFERENCES.rate,
-                    years: p.years ?? DEFAULT_PREFERENCES.years,
-                    expectedRent: p.expectedRent ?? DEFAULT_PREFERENCES.expectedRent,
-                    maintenanceTaxes: p.maintenanceTaxes ?? DEFAULT_PREFERENCES.maintenanceTaxes,
-                    marketReturn: p.marketReturn ?? DEFAULT_PREFERENCES.marketReturn,
-                    vacancyRate: p.vacancyRate ?? DEFAULT_PREFERENCES.vacancyRate,
-                    rentInflation: p.rentInflation ?? DEFAULT_PREFERENCES.rentInflation,
-                    extraMaintenance: p.extraMaintenance ?? DEFAULT_PREFERENCES.extraMaintenance,
-                    careerProgression: p.careerProgression ?? "[]",
-                    expectedMonthlyExpenses: p.expectedMonthlyExpenses ?? DEFAULT_PREFERENCES.expectedMonthlyExpenses,
-                    fireWithdrawalRate: p.fireWithdrawalRate ?? DEFAULT_PREFERENCES.fireWithdrawalRate,
-                    fireExpectedReturn: p.fireExpectedReturn ?? DEFAULT_PREFERENCES.fireExpectedReturn,
-                });
+                setPreferences(normalizePreferences(data.preferences));
                 toast.success("Preferenze caricate dal tuo account");
+            } else {
+                setPreferences(DEFAULT_PREFERENCES);
             }
             setIsLoaded(true);
         } catch (error) {
             console.error("Errore nel caricamento preferenze:", error);
             setIsLoaded(true);
         }
-    }, []);
+    }, [normalizePreferences, user]);
 
     useEffect(() => {
-        if (user && !isLoaded) {
+        if (isLoadingUser) return;
+        if (!isLoaded) {
             loadPreferences();
         }
-        if (!user) {
-            setIsLoaded(false);
-            isFirstLoad.current = true;
-        }
-    }, [user, isLoaded, loadPreferences]);
+    }, [user, isLoaded, isLoadingUser, loadPreferences]);
+
+    useEffect(() => {
+        if (isLoadingUser) return;
+        setPreferences(DEFAULT_PREFERENCES);
+        setIsSaving(false);
+        setIsLoaded(false);
+        isFirstLoad.current = true;
+    }, [user, isLoadingUser]);
 
     // Auto-save with debounce
     useEffect(() => {
-        if (!user || isLoadingUser) return;
+        if (isLoadingUser || !isLoaded) return;
         if (isFirstLoad.current) {
             isFirstLoad.current = false;
             return;
@@ -125,20 +156,24 @@ export function usePreferences() {
         const timeoutId = setTimeout(async () => {
             setIsSaving(true);
             try {
-                await fetch('/api/preferences', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(preferences),
-                });
+                if (user) {
+                    await fetch('/api/preferences', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(preferences),
+                    });
+                } else if (typeof window !== "undefined") {
+                    window.localStorage.setItem(LOCAL_PREFERENCES_KEY, JSON.stringify(preferences));
+                }
             } catch (error) {
-                console.error("Network error during auto-save:", error);
+                console.error("Errore durante il salvataggio preferenze:", error);
             } finally {
                 setIsSaving(false);
             }
         }, 1500);
 
         return () => clearTimeout(timeoutId);
-    }, [preferences, user, isLoadingUser]);
+    }, [preferences, user, isLoaded, isLoadingUser]);
 
     const updatePreference = useCallback(<K extends keyof MortgagePreferences>(
         key: K, value: MortgagePreferences[K]

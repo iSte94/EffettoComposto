@@ -54,6 +54,7 @@ model Preference {
   customStocksList         String   @default("[]") // JSON string of Stocks/ETFs {ticker, shares, lastPrice}
   acceptedPurchases        String   @default("[]") // JSON string of accepted purchase simulations
   careerProgression        String   @default("[]") // JSON string of career progression predictions
+  salaryCalculationHistory String   @default("[]") // JSON string of gross-to-net salary simulations
 
   // FIRE Parameters
   birthYear                Int?
@@ -65,6 +66,7 @@ model Preference {
   expectedPublicPension    Float    @default(0)
   publicPensionAge         Int      @default(67)
   applyTaxStamp            Boolean  @default(true)
+  separateEmergencyFund    Boolean  @default(false)
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -82,6 +84,7 @@ model AssetRecord {
   
   // Liquid Assets (Stocks, Bonds, ETFs)
   liquidStockValue   Float    @default(0)
+  stocksSnapshotValue Float   @default(0) // Valore titoli al momento del salvataggio
   customStocksList   String   @default("[]") // Snapshot of custom stocks holding
   
   // Safe Haven (Oro, Orologi, Arte)

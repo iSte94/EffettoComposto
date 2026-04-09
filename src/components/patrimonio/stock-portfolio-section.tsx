@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Switch } from "@/components/ui/switch";
 import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import type { CustomStock } from "@/types";
@@ -14,6 +15,7 @@ interface StockPortfolioSectionProps {
     customStocksList: CustomStock[];
     liquidStockValue: number;
     emergencyFund: number;
+    separateEmergencyFund: boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     searchResults: any[];
     activeSearchIdx: number | null;
@@ -24,6 +26,7 @@ interface StockPortfolioSectionProps {
     onStocksListChange: (list: CustomStock[]) => void;
     onLiquidStockValueChange: (v: number) => void;
     onEmergencyFundChange: (v: number) => void;
+    onToggleSeparateEmergencyFund: (v: boolean) => void;
     onSearchStocks: (query: string, index: number) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onSelectStock: (stock: CustomStock, suggestion: any) => void;
@@ -31,11 +34,11 @@ interface StockPortfolioSectionProps {
 }
 
 export const StockPortfolioSection = memo(function StockPortfolioSection({
-    customStocksList, liquidStockValue, emergencyFund,
+    customStocksList, liquidStockValue, emergencyFund, separateEmergencyFund,
     searchResults, activeSearchIdx, isSearching,
     portfolioHistory, isFetchingHistory,
     onStocksListChange, onLiquidStockValueChange, onEmergencyFundChange,
-    onSearchStocks, onSelectStock, onTriggerSave,
+    onToggleSeparateEmergencyFund, onSearchStocks, onSelectStock, onTriggerSave,
 }: StockPortfolioSectionProps) {
     return (
         <>
@@ -152,15 +155,24 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
 
                         <div className="space-y-4">
                             <div className="space-y-2 border-b border-slate-100 pb-4 dark:border-slate-800">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Liquidita Immediata (Conto Corrente)</Label>
+                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                                    {separateEmergencyFund ? "Liquidita Immediata (Conto Corrente)" : "Liquidita / Fondo Emergenza"}
+                                </Label>
                                 <Input
                                     type="number"
                                     value={liquidStockValue}
                                     onChange={e => onLiquidStockValueChange(Number(e.target.value))}
                                     onBlur={onTriggerSave}
-                                    className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
+                                    className={separateEmergencyFund
+                                        ? "h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
+                                        : "h-11 border-emerald-200 bg-emerald-50 text-lg font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                    }
                                 />
-                                <p className="text-[10px] text-slate-400 dark:text-slate-400">Questa liquidita fa parte dell&apos;Indice di Sopravvivenza.</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-400">
+                                    {separateEmergencyFund
+                                        ? "Saldo del conto corrente, separato dal fondo emergenza."
+                                        : "Questa liquidita include il fondo emergenza e fa parte dell'Indice di Sopravvivenza."}
+                                </p>
                             </div>
                         </div>
 
@@ -225,17 +237,30 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                         );
                     })()}
 
-                    <div className="space-y-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-                        <Label className="flex items-center text-xs font-bold uppercase tracking-wider text-slate-500">
-                            <ShieldCheck className="mr-1 h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Fondo Emergenza (Cash / Deposito)
-                        </Label>
-                        <Input
-                            type="number"
-                            value={emergencyFund}
-                            onChange={e => onEmergencyFundChange(Number(e.target.value))}
-                            onBlur={onTriggerSave}
-                            className="h-11 border-emerald-200 bg-emerald-50 text-lg font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
-                        />
+                    <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center text-xs font-bold uppercase tracking-wider text-slate-500">
+                                <ShieldCheck className="mr-1 h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Fondo Emergenza Separato
+                            </Label>
+                            <Switch
+                                checked={separateEmergencyFund}
+                                onCheckedChange={onToggleSeparateEmergencyFund}
+                            />
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                            {separateEmergencyFund
+                                ? "Il fondo emergenza e' separato dalla liquidita del conto corrente."
+                                : "Liquidita e fondo emergenza sono un unico importo (campo sopra)."}
+                        </p>
+                        {separateEmergencyFund && (
+                            <Input
+                                type="number"
+                                value={emergencyFund}
+                                onChange={e => onEmergencyFundChange(Number(e.target.value))}
+                                onBlur={onTriggerSave}
+                                className="h-11 border-emerald-200 bg-emerald-50 text-lg font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
+                            />
+                        )}
                     </div>
                 </CardContent>
             </Card>

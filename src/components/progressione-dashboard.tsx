@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 /* eslint-disable react/no-unescaped-entities */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
@@ -12,10 +12,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatEuro } from "@/lib/format";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePreferences } from "@/hooks/usePreferences";
+import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Flame } from "lucide-react";
 import { useTheme } from "next-themes";
+import { SalaryCalculator, type SavedSalaryCalculation } from "@/components/salary-calculator";
 
 interface Bonus {
     id: string;
@@ -42,10 +44,24 @@ const DEFAULT_PROGRESSION: CareerProgressionData = {
     person2: { annualRaisePct: 3.0, expectedInflationPct: 2.0, promotions: [] }
 };
 
+function parseStoredValue<T>(raw: string | null | undefined, fallback: T): T {
+    if (!raw) return fallback;
+
+    try {
+        const parsed = JSON.parse(raw);
+        return (parsed as T) ?? fallback;
+    } catch (error) {
+        console.error("Errore nel parsing del valore salvato", error);
+        return fallback;
+    }
+}
+
 export function ProgressioneDashboard() {
+    const { user } = useAuth();
     const { preferences, updatePreference, isLoaded, isSaving } = usePreferences();
     const { resolvedTheme } = useTheme();
     const [progressionData, setProgressionData] = useState<CareerProgressionData>(DEFAULT_PROGRESSION);
+    const [salaryHistory, setSalaryHistory] = useState<SavedSalaryCalculation[]>([]);
     const [activePersonTab, setActivePersonTab] = useState<"person1" | "person2">("person1");
     const [showScenarios, setShowScenarios] = useState(false);
     const [currentNetWorth, setCurrentNetWorth] = useState<number>(0);
@@ -59,10 +75,10 @@ export function ProgressioneDashboard() {
             if (data.history && data.history.length > 0) {
                 const last = data.history[data.history.length - 1];
                 // Calcoliamo gli asset liquidi per allinearci al calcolatore FIRE
-                const nw = (last.liquidStockValue || 0) + 
-                           (last.safeHavens || 0) + 
-                           (last.emergencyFund || 0) + 
-                           (last.pensionFund || 0) + 
+                const nw = (last.liquidStockValue || 0) + (last.stocksSnapshotValue || 0) +
+                           (last.safeHavens || 0) +
+                           (last.emergencyFund || 0) +
+                           (last.pensionFund || 0) +
                            ((last.bitcoinAmount || 0) * (last.bitcoinPrice || 0));
                 // Sottraiamo debito solo se non supera gli asset liquidi per evitare negativi che rompono FIRE
                 setCurrentNetWorth(Math.max(0, nw - (last.debtsTotal || 0)));
@@ -73,20 +89,34 @@ export function ProgressioneDashboard() {
     // Load data only ONCE upon mounting and preferences ready
     useEffect(() => {
         if (isLoaded && !initialLoadDone) {
-            if (preferences.careerProgression) {
-                try {
-                    const parsed = JSON.parse(preferences.careerProgression);
-                    if (parsed && typeof parsed === 'object') {
-                        setProgressionData({ ...DEFAULT_PROGRESSION, ...parsed });
-                    }
-                } catch (e) {
-                    console.error("Errore nel parsing della career progression", e);
-                }
+            const storedProgression = parseStoredValue<Partial<CareerProgressionData>>(
+                preferences.careerProgression,
+                DEFAULT_PROGRESSION,
+            );
+
+            if (storedProgression && typeof storedProgression === "object") {
+                setProgressionData({
+                    ...DEFAULT_PROGRESSION,
+                    ...storedProgression,
+                    person1: {
+                        ...DEFAULT_PROGRESSION.person1,
+                        ...(storedProgression.person1 ?? {}),
+                    },
+                    person2: {
+                        ...DEFAULT_PROGRESSION.person2,
+                        ...(storedProgression.person2 ?? {}),
+                    },
+                });
             }
+
+            setSalaryHistory(parseStoredValue<SavedSalaryCalculation[]>(
+                preferences.salaryCalculationHistory,
+                [],
+            ));
             // Mark load as finished to enable auto-save
             setInitialLoadDone(true);
         }
-    }, [isLoaded, preferences.careerProgression, initialLoadDone]);
+    }, [isLoaded, preferences.careerProgression, preferences.salaryCalculationHistory, initialLoadDone]);
 
     // Auto-Save whenever progressionData changes, IF initial load is complete
     useEffect(() => {
@@ -95,6 +125,13 @@ export function ProgressioneDashboard() {
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [progressionData, initialLoadDone]);
+
+    useEffect(() => {
+        if (initialLoadDone) {
+            updatePreference("salaryCalculationHistory", JSON.stringify(salaryHistory));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [salaryHistory, initialLoadDone]);
 
     const handleUpdatePerson = <K extends keyof PersonProgression>(person: "person1" | "person2", field: K, value: PersonProgression[K]) => {
         setProgressionData(prev => ({
@@ -119,6 +156,14 @@ export function ProgressioneDashboard() {
     const updateBonus = <K extends keyof Bonus>(person: "person1" | "person2", id: string, field: K, value: Bonus[K]) => {
         handleUpdatePerson(person, "promotions", progressionData[person].promotions.map(p => p.id === id ? { ...p, [field]: value } : p));
     };
+
+    const handleSaveSalaryCalculation = useCallback((entry: SavedSalaryCalculation) => {
+        setSalaryHistory((prev) => [entry, ...prev]);
+    }, []);
+
+    const handleDeleteSalaryCalculation = useCallback((id: string) => {
+        setSalaryHistory((prev) => prev.filter((entry) => entry.id !== id));
+    }, []);
 
     // Derived chart data
     const generateChartData = useCallback(() => {
@@ -485,6 +530,25 @@ export function ProgressioneDashboard() {
                     </Card>
                 </div>
             </div>
+
+            {/* Salary Calculator Widget */}
+            <div className="pt-8 border-t border-border/70">
+                <div className="mb-6 text-center">
+                    <h2 className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-2xl font-extrabold tracking-tight text-foreground md:text-4xl">
+                        Calcola <span className="text-emerald-600 dark:text-emerald-400">Stipendio Netto</span>
+                    </h2>
+                    <p className="mt-1 mx-auto max-w-2xl text-balance text-sm leading-relaxed text-muted-foreground sm:text-base">
+                        Simula il netto quante volte vuoi, salva gli scenari utili e tieni la cronologia direttamente dentro la sezione Carriera.
+                    </p>
+                </div>
+                <SalaryCalculator
+                    history={salaryHistory}
+                    onSaveCalculation={handleSaveSalaryCalculation}
+                    onDeleteCalculation={handleDeleteSalaryCalculation}
+                    persistenceMode={user ? "account" : "device"}
+                />
+            </div>
+
         </div>
     );
 }

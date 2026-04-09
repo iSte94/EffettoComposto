@@ -51,13 +51,13 @@ describe('exportPatrimonioCSV', () => {
         const csv = await getCsvContent();
 
         // Check headers
-        expect(csv).toContain('Data;Immobili;Azioni/ETF;Beni Rifugio');
+        expect(csv).toContain('Data;Immobili;Liquidita CC;Azioni/ETF;Beni Rifugio');
 
         // Check data
         expect(csv).toContain('2024-01-15');
         expect(csv).toContain('200000');
 
-        // Net worth (esclusi immobili): 50000+10000+5000+3000+(0.5*40000)-100000 = -12000
+        // Net worth (esclusi immobili): 50000+0+10000+5000+3000+(0.5*40000)-100000 = -12000
         expect(csv).toContain('-12000');
 
         // Download triggered

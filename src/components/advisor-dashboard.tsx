@@ -75,7 +75,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
 
         if (patrimonioData.records?.length > 0) {
           const latest = patrimonioData.records[patrimonioData.records.length - 1];
-          liquidAssets = (latest.liquidStockValue || 0) + (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
+          liquidAssets = (latest.liquidStockValue || 0) + (latest.stocksSnapshotValue || 0) + (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
           emergencyFund = latest.emergencyFund || 0;
           realEstateValue = latest.realEstateValue || 0;
           totalDebts = latest.debtsTotal || 0;

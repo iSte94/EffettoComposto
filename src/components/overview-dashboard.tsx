@@ -65,7 +65,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                 // Calcola totalNetWorth per ogni record (esclusi immobili)
                 const enriched = patrimonioData.history.map((item: AssetRecord) => ({
                     ...item,
-                    totalNetWorth: (item.liquidStockValue || 0) +
+                    totalNetWorth: (item.liquidStockValue || 0) + (item.stocksSnapshotValue || 0) +
                         (item.safeHavens || 0) + (item.emergencyFund || 0) + (item.pensionFund || 0) +
                         ((item.bitcoinAmount || 0) * (item.bitcoinPrice || 0)) - (item.debtsTotal || 0)
                 }));
@@ -96,7 +96,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         const debtToAssetRatio = totalAssets > 0 ? (totalDebts / totalAssets) * 100 : 0;
 
         const realEstateValue = latest.realEstateValue || 0;
-        const liquidValue = (latest.liquidStockValue || 0) + (latest.emergencyFund || 0);
+        const liquidValue = (latest.liquidStockValue || 0) + (latest.stocksSnapshotValue || 0) + (latest.emergencyFund || 0);
         const btcValue = (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
         const otherAssets = (latest.safeHavens || 0) + (latest.pensionFund || 0);
 
@@ -123,8 +123,10 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             : 0;
         const fireProgress = fireTarget > 0 ? Math.min(100, (currentNetWorth / fireTarget) * 100) : 0;
 
-        // Emergency fund months
-        const emergencyFund = latest.emergencyFund || 0;
+        // Emergency fund months - se separato usa emergencyFund, altrimenti liquidStockValue
+        const isSeparate = !!preferences.separateEmergencyFund;
+        const emergencyFundValue = isSeparate ? (latest.emergencyFund || 0) : (latest.liquidStockValue || 0);
+        const emergencyFund = emergencyFundValue;
         const monthlyExpenses = expectedMonthlyExpenses || 2000; // fallback
         const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0;
 

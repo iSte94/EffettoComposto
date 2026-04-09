@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Wallet, Plus, Trash2, HomeIcon, CreditCard, CalendarClock, Calendar } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { MonthlyExpense } from "@/types";
 
 interface FinancialProfileProps {
@@ -22,6 +23,7 @@ interface FinancialProfileProps {
     totalExpenses: number;
     grossIncome: number;
     netIncome: number;
+    containerClassName?: string;
     onPerson1NameChange: (v: string) => void;
     onPerson1IncomeChange: (v: number) => void;
     onPerson2NameChange: (v: string) => void;
@@ -34,11 +36,12 @@ export const FinancialProfile = memo(function FinancialProfile({
     person1Name, person1Income, person2Name, person2Income,
     expensesList, autoMonthlyRealEstateCosts, autoMonthlyLoanPayments,
     totalAutoExpenses, manualExpenses, totalExpenses, grossIncome, netIncome,
+    containerClassName,
     onPerson1NameChange, onPerson1IncomeChange, onPerson2NameChange, onPerson2IncomeChange,
     onExpensesListChange, onBlur,
 }: FinancialProfileProps) {
     return (
-        <div className="mx-auto w-full max-w-2xl">
+        <div className={cn("mx-auto w-full max-w-2xl", containerClassName)}>
             <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
                 <CardContent className="p-4 sm:p-6">
                     <div className="mb-5 flex items-center justify-between gap-3">

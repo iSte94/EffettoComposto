@@ -5,6 +5,7 @@ export const assetRecordSchema = z.object({
     realEstateCosts: z.number().min(0).optional(),
     realEstateRent: z.number().min(0).optional(),
     liquidStockValue: z.number().min(0).optional(),
+    stocksSnapshotValue: z.number().min(0).optional(),
     safeHavens: z.number().min(0).optional(),
     emergencyFund: z.number().min(0).optional(),
     pensionFund: z.number().min(0).optional(),

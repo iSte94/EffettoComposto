@@ -26,6 +26,7 @@ export function exportPatrimonioCSV(history: Array<{
     date: string;
     realEstateValue: number;
     liquidStockValue: number;
+    stocksSnapshotValue?: number;
     safeHavens: number;
     emergencyFund: number;
     pensionFund: number;
@@ -34,12 +35,13 @@ export function exportPatrimonioCSV(history: Array<{
     debtsTotal: number;
 }>) {
     const headers = [
-        'Data', 'Immobili', 'Azioni/ETF', 'Beni Rifugio', 'Fondo Emergenza',
+        'Data', 'Immobili', 'Liquidita CC', 'Azioni/ETF', 'Beni Rifugio', 'Fondo Emergenza',
         'Fondo Pensione', 'BTC Quantita', 'BTC Prezzo', 'Debiti', 'Patrimonio Netto'
     ];
 
     const rows = history.map(item => {
-        const netWorth = (item.liquidStockValue || 0) +
+        const stocksValue = item.stocksSnapshotValue || 0;
+        const netWorth = (item.liquidStockValue || 0) + stocksValue +
             (item.safeHavens || 0) + (item.emergencyFund || 0) + (item.pensionFund || 0) +
             ((item.bitcoinAmount || 0) * (item.bitcoinPrice || 0)) - (item.debtsTotal || 0);
 
@@ -47,6 +49,7 @@ export function exportPatrimonioCSV(history: Array<{
             item.date.split('T')[0],
             Math.round(item.realEstateValue || 0),
             Math.round(item.liquidStockValue || 0),
+            Math.round(stocksValue),
             Math.round(item.safeHavens || 0),
             Math.round(item.emergencyFund || 0),
             Math.round(item.pensionFund || 0),
