@@ -354,6 +354,26 @@ export function DirectaMovementsViewer() {
       .sort((a, b) => b.investito - a.investito);
   }, [filteredMovements]);
 
+  // Ranking: only closed positions (ricavato > 0), sorted by % return
+  const tickerRanking = useMemo(() => {
+    return tickerBreakdown
+      .filter((t) => t.ricavato > 0 && t.investito > 0)
+      .map((t) => ({ ...t, pctReturn: ((t.ricavato - t.investito) / t.investito) * 100 }))
+      .sort((a, b) => b.pctReturn - a.pctReturn);
+  }, [tickerBreakdown]);
+
+  // P/L totals
+  const plSummary = useMemo(() => {
+    const closed = tickerBreakdown.filter((t) => t.ricavato > 0 && t.investito > 0);
+    const totalGain = closed.filter((t) => t.pl >= 0).reduce((s, t) => s + t.pl, 0);
+    const totalLoss = closed.filter((t) => t.pl < 0).reduce((s, t) => s + t.pl, 0);
+    const totalInvested = closed.reduce((s, t) => s + t.investito, 0);
+    const totalReturned = closed.reduce((s, t) => s + t.ricavato, 0);
+    const netPL = totalReturned - totalInvested;
+    const pctReturn = totalInvested > 0 ? ((totalReturned - totalInvested) / totalInvested) * 100 : 0;
+    return { totalGain, totalLoss, netPL, totalInvested, totalReturned, pctReturn, count: closed.length };
+  }, [tickerBreakdown]);
+
   // Pie chart for operation categories
   const categoryPie = useMemo(() => {
     const map = new Map<string, number>();
@@ -664,8 +684,81 @@ export function DirectaMovementsViewer() {
         </ChartCard>
       </div>
 
+      {/* P/L Summary */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiCard
+          icon={TrendingUp} label="Guadagni totali"
+          value={fmtEuroSigned(plSummary.totalGain)}
+          color="bg-emerald-500"
+          sub={`da ${plSummary.count} posizioni chiuse`}
+        />
+        <KpiCard
+          icon={TrendingDown} label="Perdite totali"
+          value={fmtEuro(Math.abs(plSummary.totalLoss))}
+          color="bg-rose-500"
+        />
+        <KpiCard
+          icon={Wallet} label="P/L netto"
+          value={fmtEuroSigned(plSummary.netPL)}
+          color={plSummary.netPL >= 0 ? "bg-emerald-500" : "bg-rose-500"}
+          sub={`${plSummary.pctReturn >= 0 ? "+" : ""}${plSummary.pctReturn.toFixed(1)}% sul capitale chiuso`}
+        />
+        <KpiCard
+          icon={ArrowDownUp} label="Capitale chiuso"
+          value={fmtEuro(plSummary.totalInvested)}
+          color="bg-indigo-500"
+          sub={`ricavato ${fmtEuro(plSummary.totalReturned)}`}
+        />
+      </div>
+
+      {/* Classifica investimenti */}
+      {tickerRanking.length > 0 && (
+        <ChartCard title="Classifica investimenti (dal migliore al peggiore)" icon={TrendingUp}>
+          <div className="overflow-x-auto -mx-4 sm:-mx-5">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border/60 text-left">
+                  <th className="px-4 sm:px-5 py-2.5 font-semibold text-muted-foreground w-8">#</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground">Ticker</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground">Descrizione</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Investito</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">Ricavato</th>
+                  <th className="px-3 py-2.5 font-semibold text-muted-foreground text-right">P/L</th>
+                  <th className="px-4 sm:px-5 py-2.5 font-semibold text-muted-foreground text-right">Rendimento %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickerRanking.map((t, i) => (
+                  <tr key={t.ticker} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
+                    <td className="px-4 sm:px-5 py-2.5 font-bold text-muted-foreground">{i + 1}</td>
+                    <td className="px-3 py-2.5">
+                      <span className="font-mono font-bold text-xs bg-muted/50 rounded px-1.5 py-0.5">{t.ticker}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground max-w-48 truncate">{t.descrizione}</td>
+                    <td className="px-3 py-2.5 text-right font-medium">{fmtEuro(t.investito)}</td>
+                    <td className="px-3 py-2.5 text-right font-medium">{fmtEuro(t.ricavato)}</td>
+                    <td className={`px-3 py-2.5 text-right font-bold ${t.pl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                      {fmtEuroSigned(t.pl)}
+                    </td>
+                    <td className={`px-4 sm:px-5 py-2.5 text-right font-bold ${t.pctReturn >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {t.pctReturn >= 0
+                          ? <ArrowUpRight className="size-3.5" />
+                          : <ArrowDownRight className="size-3.5" />
+                        }
+                        {t.pctReturn >= 0 ? "+" : ""}{t.pctReturn.toFixed(1)}%
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ChartCard>
+      )}
+
       {/* Ticker breakdown */}
-      <ChartCard title="Dettaglio per strumento" icon={Building2}>
+      <ChartCard title={`Dettaglio per strumento (${tickerBreakdown.length})`} icon={Building2}>
         <div className="overflow-x-auto -mx-4 sm:-mx-5">
           <table className="w-full text-xs">
             <thead>
@@ -679,7 +772,7 @@ export function DirectaMovementsViewer() {
               </tr>
             </thead>
             <tbody>
-              {tickerBreakdown.slice(0, 20).map((t) => (
+              {tickerBreakdown.map((t) => (
                 <tr key={t.ticker} className="border-b border-border/30 hover:bg-muted/30 transition-colors">
                   <td className="px-4 sm:px-5 py-2.5">
                     <span className="font-mono font-bold text-xs bg-muted/50 rounded px-1.5 py-0.5">{t.ticker}</span>
@@ -697,11 +790,6 @@ export function DirectaMovementsViewer() {
               ))}
             </tbody>
           </table>
-          {tickerBreakdown.length > 20 && (
-            <p className="text-xs text-muted-foreground text-center py-2">
-              ...e altri {tickerBreakdown.length - 20} strumenti
-            </p>
-          )}
         </div>
       </ChartCard>
 
