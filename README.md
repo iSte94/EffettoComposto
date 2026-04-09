@@ -30,17 +30,6 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 
 ---
 
-## Novita' Recenti
-
-- **Viewer Movimenti Directa** - importa il CSV scaricato da Directa Trading e ottieni un'analisi visuale completa: KPI, grafici cumulativi, flussi mensili, breakdown per strumento, riepilogo annuale e tabella movimenti con filtri
-- **Sezione "Calcolatori" rinominata "Strumenti"** - raccoglie calcolatori finanziari e il nuovo viewer Directa
-- **Patrimonio rinnovato** - snapshot piu' ricchi, liquidita' distinta dal valore titoli, storico migliorato ed export CSV aggiornato
-- **Sezione Carriera evoluta** - simulazioni di crescita professionale e nuovo calcolatore **lordo -> netto** integrato nella dashboard
-- **Cronologia stipendio persistente** - ogni simulazione puo' essere salvata, ricaricata o eliminata; resta sull'account oppure sul dispositivo in modalita' guest
-- **Motore IRPEF validato** - calcolo netto con INPS, IRPEF, detrazioni, addizionali e test di confronto con reference asset dedicati
-
----
-
 ## Funzionalita'
 
 ### Simulazione e Calcolo
@@ -90,11 +79,36 @@ Testing        Vitest + GitHub Actions CI
 Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ```
 
-### Note Tecniche Recenti
+---
 
-- **Persistenza preferenze** con fallback account/dispositivo per non perdere simulazioni anche da utente non autenticato
-- **Motore stipendio** centralizzato in `src/lib/finance/irpef.ts` con test dedicati e asset di confronto in `stipendee_js/` e `stipendee_tester/`
-- **Schema Prisma aggiornato** per supportare cronologia stipendi e campi aggiuntivi nello storico patrimonio
+## Changelog
+
+### 10 aprile 2026
+
+- **Analisi rendimenti avanzata** — ogni strumento nella classifica investimenti mostra ora il rendimento MWR (Money-Weighted Return / XIRR annualizzato), il rendimento semplice, il rendimento annualizzato, la durata dell'investimento e la contribuzione percentuale al P/L totale del portafoglio
+- **XIRR di portafoglio** — nuovo KPI che mostra il rendimento annualizzato complessivo di tutte le posizioni chiuse, ponderato per i flussi di cassa reali
+- **Tutti gli strumenti visibili** — la tabella dettaglio per strumento mostra ora tutti i ticker senza limiti, con riepilogo guadagni/perdite totali
+
+### 9 aprile 2026
+
+- **Viewer Movimenti Directa** — nuovo strumento nella sezione Strumenti per importare il CSV scaricato da Directa Trading. Analisi completa con 8 KPI, grafico cumulativo (conferimenti, investito, dividendi), flussi mensili, distribuzione operazioni, riepilogo annuale, dettaglio per strumento e tabella movimenti con filtri per anno, ticker, categoria e ricerca testuale. Solo visualizzazione client-side, nessun dato salvato
+- **Sezione "Strumenti"** — la sezione Calcolatori e' stata rinominata Strumenti per raccogliere calcolatori finanziari e il nuovo viewer Directa
+- **Patrimonio rinnovato** — snapshot piu' ricchi con liquidita' distinta dal valore titoli, storico migliorato ed export CSV aggiornato
+- **Sezione Carriera evoluta** — simulazioni di crescita professionale e nuovo calcolatore lordo-netto integrato nella dashboard con IRPEF, INPS, detrazioni e addizionali
+- **Cronologia stipendio** — ogni simulazione dello stipendio netto puo' essere salvata, ricaricata o eliminata; persiste sull'account o sul dispositivo in modalita' guest
+
+### 8 aprile 2026
+
+- **Lancio Effetto Composto** — prima release pubblica su [effettocomposto.it](https://effettocomposto.it) con 8 sezioni: Riepilogo, Patrimonio, Carriera, Consulente Acquisti, Immobiliare, FIRE, Budget e Calcolatori
+- **Simulatore Mutuo** — calcolo rata con ammortamento francese, confronto fino a 3 mutui side-by-side, analisi DTI e analisi redditivita' acquisto vs affitto
+- **Calcolatore FIRE** — 10.000 simulazioni Monte Carlo via Web Worker con proiezione patrimonio e probabilita' di successo per anno target
+- **Tracker Patrimonio** — snapshot giornalieri del patrimonio netto, gestione immobili, portafoglio titoli con dividendi, prestiti attivi, proiezione futura e storico esportabile in CSV
+- **Budget e Abbonamenti** — spese per categoria con import CSV (Fineco, Intesa, generico), tracker abbonamenti ricorrenti, obiettivi di risparmio e strategia debiti (snowball vs avalanche)
+- **Mutui Market** — confronto offerte mutui in tempo reale da MutuiSupermarket.it con aggiornamento automatico giornaliero, filtri per tipo tasso e durata, ricalcolo rata personalizzato
+- **Proiezione patrimonio** — stima dell'evoluzione futura del patrimonio anche senza storico, basata su patrimonio attuale e risparmio mensile
+- **PWA installabile** — funziona come app su smartphone, supporto offline con Service Worker
+- **Sicurezza** — autenticazione JWT, password bcrypt 12 rounds, rate limiting, HTTPS con HSTS, validazione input con Zod, security headers completi
+- **Dark mode e responsive** — interfaccia ottimizzata per mobile e desktop con tema chiaro e scuro
 
 ---
 
