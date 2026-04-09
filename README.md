@@ -32,6 +32,8 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 
 ## Novita' Recenti
 
+- **Viewer Movimenti Directa** - importa il CSV scaricato da Directa Trading e ottieni un'analisi visuale completa: KPI, grafici cumulativi, flussi mensili, breakdown per strumento, riepilogo annuale e tabella movimenti con filtri
+- **Sezione "Calcolatori" rinominata "Strumenti"** - raccoglie calcolatori finanziari e il nuovo viewer Directa
 - **Patrimonio rinnovato** - snapshot piu' ricchi, liquidita' distinta dal valore titoli, storico migliorato ed export CSV aggiornato
 - **Sezione Carriera evoluta** - simulazioni di crescita professionale e nuovo calcolatore **lordo -> netto** integrato nella dashboard
 - **Cronologia stipendio persistente** - ogni simulazione puo' essere salvata, ricaricata o eliminata; resta sull'account oppure sul dispositivo in modalita' guest
@@ -49,6 +51,7 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 | **Calcolatore FIRE** | 10.000 simulazioni Monte Carlo via Web Worker, proiezione patrimonio, probabilita' di successo per anno target |
 | **Interesse Composto** | Simulazione crescita capitale con versamenti periodici e reinvestimento |
 | **Calcolatore Inflazione** | Impatto dell'inflazione sul potere d'acquisto nel tempo |
+| **Viewer Movimenti Directa** | Importa il CSV dei movimenti da Directa Trading: dashboard con KPI, grafici cumulativi, flussi mensili, breakdown per strumento, riepilogo annuale e tabella filtrata (solo visualizzazione, nessun dato salvato) |
 | **Advisor Acquisti** | Analisi dell'impatto di un acquisto sul percorso FIRE con grafici comparativi |
 | **Lordo -> Netto** | Calcolo dinamico stipendio netto con IRPEF, INPS, addizionali, bonus, cronologia scenari salvati e richiamo rapido delle simulazioni |
 

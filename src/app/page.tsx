@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Briefcase, Building2, Calculator, Flame, Github, Loader2, LineChart, ShieldCheck, TrendingUp, Wallet } from "lucide-react";
+import { BarChart3, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -96,8 +96,8 @@ export default function CalculatorPage() {
               <span>Budget</span>
             </TabsTrigger>
             <TabsTrigger value="calculators" className={triggerClass}>
-              <Calculator className="size-4 text-teal-500" />
-              <span>Calcolatori</span>
+              <Wrench className="size-4 text-teal-500" />
+              <span>Strumenti</span>
             </TabsTrigger>
           </TabsList>
         </div>
