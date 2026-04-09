@@ -15,7 +15,7 @@
 
 ---
 
-*Simulatore mutuo, calcolatore FIRE, tracker patrimonio, budget e molto altro.*
+*Simulatore mutuo, calcolatore FIRE, tracker patrimonio, carriera, stipendio netto, budget e molto altro.*
 *Tutto in italiano. Tutto gratuito. Tutto open-source.*
 
 </div>
@@ -30,6 +30,15 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 
 ---
 
+## Novita' Recenti
+
+- **Patrimonio rinnovato** - snapshot piu' ricchi, liquidita' distinta dal valore titoli, storico migliorato ed export CSV aggiornato
+- **Sezione Carriera evoluta** - simulazioni di crescita professionale e nuovo calcolatore **lordo -> netto** integrato nella dashboard
+- **Cronologia stipendio persistente** - ogni simulazione puo' essere salvata, ricaricata o eliminata; resta sull'account oppure sul dispositivo in modalita' guest
+- **Motore IRPEF validato** - calcolo netto con INPS, IRPEF, detrazioni, addizionali e test di confronto con reference asset dedicati
+
+---
+
 ## Funzionalita'
 
 ### Simulazione e Calcolo
@@ -41,16 +50,18 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 | **Interesse Composto** | Simulazione crescita capitale con versamenti periodici e reinvestimento |
 | **Calcolatore Inflazione** | Impatto dell'inflazione sul potere d'acquisto nel tempo |
 | **Advisor Acquisti** | Analisi dell'impatto di un acquisto sul percorso FIRE con grafici comparativi |
+| **Lordo -> Netto** | Calcolo dinamico stipendio netto con IRPEF, INPS, addizionali, bonus, cronologia scenari salvati e richiamo rapido delle simulazioni |
 
 ### Monitoraggio e Gestione
 
 | Strumento | Descrizione |
 |---|---|
-| **Tracker Patrimonio** | Snapshot giornalieri del patrimonio netto, gestione immobili, portafoglio titoli con dividendi, prestiti attivi, proiezione futura |
+| **Tracker Patrimonio** | Snapshot giornalieri del patrimonio netto, gestione immobili, liquidita' e titoli separati, portafoglio con dividendi, prestiti attivi, proiezione futura e storico esportabile |
 | **Budget Mensile** | Spese per categoria, import CSV estratto conto (Fineco, Intesa, formato generico) |
 | **Obiettivi di Risparmio** | Target personalizzati con tracking progressi e deadline |
 | **Tracker Abbonamenti** | Costi ricorrenti con riepilogo mensile e annuale |
 | **Strategia Debiti** | Confronto metodo snowball vs avalanche per l'estinzione dei debiti |
+| **Carriera** | Timeline retributiva e strumenti per stimare l'evoluzione del reddito nel tempo dentro la stessa area del dashboard |
 
 ### Riepilogo e Alert
 
@@ -75,6 +86,12 @@ PWA            Service Worker (cache-first statico, network-first API)
 Testing        Vitest + GitHub Actions CI
 Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ```
+
+### Note Tecniche Recenti
+
+- **Persistenza preferenze** con fallback account/dispositivo per non perdere simulazioni anche da utente non autenticato
+- **Motore stipendio** centralizzato in `src/lib/finance/irpef.ts` con test dedicati e asset di confronto in `stipendee_js/` e `stipendee_tester/`
+- **Schema Prisma aggiornato** per supportare cronologia stipendi e campi aggiuntivi nello storico patrimonio
 
 ---
 
