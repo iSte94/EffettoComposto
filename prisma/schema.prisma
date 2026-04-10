@@ -102,7 +102,10 @@ model AssetRecord {
   
   // Passività (Mutui, Prestiti, Carte)
   debtsTotal         Float    @default(0)
-  
+
+  // Per-person ownership breakdown (JSON: {safeHavensP1, safeHavensP2, pensionFundP1, pensionFundP2, bitcoinAmountP1, bitcoinAmountP2})
+  otherAssetsOwnership String  @default("{}")
+
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

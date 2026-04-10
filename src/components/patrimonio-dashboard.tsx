@@ -28,6 +28,7 @@ import { Area, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, 
 import { BankImportModal } from "@/components/patrimonio/bank-import-modal";
 import { FinancialProfile } from "@/components/patrimonio/financial-profile";
 import { LoanManagerModal } from "@/components/patrimonio/loan-manager-modal";
+import { OwnerFilterBar, OwnerBadgeSelect, type OwnerFilter } from "@/components/patrimonio/owner-filter";
 import { PortfolioRebalance } from "@/components/patrimonio/portfolio-rebalance";
 import { RealEstateSection } from "@/components/patrimonio/real-estate-section";
 import { SnapshotHistoryTable } from "@/components/patrimonio/snapshot-history-table";
@@ -41,7 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatEuro } from "@/lib/format";
 import { calculateRemainingDebt, getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { cn } from "@/lib/utils";
-import type { AssetRecord, CustomStock, ExistingLoan, MonthlyExpense, RealEstateProperty } from "@/types";
+import type { AssetOwner, AssetRecord, CustomStock, ExistingLoan, MonthlyExpense, RealEstateProperty } from "@/types";
 
 type PatrimonioTab = "overview" | "asset" | "cashflow" | "history";
 type AssetSubTab = "realestate" | "investments" | "other";
@@ -56,6 +57,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const [activePatrimonioTab, setActivePatrimonioTab] = useState<PatrimonioTab>("overview");
     const [activeAssetSubTab, setActiveAssetSubTab] = useState<AssetSubTab>("realestate");
     const [loadedSnapshotLabel, setLoadedSnapshotLabel] = useState<string | null>(null);
+    const [debtOwnerFilter, setDebtOwnerFilter] = useState<OwnerFilter>("all");
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
     const [saveTrigger, setSaveTrigger] = useState<number>(0);
 
@@ -88,6 +90,11 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     debtsTotal: totalPassivita,
                     bitcoinAmount,
                     bitcoinPrice: currentBtcPrice,
+                    otherAssetsOwnership: JSON.stringify({
+                        safeHavensP1, safeHavensP2,
+                        pensionFundP1, pensionFundP2,
+                        bitcoinAmountP1, bitcoinAmountP2,
+                    }),
                 }),
             });
 
@@ -120,6 +127,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         interestRate: 0,
         currentRemainingDebt: 0,
         isVariable: false,
+        owner: "person1",
     };
 
     const [newLoan, setNewLoan] = useState<ExistingLoan>(initialLoanState);
@@ -161,12 +169,18 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
     const [customStocksList, setCustomStocksList] = useState<CustomStock[]>([]);
     const [liquidStockValue, setLiquidStockValue] = useState<number>(0);
-    const [safeHavens, setSafeHavens] = useState<number>(0);
+    const [safeHavensP1, setSafeHavensP1] = useState<number>(0);
+    const [safeHavensP2, setSafeHavensP2] = useState<number>(0);
+    const safeHavens = safeHavensP1 + safeHavensP2;
     const [emergencyFund, setEmergencyFund] = useState<number>(0);
     const [separateEmergencyFund, setSeparateEmergencyFund] = useState<boolean>(false);
-    const [pensionFund, setPensionFund] = useState<number>(0);
+    const [pensionFundP1, setPensionFundP1] = useState<number>(0);
+    const [pensionFundP2, setPensionFundP2] = useState<number>(0);
+    const pensionFund = pensionFundP1 + pensionFundP2;
     const totalPassivita = totalRemainingDebt;
-    const [bitcoinAmount, setBitcoinAmount] = useState<number>(0);
+    const [bitcoinAmountP1, setBitcoinAmountP1] = useState<number>(0);
+    const [bitcoinAmountP2, setBitcoinAmountP2] = useState<number>(0);
+    const bitcoinAmount = bitcoinAmountP1 + bitcoinAmountP2;
 
     const [person1Name, setPerson1Name] = useState<string>("Persona 1");
     const [person1Income, setPerson1Income] = useState<number>(2000);
@@ -468,10 +482,15 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     if (parsedStocks.length > 0) updateStockPrices(parsedStocks.map((stock) => ({ ...stock, isLoading: true })));
 
                     setLiquidStockValue(last.liquidStockValue);
-                    setSafeHavens(last.safeHavens || 0);
+                    // Per-person split: carica da snapshot se disponibile, altrimenti tutto in P1 (retrocompat)
+                    const otherOwn = last.otherAssetsOwnership ? (typeof last.otherAssetsOwnership === "string" ? JSON.parse(last.otherAssetsOwnership) : last.otherAssetsOwnership) : null;
+                    setSafeHavensP1(otherOwn?.safeHavensP1 ?? (last.safeHavens || 0));
+                    setSafeHavensP2(otherOwn?.safeHavensP2 ?? 0);
                     setEmergencyFund(last.emergencyFund || 0);
-                    setPensionFund(last.pensionFund || 0);
-                    setBitcoinAmount(last.bitcoinAmount);
+                    setPensionFundP1(otherOwn?.pensionFundP1 ?? (last.pensionFund || 0));
+                    setPensionFundP2(otherOwn?.pensionFundP2 ?? 0);
+                    setBitcoinAmountP1(otherOwn?.bitcoinAmountP1 ?? (last.bitcoinAmount || 0));
+                    setBitcoinAmountP2(otherOwn?.bitcoinAmountP2 ?? 0);
                 }
             }
         } catch {
@@ -532,10 +551,17 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         setCustomStocksList(parsedStocks);
         if (parsedStocks.length > 0) updateStockPrices(parsedStocks.map((stock) => ({ ...stock, isLoading: true })));
         setLiquidStockValue(item.liquidStockValue || 0);
-        setSafeHavens(item.safeHavens || 0);
+        // Per-person split: carica da snapshot se disponibile, altrimenti tutto in P1
+        const otherOwn = (item as unknown as { otherAssetsOwnership?: string }).otherAssetsOwnership
+            ? JSON.parse((item as unknown as { otherAssetsOwnership?: string }).otherAssetsOwnership || "{}")
+            : null;
+        setSafeHavensP1(otherOwn?.safeHavensP1 ?? (item.safeHavens || 0));
+        setSafeHavensP2(otherOwn?.safeHavensP2 ?? 0);
         setEmergencyFund(item.emergencyFund || 0);
-        setPensionFund(item.pensionFund || 0);
-        setBitcoinAmount(item.bitcoinAmount || 0);
+        setPensionFundP1(otherOwn?.pensionFundP1 ?? (item.pensionFund || 0));
+        setPensionFundP2(otherOwn?.pensionFundP2 ?? 0);
+        setBitcoinAmountP1(otherOwn?.bitcoinAmountP1 ?? (item.bitcoinAmount || 0));
+        setBitcoinAmountP2(otherOwn?.bitcoinAmountP2 ?? 0);
 
         toast.success(`Dati caricati per modifica: ${format(parseISO(item.date), "MMM yyyy")}. Una volta fatte le modifiche, clicca semplicemente nel vuoto per attivare l'auto-salvataggio o aspetta qualche istante!`, { duration: 5000 });
         setLoadedSnapshotLabel(format(parseISO(item.date), "dd MMMM yyyy", { locale: it }));
@@ -830,7 +856,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     </TabsList>
 
                                     <TabsContent value="realestate" forceMount className={cn("mt-0", activeAssetSubTab !== "realestate" && "hidden")}>
-                                        <RealEstateSection realEstateList={realEstateList} existingLoansList={existingLoansList} realEstateGrossValue={realEstateGrossValue} realEstateNetValue={realEstateNetValue} onListChange={setRealEstateList} onTriggerSave={triggerSave} />
+                                        <RealEstateSection realEstateList={realEstateList} existingLoansList={existingLoansList} realEstateGrossValue={realEstateGrossValue} realEstateNetValue={realEstateNetValue} person1Name={person1Name} person2Name={person2Name} onListChange={setRealEstateList} onTriggerSave={triggerSave} />
                                     </TabsContent>
 
                                     <TabsContent value="investments" forceMount className={cn("mt-0", activeAssetSubTab !== "investments" && "hidden")}>
@@ -839,6 +865,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                             liquidStockValue={liquidStockValue}
                                             emergencyFund={emergencyFund}
                                             separateEmergencyFund={separateEmergencyFund}
+                                            person1Name={person1Name}
+                                            person2Name={person2Name}
                                             searchResults={searchResults}
                                             activeSearchIdx={activeSearchIdx}
                                             isSearching={isSearching}
@@ -855,22 +883,39 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     </TabsContent>
 
                                     <TabsContent value="other" forceMount className={cn("mt-0", activeAssetSubTab !== "other" && "hidden")}>
-                                        <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                                        <div className="space-y-6">
                                             <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
                                                 <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
                                                     <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100"><Bitcoin className="mr-3 h-5 w-5 text-amber-500" /> Crypto</CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="space-y-4 p-6">
                                                     <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm dark:border-amber-900 dark:bg-amber-950/50">
-                                                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Inserisci solo quanti Bitcoin possiedi. Il controvalore viene aggiornato con il prezzo live.</p>
+                                                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Inserisci quanti Bitcoin possiede ciascuno. Il controvalore viene aggiornato con il prezzo live.</p>
                                                     </div>
-                                                    <div className="space-y-2">
-                                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Quantita Bitcoin Posseduta</Label>
-                                                        <div className="relative">
-                                                            <Input type="number" step="0.001" value={bitcoinAmount} onChange={(e) => setBitcoinAmount(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 pl-14 text-xl text-slate-900 focus-visible:ring-amber-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
-                                                            <div className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-amber-600 dark:text-amber-400">BTC</div>
+                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{person1Name}</Label>
+                                                            <div className="relative">
+                                                                <Input type="number" step="0.001" value={bitcoinAmountP1} onChange={(e) => setBitcoinAmountP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 pl-14 text-lg text-slate-900 focus-visible:ring-amber-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
+                                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-600 dark:text-amber-400">BTC</div>
+                                                            </div>
+                                                            {currentBtcPrice > 0 && bitcoinAmountP1 > 0 && <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{formatEuro(bitcoinAmountP1 * currentBtcPrice)}</p>}
+                                                        </div>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">{person2Name}</Label>
+                                                            <div className="relative">
+                                                                <Input type="number" step="0.001" value={bitcoinAmountP2} onChange={(e) => setBitcoinAmountP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 pl-14 text-lg text-slate-900 focus-visible:ring-amber-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
+                                                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-600 dark:text-amber-400">BTC</div>
+                                                            </div>
+                                                            {currentBtcPrice > 0 && bitcoinAmountP2 > 0 && <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{formatEuro(bitcoinAmountP2 * currentBtcPrice)}</p>}
                                                         </div>
                                                     </div>
+                                                    {currentBtcPrice > 0 && bitcoinAmount > 0 && (
+                                                        <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Totale BTC</span>
+                                                            <span className="text-lg font-extrabold text-amber-600 dark:text-amber-400">{bitcoinAmount.toFixed(4)} BTC = {formatEuro(bitcoinAmount * currentBtcPrice)}</span>
+                                                        </div>
+                                                    )}
                                                 </CardContent>
                                             </Card>
 
@@ -878,14 +923,45 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                 <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
                                                     <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100"><Gem className="mr-3 h-5 w-5 text-indigo-600 dark:text-indigo-400" /> Altre Attivita</CardTitle>
                                                 </CardHeader>
-                                                <CardContent className="space-y-4 p-6">
-                                                    <div className="space-y-2">
+                                                <CardContent className="space-y-5 p-6">
+                                                    <div className="space-y-3">
                                                         <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Beni Rifugio (Oro / Orologi / Arte)</Label>
-                                                        <Input type="number" value={safeHavens} onChange={(e) => setSafeHavens(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{person1Name}</Label>
+                                                                <Input type="number" value={safeHavensP1} onChange={(e) => setSafeHavensP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">{person2Name}</Label>
+                                                                <Input type="number" value={safeHavensP2} onChange={(e) => setSafeHavensP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
+                                                            </div>
+                                                        </div>
+                                                        {safeHavens > 0 && (
+                                                            <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 dark:border-indigo-900 dark:bg-indigo-950/40">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Totale</span>
+                                                                <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">{formatEuro(safeHavens)}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    <div className="space-y-2 pt-2">
+
+                                                    <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
                                                         <Label className="flex items-center text-xs font-bold uppercase tracking-wider text-slate-500"><Landmark className="mr-1 h-4 w-4 text-slate-500" /> TFR / Fondo Pensione</Label>
-                                                        <Input type="number" value={pensionFund} onChange={(e) => setPensionFund(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{person1Name}</Label>
+                                                                <Input type="number" value={pensionFundP1} onChange={(e) => setPensionFundP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">{person2Name}</Label>
+                                                                <Input type="number" value={pensionFundP2} onChange={(e) => setPensionFundP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
+                                                            </div>
+                                                        </div>
+                                                        {pensionFund > 0 && (
+                                                            <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50/80 px-3 py-1.5 dark:border-indigo-900 dark:bg-indigo-950/40">
+                                                                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Totale</span>
+                                                                <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">{formatEuro(pensionFund)}</span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </CardContent>
                                             </Card>
@@ -942,11 +1018,38 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                 </CardHeader>
                                 <CardContent className="space-y-4 p-6">
                                     <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm dark:border-rose-900 dark:bg-rose-950/50"><p className="text-sm font-medium text-rose-700 dark:text-rose-300">Gestisci qui i tuoi mutui, finanziamenti auto e altri debiti. Il debito residuo viene sottratto automaticamente dal tuo Patrimonio Netto.</p></div>
+
+                                    {existingLoansList.length > 0 && (
+                                        <OwnerFilterBar
+                                            value={debtOwnerFilter}
+                                            onChange={setDebtOwnerFilter}
+                                            person1Name={person1Name}
+                                            person2Name={person2Name}
+                                            person1Total={existingLoansList.filter(l => l.owner === "person1").reduce((acc, l) => acc + calculateRemainingDebt(l), 0)}
+                                            person2Total={existingLoansList.filter(l => l.owner === "person2").reduce((acc, l) => acc + calculateRemainingDebt(l), 0)}
+                                            formatValue={formatEuro}
+                                            colorScheme="rose"
+                                        />
+                                    )}
+
                                     <div className="space-y-3">
                                         {existingLoansList.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">Nessun debito configurato. Se ne hai uno, aggiungilo qui per calcolare correttamente patrimonio netto e cashflow.</div>}
 
-                                        {existingLoansList.map((loan) => (
-                                            <div key={loan.id} className="flex items-center justify-between rounded-2xl border border-slate-200/80 bg-white/70 p-3 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
+                                        {existingLoansList.filter(l => debtOwnerFilter === "all" || l.owner === debtOwnerFilter).map((loan) => (
+                                            <div key={loan.id} className="rounded-2xl border border-slate-200/80 bg-white/70 p-3 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
+                                                <div className="mb-2">
+                                                    <OwnerBadgeSelect
+                                                        value={loan.owner}
+                                                        onChange={(owner: AssetOwner) => {
+                                                            const updated = existingLoansList.map(l => l.id === loan.id ? { ...l, owner } : l);
+                                                            setExistingLoansList(updated);
+                                                            savePreferences(updated);
+                                                        }}
+                                                        person1Name={person1Name}
+                                                        person2Name={person2Name}
+                                                    />
+                                                </div>
+                                                <div className="flex items-center justify-between">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2">
                                                         <span className="font-bold text-slate-800 dark:text-slate-200">{loan.name}</span>
@@ -1002,6 +1105,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                     <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-rose-400 hover:text-rose-600 dark:text-rose-400" onClick={() => handleRemoveLoan(loan.id)}>
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
+                                                </div>
                                                 </div>
                                             </div>
                                         ))}
@@ -1095,6 +1199,8 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                 onOpenChange={setIsLoanModalOpen}
                 editingLoan={editingLoan}
                 newLoan={newLoan}
+                person1Name={person1Name}
+                person2Name={person2Name}
                 onEditingLoanChange={setEditingLoan}
                 onNewLoanChange={setNewLoan}
                 onAdd={handleAddLoan}

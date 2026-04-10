@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,16 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } f
 import { Switch } from "@/components/ui/switch";
 import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote } from "lucide-react";
 import { formatEuro } from "@/lib/format";
-import type { CustomStock } from "@/types";
+import { OwnerFilterBar, OwnerBadgeSelect, type OwnerFilter } from "@/components/patrimonio/owner-filter";
+import type { AssetOwner, CustomStock } from "@/types";
 
 interface StockPortfolioSectionProps {
     customStocksList: CustomStock[];
     liquidStockValue: number;
     emergencyFund: number;
     separateEmergencyFund: boolean;
+    person1Name: string;
+    person2Name: string;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     searchResults: any[];
     activeSearchIdx: number | null;
@@ -35,11 +38,29 @@ interface StockPortfolioSectionProps {
 
 export const StockPortfolioSection = memo(function StockPortfolioSection({
     customStocksList, liquidStockValue, emergencyFund, separateEmergencyFund,
+    person1Name, person2Name,
     searchResults, activeSearchIdx, isSearching,
     portfolioHistory, isFetchingHistory,
     onStocksListChange, onLiquidStockValueChange, onEmergencyFundChange,
     onToggleSeparateEmergencyFund, onSearchStocks, onSelectStock, onTriggerSave,
 }: StockPortfolioSectionProps) {
+    const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
+
+    const stockValue = (s: CustomStock) => (s.currentPrice || 0) * s.shares;
+    const person1Total = useMemo(() => customStocksList.filter(s => s.owner === "person1").reduce((acc, s) => acc + stockValue(s), 0), [customStocksList]);
+    const person2Total = useMemo(() => customStocksList.filter(s => s.owner === "person2").reduce((acc, s) => acc + stockValue(s), 0), [customStocksList]);
+
+    const filteredStocks = useMemo(() => {
+        if (ownerFilter === "all") return customStocksList;
+        return customStocksList.filter(s => s.owner === ownerFilter);
+    }, [customStocksList, ownerFilter]);
+
+    // Map filtered index to original index for search
+    const getOriginalIndex = (filteredIdx: number) => {
+        const stock = filteredStocks[filteredIdx];
+        return customStocksList.findIndex(s => s.id === stock.id);
+    };
+
     return (
         <>
             <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
@@ -49,9 +70,34 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5 p-4 sm:p-6">
+                    {customStocksList.length > 0 && (
+                        <OwnerFilterBar
+                            value={ownerFilter}
+                            onChange={setOwnerFilter}
+                            person1Name={person1Name}
+                            person2Name={person2Name}
+                            person1Total={person1Total}
+                            person2Total={person2Total}
+                            formatValue={formatEuro}
+                        />
+                    )}
+
                     <div className="space-y-4">
-                        {customStocksList.map((stock, idx) => (
+                        {filteredStocks.map((stock, filteredIdx) => {
+                            const idx = getOriginalIndex(filteredIdx);
+                            return (
                             <div key={stock.id} className="relative rounded-2xl border border-slate-200/80 bg-white/70 p-3 shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
+                                <div className="mb-2">
+                                    <OwnerBadgeSelect
+                                        value={stock.owner}
+                                        onChange={(owner: AssetOwner) => {
+                                            onStocksListChange(customStocksList.map(s => s.id === stock.id ? { ...s, owner } : s));
+                                            onTriggerSave();
+                                        }}
+                                        person1Name={person1Name}
+                                        person2Name={person2Name}
+                                    />
+                                </div>
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_110px_120px_auto] sm:items-center">
                                     <div className="space-y-1 relative">
                                         <Label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ticker Azione/ETF</Label>
@@ -143,7 +189,8 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                                     </Button>
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
 
                         {customStocksList.length === 0 && (
                             <div className="mb-4 rounded-2xl border border-purple-200 bg-purple-50/90 p-4 shadow-sm dark:border-purple-900 dark:bg-purple-950/30">
@@ -182,16 +229,18 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                                 size="sm"
                                 className="h-11 rounded-xl border-2 border-dashed border-purple-300 bg-transparent px-4 text-purple-600 transition-all hover:bg-purple-50 hover:text-purple-700 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-400 dark:hover:bg-purple-950/50"
                                 onClick={() => {
-                                    onStocksListChange([...customStocksList, { id: Date.now().toString(), ticker: "", shares: 1 }]);
+                                    onStocksListChange([...customStocksList, { id: Date.now().toString(), ticker: "", shares: 1, owner: ownerFilter !== "all" ? ownerFilter : "person1" }]);
                                 }}
                             >
                                 <Plus className="mr-1 h-3 w-3" /> Aggiungi Azione/ETF Live
                             </Button>
                             {customStocksList.length > 0 && (
                                 <div className="text-left sm:text-right">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Totale Azionario</div>
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                        {ownerFilter === "all" ? "Totale Azionario" : `Totale ${ownerFilter === "person1" ? person1Name : person2Name}`}
+                                    </div>
                                     <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400">
-                                        {formatEuro(customStocksList.reduce((acc, s) => acc + ((s.currentPrice || 0) * s.shares), 0))}
+                                        {formatEuro(filteredStocks.reduce((acc, s) => acc + ((s.currentPrice || 0) * s.shares), 0))}
                                     </div>
                                 </div>
                             )}

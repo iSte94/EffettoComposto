@@ -22,6 +22,8 @@ export interface AssetRecord {
     totalNetWorth?: number; // Calcolato lato client
 }
 
+export type AssetOwner = "person1" | "person2";
+
 export interface RealEstateProperty {
     id: string;
     name: string;
@@ -33,6 +35,7 @@ export interface RealEstateProperty {
     isRented?: boolean;
     rentStartDate?: string; // YYYY-MM
     linkedLoanId?: string;
+    owner?: AssetOwner;
 }
 
 export interface CustomStock {
@@ -43,6 +46,7 @@ export interface CustomStock {
     dividendYield?: number;
     annualDividend?: number;
     isLoading?: boolean;
+    owner?: AssetOwner;
 }
 
 export interface MonthlyExpense {

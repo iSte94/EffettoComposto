@@ -67,6 +67,7 @@ export async function POST(req: Request) {
             bitcoinPrice: data.bitcoinPrice || 0,
             realEstateList: data.realEstateList || '[]',
             customStocksList: data.customStocksList || '[]',
+            otherAssetsOwnership: data.otherAssetsOwnership || '{}',
         };
 
         let newRecord;

@@ -9,6 +9,7 @@ export interface ExistingLoan {
     interestRate?: number;
     currentRemainingDebt?: number;
     isVariable?: boolean; // Se true, la rata viene ricalcolata e non presa da 'installment'
+    owner?: "person1" | "person2";
 }
 
 export const calculateRemainingDebt = (loan?: ExistingLoan): number => {

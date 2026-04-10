@@ -14,6 +14,7 @@ export const assetRecordSchema = z.object({
     bitcoinPrice: z.number().min(0).optional(),
     realEstateList: z.string().optional(),
     customStocksList: z.string().optional(),
+    otherAssetsOwnership: z.string().optional(),
 });
 
 export const deleteRecordSchema = z.object({

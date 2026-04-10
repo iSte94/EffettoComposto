@@ -13,6 +13,8 @@ interface LoanManagerModalProps {
     onOpenChange: (open: boolean) => void;
     editingLoan: ExistingLoan | null;
     newLoan: ExistingLoan;
+    person1Name: string;
+    person2Name: string;
     onEditingLoanChange: (loan: ExistingLoan | null) => void;
     onNewLoanChange: (loan: ExistingLoan) => void;
     onAdd: () => void;
@@ -21,6 +23,7 @@ interface LoanManagerModalProps {
 
 export function LoanManagerModal({
     isOpen, onOpenChange, editingLoan, newLoan,
+    person1Name, person2Name,
     onEditingLoanChange, onNewLoanChange, onAdd, onUpdate,
 }: LoanManagerModalProps) {
     const loan = editingLoan || newLoan;
@@ -64,6 +67,20 @@ export function LoanManagerModal({
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="space-y-2">
+                            <Label>Intestatario</Label>
+                            <Select value={loan.owner || "person1"} onValueChange={(val: "person1" | "person2") => updateField("owner", val)}>
+                                <SelectTrigger className="h-11 bg-white border-slate-200 text-slate-700 dark:text-slate-300">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="person1">{person1Name}</SelectItem>
+                                    <SelectItem value="person2">{person2Name}</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>Rata Mensile</Label>
                             <Input type="number" value={loan.installment}

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -10,25 +10,37 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { HomeIcon, Plus, Trash2, LinkIcon } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { calculateRemainingDebt } from "@/lib/finance/loans";
-import type { RealEstateProperty, ExistingLoan } from "@/types";
+import { OwnerFilterBar, OwnerBadgeSelect, type OwnerFilter } from "@/components/patrimonio/owner-filter";
+import type { AssetOwner, RealEstateProperty, ExistingLoan } from "@/types";
 
 interface RealEstateSectionProps {
     realEstateList: RealEstateProperty[];
     existingLoansList: ExistingLoan[];
     realEstateGrossValue: number;
     realEstateNetValue: number;
+    person1Name: string;
+    person2Name: string;
     onListChange: (list: RealEstateProperty[]) => void;
     onTriggerSave: () => void;
 }
 
 export const RealEstateSection = memo(function RealEstateSection({
-    realEstateList, existingLoansList, realEstateGrossValue, realEstateNetValue,
+    realEstateList, existingLoansList, realEstateNetValue,
+    person1Name, person2Name,
     onListChange, onTriggerSave,
 }: RealEstateSectionProps) {
-    const updateProp = (idx: number, updates: Partial<RealEstateProperty>) => {
-        const newList = [...realEstateList];
-        newList[idx] = { ...newList[idx], ...updates };
-        onListChange(newList);
+    const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
+
+    const person1Total = useMemo(() => realEstateList.filter(p => p.owner === "person1").reduce((acc, p) => acc + (p.value || 0), 0), [realEstateList]);
+    const person2Total = useMemo(() => realEstateList.filter(p => p.owner === "person2").reduce((acc, p) => acc + (p.value || 0), 0), [realEstateList]);
+
+    const filteredList = useMemo(() => {
+        if (ownerFilter === "all") return realEstateList;
+        return realEstateList.filter(p => p.owner === ownerFilter);
+    }, [realEstateList, ownerFilter]);
+
+    const updateProp = (id: string, updates: Partial<RealEstateProperty>) => {
+        onListChange(realEstateList.map(p => p.id === id ? { ...p, ...updates } : p));
     };
 
     return (
@@ -44,17 +56,40 @@ export const RealEstateSection = memo(function RealEstateSection({
                 </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col space-y-5 p-4 sm:p-6">
-                {realEstateList.map((prop, idx) => (
+                {realEstateList.length > 0 && (
+                    <OwnerFilterBar
+                        value={ownerFilter}
+                        onChange={setOwnerFilter}
+                        person1Name={person1Name}
+                        person2Name={person2Name}
+                        person1Total={person1Total}
+                        person2Total={person2Total}
+                        formatValue={formatEuro}
+                    />
+                )}
+
+                {filteredList.map((prop) => (
                     <div key={prop.id} className="group relative rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute right-2 top-2 h-10 w-10 rounded-full text-rose-500 opacity-100 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/50 sm:opacity-0 sm:group-hover:opacity-100"
-                            onClick={() => onListChange(realEstateList.filter(p => p.id !== prop.id))}
-                            aria-label="Rimuovi immobile"
-                        >
-                            <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-between">
+                            <OwnerBadgeSelect
+                                value={prop.owner}
+                                onChange={(owner: AssetOwner) => {
+                                    updateProp(prop.id, { owner });
+                                    onTriggerSave();
+                                }}
+                                person1Name={person1Name}
+                                person2Name={person2Name}
+                            />
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 rounded-full text-rose-500 opacity-100 transition-colors hover:bg-rose-50 hover:text-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/50 sm:opacity-0 sm:group-hover:opacity-100"
+                                onClick={() => onListChange(realEstateList.filter(p => p.id !== prop.id))}
+                                aria-label="Rimuovi immobile"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </div>
 
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-5">
@@ -62,7 +97,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Nome Immobile</Label>
                                     <Input
                                         value={prop.name}
-                                        onChange={e => updateProp(idx, { name: e.target.value })}
+                                        onChange={e => updateProp(prop.id, { name: e.target.value })}
                                         onBlur={onTriggerSave}
                                         placeholder="Es. Casa Roma"
                                         className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
@@ -73,7 +108,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Input
                                         type="number"
                                         value={prop.value}
-                                        onChange={e => updateProp(idx, { value: Number(e.target.value) })}
+                                        onChange={e => updateProp(prop.id, { value: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
                                         className="h-11 border-emerald-200 bg-emerald-50 font-bold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300"
                                     />
@@ -94,7 +129,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Input
                                         type="number"
                                         value={prop.costs}
-                                        onChange={e => updateProp(idx, { costs: Number(e.target.value) })}
+                                        onChange={e => updateProp(prop.id, { costs: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
                                         className="h-11 border-rose-200 bg-rose-50 font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300"
                                     />
@@ -104,7 +139,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Input
                                         type="number"
                                         value={prop.imu || 0}
-                                        onChange={e => updateProp(idx, { imu: Number(e.target.value) })}
+                                        onChange={e => updateProp(prop.id, { imu: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
                                         className="h-11 border-rose-200 bg-rose-50 font-semibold text-rose-700 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-300"
                                     />
@@ -114,7 +149,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Input
                                         type="number"
                                         value={prop.rent}
-                                        onChange={e => updateProp(idx, { rent: Number(e.target.value) })}
+                                        onChange={e => updateProp(prop.id, { rent: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
                                         className="h-11 border-slate-200 bg-white text-emerald-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-emerald-400"
                                     />
@@ -130,7 +165,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Switch
                                         checked={prop.isPrimaryResidence || false}
                                         onCheckedChange={(checked) => {
-                                            updateProp(idx, { isPrimaryResidence: checked });
+                                            updateProp(prop.id, { isPrimaryResidence: checked });
                                             onTriggerSave();
                                         }}
                                         className="data-[state=checked]:bg-blue-500"
@@ -146,7 +181,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                         <Switch
                                             checked={prop.isRented || false}
                                             onCheckedChange={(checked) => {
-                                                updateProp(idx, { isRented: checked, ...(checked ? { rentStartDate: undefined } : {}) });
+                                                updateProp(prop.id, { isRented: checked, ...(checked ? { rentStartDate: undefined } : {}) });
                                                 onTriggerSave();
                                             }}
                                             className="data-[state=checked]:bg-emerald-500"
@@ -162,7 +197,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                             <Input
                                                 type="month"
                                                 value={prop.rentStartDate || ""}
-                                                onChange={e => updateProp(idx, { rentStartDate: e.target.value })}
+                                                onChange={e => updateProp(prop.id, { rentStartDate: e.target.value })}
                                                 onBlur={onTriggerSave}
                                                 className="h-11 flex-1 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
                                             />
@@ -182,7 +217,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                             <Select
                                                 value={prop.linkedLoanId || "none"}
                                                 onValueChange={(val) => {
-                                                    updateProp(idx, { linkedLoanId: val === "none" ? undefined : val });
+                                                    updateProp(prop.id, { linkedLoanId: val === "none" ? undefined : val });
                                                     onTriggerSave();
                                                 }}
                                             >
@@ -213,7 +248,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                     variant="outline"
                     className="w-full rounded-2xl border-2 border-dashed border-emerald-300 py-6 text-slate-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
                     onClick={() => {
-                        onListChange([...realEstateList, { id: Date.now().toString(), name: `Immobile ${realEstateList.length + 1}`, value: 0, costs: 0, imu: 0, isPrimaryResidence: false, rent: 0, isRented: false }]);
+                        onListChange([...realEstateList, { id: Date.now().toString(), name: `Immobile ${realEstateList.length + 1}`, value: 0, costs: 0, imu: 0, isPrimaryResidence: false, rent: 0, isRented: false, owner: ownerFilter !== "all" ? ownerFilter : "person1" }]);
                     }}
                 >
                     <Plus className="mr-2 h-4 w-4" /> Aggiungi Immobile
@@ -221,8 +256,12 @@ export const RealEstateSection = memo(function RealEstateSection({
 
                 {realEstateList.length > 0 && (
                     <div className="mt-4 flex items-center justify-between border-t border-slate-200/80 pt-4 text-sm dark:border-slate-800">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Totale Immobili (Lordo)</span>
-                        <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{formatEuro(realEstateGrossValue)}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                            {ownerFilter === "all" ? "Totale Immobili (Lordo)" : `Totale ${ownerFilter === "person1" ? person1Name : person2Name} (Lordo)`}
+                        </span>
+                        <span className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400">
+                            {formatEuro(filteredList.reduce((acc, p) => acc + (p.value || 0), 0))}
+                        </span>
                     </div>
                 )}
             </CardContent>
