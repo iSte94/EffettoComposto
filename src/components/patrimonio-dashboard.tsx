@@ -47,6 +47,12 @@ import type { AssetOwner, AssetRecord, CustomStock, ExistingLoan, MonthlyExpense
 type PatrimonioTab = "overview" | "asset" | "cashflow" | "history";
 type AssetSubTab = "realestate" | "investments" | "other";
 
+/** Compute effective total value for a stock, preferring manualValue over price*shares */
+function effectiveStockValue(s: CustomStock): number {
+    if (s.manualValue !== undefined && s.manualValue > 0) return s.manualValue;
+    return (s.currentPrice || 0) * s.shares;
+}
+
 interface PatrimonioDashboardProps {
     user: { username: string } | null;
 }
@@ -82,7 +88,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     realEstateRent,
                     realEstateList: JSON.stringify(realEstateList),
                     liquidStockValue,
-                    stocksSnapshotValue: customStocksList.reduce((acc, stock) => acc + ((stock.currentPrice || 0) * stock.shares), 0),
+                    stocksSnapshotValue: customStocksList.reduce((acc, stock) => acc + effectiveStockValue(stock), 0),
                     customStocksList: JSON.stringify(customStocksList),
                     safeHavens,
                     emergencyFund: separateEmergencyFund ? emergencyFund : 0,
@@ -583,7 +589,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         );
     }
 
-    const activeStocksValue = customStocksList.reduce((acc, stock) => acc + ((stock.currentPrice || 0) * stock.shares), 0);
+    const activeStocksValue = customStocksList.reduce((acc, stock) => acc + effectiveStockValue(stock), 0);
     const activeLiquidValue = activeStocksValue + liquidStockValue;
     const effectiveEmergencyFund = separateEmergencyFund ? emergencyFund : 0;
     const totalGrossAssets = activeLiquidValue + safeHavens + effectiveEmergencyFund + pensionFund + (bitcoinAmount * currentBtcPrice);

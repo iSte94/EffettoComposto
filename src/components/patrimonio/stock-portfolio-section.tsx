@@ -1,16 +1,22 @@
 "use client";
 
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Switch } from "@/components/ui/switch";
-import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote } from "lucide-react";
+import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote, HelpCircle } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { OwnerFilterBar, OwnerBadgeSelect, type OwnerFilter } from "@/components/patrimonio/owner-filter";
 import type { AssetOwner, CustomStock } from "@/types";
+
+/** Compute effective total value for a stock, preferring manualValue over price*shares */
+function effectiveStockValue(s: CustomStock): number {
+    if (s.manualValue !== undefined && s.manualValue > 0) return s.manualValue;
+    return (s.currentPrice || 0) * s.shares;
+}
 
 interface StockPortfolioSectionProps {
     customStocksList: CustomStock[];
@@ -45,10 +51,27 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
     onToggleSeparateEmergencyFund, onSearchStocks, onSelectStock, onTriggerSave,
 }: StockPortfolioSectionProps) {
     const [ownerFilter, setOwnerFilter] = useState<OwnerFilter>("all");
+    const [manualValueOpenId, setManualValueOpenId] = useState<string | null>(null);
+    const [toastVisible, setToastVisible] = useState(false);
+    const hasUnpricedStock = useMemo(() => customStocksList.some(s => s.ticker && !s.isLoading && !s.currentPrice), [customStocksList]);
 
-    const stockValue = (s: CustomStock) => (s.currentPrice || 0) * s.shares;
-    const person1Total = useMemo(() => customStocksList.filter(s => s.owner === "person1").reduce((acc, s) => acc + stockValue(s), 0), [customStocksList]);
-    const person2Total = useMemo(() => customStocksList.filter(s => s.owner === "person2").reduce((acc, s) => acc + stockValue(s), 0), [customStocksList]);
+    // Show one-time toast when a stock has no price and user hasn't seen the hint yet
+    useEffect(() => {
+        if (!hasUnpricedStock || toastVisible) return;
+        const alreadySeen = sessionStorage.getItem("manualValueHintSeen");
+        if (alreadySeen) return;
+        sessionStorage.setItem("manualValueHintSeen", "1");
+        const showTimer = setTimeout(() => setToastVisible(true), 0);
+        const hideTimer = setTimeout(() => setToastVisible(false), 5000);
+        return () => { clearTimeout(showTimer); clearTimeout(hideTimer); };
+    }, [hasUnpricedStock, toastVisible]);
+
+    const toggleManualInput = useCallback((stockId: string) => {
+        setManualValueOpenId(prev => prev === stockId ? null : stockId);
+    }, []);
+
+    const person1Total = useMemo(() => customStocksList.filter(s => s.owner === "person1").reduce((acc, s) => acc + effectiveStockValue(s), 0), [customStocksList]);
+    const person2Total = useMemo(() => customStocksList.filter(s => s.owner === "person2").reduce((acc, s) => acc + effectiveStockValue(s), 0), [customStocksList]);
 
     const filteredStocks = useMemo(() => {
         if (ownerFilter === "all") return customStocksList;
@@ -70,6 +93,14 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5 p-4 sm:p-6">
+                    {toastVisible && (
+                        <div className="animate-in slide-in-from-top-2 fade-in duration-300 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                            <div className="flex items-start gap-2">
+                                <HelpCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span>Ticker non trovato? Clicca sul <strong>?</strong> accanto al titolo per inserire il controvalore manualmente.</span>
+                            </div>
+                        </div>
+                    )}
                     {customStocksList.length > 0 && (
                         <OwnerFilterBar
                             value={ownerFilter}
@@ -159,12 +190,44 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                                                 <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
                                             ) : (
                                                 <>
-                                                    <div className="text-xs font-bold text-slate-700 dark:text-slate-300">{stock.currentPrice ? formatEuro(stock.currentPrice) : (stock.ticker ? "?" : "")}</div>
-                                                    {stock.currentPrice && (
-                                                        <div className="mt-1 inline-flex w-fit rounded-full border border-purple-200 bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-300">
-                                                            {formatEuro(stock.currentPrice * stock.shares)}
-                                                        </div>
-                                                    )}
+                                                    {stock.currentPrice ? (
+                                                        <>
+                                                            <div className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatEuro(stock.currentPrice)}</div>
+                                                            <div className="mt-1 inline-flex w-fit rounded-full border border-purple-200 bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700 dark:border-purple-900 dark:bg-purple-950/30 dark:text-purple-300">
+                                                                {formatEuro(stock.currentPrice * stock.shares)}
+                                                            </div>
+                                                        </>
+                                                    ) : stock.ticker ? (
+                                                        <>
+                                                            <button
+                                                                onClick={() => toggleManualInput(stock.id)}
+                                                                className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 transition-colors"
+                                                                title="Clicca per inserire il controvalore manualmente"
+                                                            >
+                                                                <HelpCircle className="h-3.5 w-3.5" />
+                                                                {stock.manualValue ? formatEuro(stock.manualValue) : "Inserisci valore"}
+                                                            </button>
+                                                            {manualValueOpenId === stock.id && (
+                                                                <Input
+                                                                    type="number"
+                                                                    placeholder="Controvalore €"
+                                                                    value={stock.manualValue || ""}
+                                                                    onChange={e => {
+                                                                        const val = Number(e.target.value);
+                                                                        onStocksListChange(customStocksList.map(s => s.id === stock.id ? { ...s, manualValue: val || undefined } : s));
+                                                                    }}
+                                                                    onBlur={onTriggerSave}
+                                                                    autoFocus
+                                                                    className="mt-1 h-8 w-28 border-amber-300 bg-amber-50 text-xs font-bold text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+                                                                />
+                                                            )}
+                                                            {stock.manualValue !== undefined && stock.manualValue > 0 && (
+                                                                <div className="mt-1 inline-flex w-fit rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                                                                    {formatEuro(stock.manualValue)}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    ) : null}
                                                     {stock.dividendYield !== undefined && stock.dividendYield > 0 && (
                                                         <div className="mt-1 inline-flex w-fit rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">
                                                             Div {(stock.dividendYield * 100).toFixed(1)}%
@@ -240,7 +303,7 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                                         {ownerFilter === "all" ? "Totale Azionario" : `Totale ${ownerFilter === "person1" ? person1Name : person2Name}`}
                                     </div>
                                     <div className="text-lg font-extrabold text-purple-600 dark:text-purple-400">
-                                        {formatEuro(filteredStocks.reduce((acc, s) => acc + ((s.currentPrice || 0) * s.shares), 0))}
+                                        {formatEuro(filteredStocks.reduce((acc, s) => acc + effectiveStockValue(s), 0))}
                                     </div>
                                 </div>
                             )}
@@ -251,7 +314,7 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                         const stocksWithDividends = customStocksList.filter(s => s.annualDividend && s.annualDividend > 0 && s.shares > 0);
                         if (stocksWithDividends.length === 0) return null;
                         const totalAnnualDividends = stocksWithDividends.reduce((acc, s) => acc + (s.annualDividend || 0) * s.shares, 0);
-                        const totalPortfolioValue = customStocksList.reduce((acc, s) => acc + ((s.currentPrice || 0) * s.shares), 0);
+                        const totalPortfolioValue = customStocksList.reduce((acc, s) => acc + effectiveStockValue(s), 0);
                         const weightedYield = totalPortfolioValue > 0 ? (totalAnnualDividends / totalPortfolioValue) * 100 : 0;
                         return (
                             <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/90 p-4 pt-4 dark:border-emerald-900 dark:bg-emerald-950/30">

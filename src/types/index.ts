@@ -43,6 +43,7 @@ export interface CustomStock {
     ticker: string;
     shares: number;
     currentPrice?: number;
+    manualValue?: number;
     dividendYield?: number;
     annualDividend?: number;
     isLoading?: boolean;
