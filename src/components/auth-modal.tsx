@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -8,9 +8,17 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { Settings, Download, Upload, LogOut } from "lucide-react";
 
 interface AuthModalProps {
     user: { username: string } | null;
@@ -24,6 +32,7 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -66,20 +75,105 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
         }
     };
 
+    const handleExport = async () => {
+        try {
+            const res = await fetch("/api/user-data");
+            if (!res.ok) throw new Error("Errore durante l'esportazione");
+            const data = await res.json();
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `effetto-composto-backup-${new Date().toISOString().split("T")[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+
+            toast.success("Backup esportato con successo");
+        } catch {
+            toast.error("Errore durante l'esportazione dei dati");
+        }
+    };
+
+    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const data = JSON.parse(text);
+
+            if (!data.version) {
+                toast.error("File non valido: formato non riconosciuto");
+                return;
+            }
+
+            const res = await fetch("/api/user-data", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: text,
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                toast.success(
+                    `Dati importati! Preferenze: ${result.results.preferences ? "sì" : "no"}, ` +
+                    `Snapshot: ${result.results.patrimonio}, Obiettivi: ${result.results.obiettivi}`
+                );
+                // Ricarica la pagina per riflettere i nuovi dati
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                toast.error(result.error || "Errore durante l'importazione");
+            }
+        } catch {
+            toast.error("File non valido o errore di lettura");
+        } finally {
+            // Reset input file per consentire reimportazione dello stesso file
+            if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+    };
+
     if (user) {
         return (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                 <span className="text-sm font-medium text-muted-foreground">
                     Ciao, <strong className="text-foreground">{user.username}</strong>
                 </span>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleLogout}
-                    className="min-h-10 bg-background/80 border-border text-foreground hover:bg-muted backdrop-blur-md"
-                >
-                    Logout
-                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="size-10 bg-background/80 border-border text-foreground hover:bg-muted backdrop-blur-md"
+                            title="Impostazioni"
+                        >
+                            <Settings className="size-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem onClick={handleExport}>
+                            <Download className="size-4 mr-2" />
+                            Esporta dati
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                            <Upload className="size-4 mr-2" />
+                            Importa dati
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                            <LogOut className="size-4 mr-2" />
+                            Logout
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImport}
+                    className="hidden"
+                />
             </div>
         );
     }
