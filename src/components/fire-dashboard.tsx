@@ -69,6 +69,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [enablePensionOptimizer, setEnablePensionOptimizer] = useState<boolean>(false);
     const [grossIncome, setGrossIncome] = useState<number>(35000);
     const [pensionContribution, setPensionContribution] = useState<number>(5164);
+    // Pension Fund Separate Pot
+    const [currentPensionFundValue, setCurrentPensionFundValue] = useState<number>(0);
+    const [pensionFundAccessAge, setPensionFundAccessAge] = useState<number>(62);
+    const [pensionFundExitTaxRate, setPensionFundExitTaxRate] = useState<number>(15);
+    const [pensionExitMode, setPensionExitMode] = useState<"annuity" | "hybrid">("hybrid");
+    const [employerContributionType, setEmployerContributionType] = useState<"percent" | "fixed">("percent");
+    const [employerContributionValue, setEmployerContributionValue] = useState<number>(1.5);
     // Monte Carlo Animation States
     const [mcIsCalculating, setMcIsCalculating] = useState(false);
     const [mcProgress, setMcProgress] = useState(0); // 0 to 100
@@ -108,6 +115,11 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 if (p.enablePensionOptimizer !== undefined) setEnablePensionOptimizer(p.enablePensionOptimizer);
                 if (p.grossIncome) setGrossIncome(p.grossIncome);
                 if (p.pensionContribution) setPensionContribution(p.pensionContribution);
+                if (p.pensionFundAccessAge) setPensionFundAccessAge(p.pensionFundAccessAge);
+                if (p.pensionFundExitTaxRate) setPensionFundExitTaxRate(p.pensionFundExitTaxRate);
+                if (p.pensionExitMode) setPensionExitMode(p.pensionExitMode);
+                if (p.employerContributionType) setEmployerContributionType(p.employerContributionType);
+                if (p.employerContributionValue !== undefined) setEmployerContributionValue(p.employerContributionValue);
 
                 if (p.expectedPublicPension) setExpectedPublicPension(p.expectedPublicPension);
                 if (p.publicPensionAge) setPublicPensionAge(p.publicPensionAge);
@@ -135,8 +147,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 const netW = totalAssets - last.debtsTotal;
                 setCurrentNetWorth(netW);
 
-                const liquid = last.liquidStockValue + (last.stocksSnapshotValue || 0) + (last.bitcoinAmount * last.bitcoinPrice) + last.emergencyFund + last.pensionFund;
+                const liquid = last.liquidStockValue + (last.stocksSnapshotValue || 0) + (last.bitcoinAmount * last.bitcoinPrice) + last.emergencyFund;
                 setCurrentLiquidAssets(liquid);
+                setCurrentPensionFundValue(last.pensionFund || 0);
 
                 // NEW: Calcola la rendita passiva dagli immobili a rendita attiva
                 let passiveIncome = 0;
@@ -184,6 +197,11 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     enablePensionOptimizer,
                     grossIncome,
                     pensionContribution,
+                    pensionFundAccessAge,
+                    pensionFundExitTaxRate,
+                    pensionExitMode,
+                    employerContributionType,
+                    employerContributionValue,
                     expectedPublicPension,
                     publicPensionAge,
                     applyTaxStamp
@@ -202,7 +220,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
         user,
         birthYear, retirementAge, expectedMonthlyExpenses, fireWithdrawalRate,
         fireExpectedReturn, fireVolatility, expectedInflation, enablePensionOptimizer,
-        grossIncome, pensionContribution, expectedPublicPension, publicPensionAge, applyTaxStamp,
+        grossIncome, pensionContribution, pensionFundAccessAge,
+        pensionFundExitTaxRate, pensionExitMode, employerContributionType,
+        employerContributionValue, expectedPublicPension, publicPensionAge, applyTaxStamp,
     ]);
 
     // --- AUTO-SAVE DEBOUNCE EFFECT ---
@@ -219,6 +239,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
         birthYear, retirementAge, expectedMonthlyExpenses,
         fireWithdrawalRate, fireExpectedReturn, fireVolatility,
         expectedInflation, enablePensionOptimizer, grossIncome, pensionContribution,
+        pensionFundAccessAge, pensionFundExitTaxRate, pensionExitMode,
+        employerContributionType, employerContributionValue,
         expectedPublicPension, publicPensionAge, applyTaxStamp,
         user, isLoadingUser, handleSavePreferences
     ]);
@@ -328,8 +350,27 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
     const annualTaxRefund = calculateTaxRefund();
 
+    // --- PENSION FUND CONTRIBUTION CALCULATION ---
+    const voluntaryContribution = enablePensionOptimizer ? Math.min(pensionContribution, 5164.57) : 0;
+    // TFR automatico quando il FP è attivo (~6.91% RAL)
+    const tfrContribution = enablePensionOptimizer ? grossIncome * 0.0691 : 0;
+    // Contributo datore di lavoro
+    const employerContribution = enablePensionOptimizer
+        ? (employerContributionType === "percent" ? grossIncome * (employerContributionValue / 100) : employerContributionValue)
+        : 0;
+    const totalAnnualPensionContribution = voluntaryContribution + tfrContribution + employerContribution;
+
+    // Pension fund return: same real return but NO bollo (0.2%) — FP is exempt
+    const pensionFundRealReturn = realReturnDecimal; // No bollo deduction
+    const pensionFundMonthlyReturn = Math.pow(1 + pensionFundRealReturn, 1 / 12) - 1;
+
+    // Life expectancy for annuity calculation (conservative: 85 years)
+    const lifeExpectancy = 85;
+
     // 1. DETERMINISTIC STANDARD SIMULATION
     let tempCap = startingCapital;
+    let pensionCap = currentPensionFundValue; // Separate pot for pension fund
+    let pensionAnnuity = 0; // Monthly annuity from pension fund (activated at access age)
     let yearsToFire = 0;
     const maxYearsSim = 100;
     const chartData = [];
@@ -355,12 +396,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         // Use the projected passive income for THIS specific future month
         const projectedMonthlyPassiveIncome = getActiveRealEstatePassiveIncomeAtMonth(m) / 12;
-        const currentMonthlyExpenses = isRetired ? Math.max(0, expectedMonthlyExpenses - projectedMonthlyPassiveIncome - monthlyPublicPension) : 0;
+        const currentMonthlyExpenses = isRetired ? Math.max(0, expectedMonthlyExpenses - projectedMonthlyPassiveIncome - monthlyPublicPension - pensionAnnuity) : 0;
 
         if (m % 12 === 0 && currentY <= maxYearsSim) {
             chartData.push({
                 age: currentAge + currentY,
                 Capital: tempCap,
+                PensionFund: pensionCap,
                 Target: fireTarget,
                 ActiveDebtAnnual: activeDebtThisMonth * 12 // Annualized burden for the chart area
             });
@@ -373,6 +415,32 @@ export function FireDashboard({ user }: FireDashboardProps) {
             tempCap += annualTaxRefund;
         }
 
+        // --- Pension Fund Pot Growth ---
+        if (pensionCap > 0 || totalAnnualPensionContribution > 0) {
+            // Pension fund grows with its own return (no bollo)
+            pensionCap = pensionCap * (1 + pensionFundMonthlyReturn);
+
+            // Annual contribution (spread monthly, only while working)
+            if (!isRetired && totalAnnualPensionContribution > 0) {
+                pensionCap += totalAnnualPensionContribution / 12;
+            }
+
+            // At pension fund access age: liquidate based on exit mode
+            if (yAge === pensionFundAccessAge && m % 12 === 0 && pensionCap > 0) {
+                const pensionCapNet = pensionCap * (1 - pensionFundExitTaxRate / 100);
+                const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
+                if (pensionExitMode === "hybrid") {
+                    // 50% capitale + 50% rendita
+                    tempCap += pensionCapNet * 0.5;
+                    pensionAnnuity = (pensionCapNet * 0.5) / annuityMonths;
+                } else {
+                    // 100% rendita mensile
+                    pensionAnnuity = pensionCapNet / annuityMonths;
+                }
+                pensionCap = 0; // Fully liquidated
+            }
+        }
+
         if (isRetired) {
             tempCap = tempCap * (1 + monthlyReturnRate) - currentMonthlyExpenses;
         } else {
@@ -381,6 +449,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         if (tempCap < 0) tempCap = 0;
     }
+    // Store the pension annuity for display
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const calculatedPensionAnnuity = pensionAnnuity;
     const displayYears = yearsToFire > 0 ? Math.min(Math.ceil(yearsToFire) + 5, 50) : 50;
     const displayChartData = chartData.slice(0, displayYears + 1);
     const isFireAlready = startingCapital >= fireTarget;
@@ -458,6 +529,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
             debtByMonth,
             passiveIncomeByMonth,
             baseInstallmentNow,
+            // Pension Fund Pot
+            currentPensionFundValue,
+            totalAnnualPensionContribution,
+            pensionFundAccessAge,
+            pensionFundExitTaxRate,
+            pensionExitMode,
+            lifeExpectancy,
         });
     };
 
@@ -474,6 +552,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
     // 3. STRESS TEST (Lost Decade)
     // Run the user's plan through 2000-2009 S&P500 real returns
     let stressCap = startingCapital;
+    let stressPensionCap = currentPensionFundValue;
+    let stressPensionAnnuity = 0;
     const stressData = [];
     let stressSurvived = true;
 
@@ -496,7 +576,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         if (isRetired) {
             const annualPublicPension = yAge >= publicPensionAge ? expectedPublicPension * 12 : 0;
-            stressCap -= Math.max(0, netAnnualExpenses - annualPublicPension);
+            stressCap -= Math.max(0, netAnnualExpenses - annualPublicPension - stressPensionAnnuity * 12);
         } else {
             // Check dynamic savings for this year (average over the 12 months)
             let totalSavingsThisYear = 0;
@@ -511,6 +591,26 @@ export function FireDashboard({ user }: FireDashboardProps) {
         // Inject Pension Fund IRPEF Tax Refund
         if (enablePensionOptimizer && !isRetired) {
             stressCap += annualTaxRefund;
+        }
+
+        // Pension fund pot in stress test (same return as main, no bollo)
+        if (stressPensionCap > 0 || totalAnnualPensionContribution > 0) {
+            const pfReturn = LOST_DECADE_RETURNS[i] / 100; // No bollo for pension fund
+            stressPensionCap = stressPensionCap * (1 + pfReturn);
+            if (!isRetired && totalAnnualPensionContribution > 0) {
+                stressPensionCap += totalAnnualPensionContribution;
+            }
+            if (yAge === pensionFundAccessAge && stressPensionCap > 0) {
+                const net = stressPensionCap * (1 - pensionFundExitTaxRate / 100);
+                const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
+                if (pensionExitMode === "hybrid") {
+                    stressCap += net * 0.5;
+                    stressPensionAnnuity = (net * 0.5) / annuityMonths;
+                } else {
+                    stressPensionAnnuity = net / annuityMonths;
+                }
+                stressPensionCap = 0;
+            }
         }
 
         if (stressCap <= 0) {
@@ -780,6 +880,15 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     grossIncome={grossIncome}
                     pensionContribution={pensionContribution}
                     annualTaxRefund={annualTaxRefund}
+                    pensionFundAccessAge={pensionFundAccessAge}
+                    pensionFundExitTaxRate={pensionFundExitTaxRate}
+                    pensionExitMode={pensionExitMode}
+                    employerContributionType={employerContributionType}
+                    employerContributionValue={employerContributionValue}
+                    tfrContribution={tfrContribution}
+                    employerContribution={employerContribution}
+                    totalAnnualPensionContribution={totalAnnualPensionContribution}
+                    calculatedPensionAnnuity={calculatedPensionAnnuity}
                     applyTaxStamp={applyTaxStamp}
                     expectedPublicPension={expectedPublicPension}
                     publicPensionAge={publicPensionAge}
@@ -795,6 +904,11 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     onEnablePensionOptimizerChange={setEnablePensionOptimizer}
                     onGrossIncomeChange={setGrossIncome}
                     onPensionContributionChange={setPensionContribution}
+                    onPensionFundAccessAgeChange={setPensionFundAccessAge}
+                    onPensionFundExitTaxRateChange={setPensionFundExitTaxRate}
+                    onPensionExitModeChange={setPensionExitMode}
+                    onEmployerContributionTypeChange={setEmployerContributionType}
+                    onEmployerContributionValueChange={setEmployerContributionValue}
                     onApplyTaxStampChange={setApplyTaxStamp}
                     onExpectedPublicPensionChange={setExpectedPublicPension}
                     onPublicPensionAgeChange={setPublicPensionAge}

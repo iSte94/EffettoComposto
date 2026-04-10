@@ -21,6 +21,13 @@ interface MonteCarloParams {
     debtByMonth: number[]; // getActiveDebtAtMonth per ogni mese
     passiveIncomeByMonth: number[]; // getActiveRealEstatePassiveIncomeAtMonth per ogni mese
     baseInstallmentNow: number;
+    // Pension Fund Pot
+    currentPensionFundValue: number;
+    totalAnnualPensionContribution: number;
+    pensionFundAccessAge: number;
+    pensionFundExitTaxRate: number;
+    pensionExitMode: "annuity" | "hybrid";
+    lifeExpectancy: number;
 }
 
 interface MonteCarloProgress {
@@ -67,7 +74,9 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
         annualExpenses, monthlySavings,
         publicPensionAge, expectedPublicPension,
         enablePensionOptimizer, annualTaxRefund,
-        targetRuns, debtByMonth, passiveIncomeByMonth, baseInstallmentNow
+        targetRuns, debtByMonth, passiveIncomeByMonth, baseInstallmentNow,
+        currentPensionFundValue, totalAnnualPensionContribution,
+        pensionFundAccessAge, pensionFundExitTaxRate, pensionExitMode, lifeExpectancy
     } = params;
 
     const stdDevDecimal = fireVolatility / 100;
@@ -81,6 +90,8 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
 
         for (let run = runsCompleted; run < currentChunkLimit; run++) {
             let runCap = startingCapital;
+            let runPensionCap = currentPensionFundValue;
+            let runPensionAnnuity = 0;
             let survived = true;
 
             for (let y = 0; y <= simYears; y++) {
@@ -104,7 +115,7 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                         totalPassiveIncomeThisYear += (passiveIncomeByMonth[monthIdx] || 0) / 12;
                     }
                     const dynamicNetAnnualExpenses = Math.max(0, annualExpenses - totalPassiveIncomeThisYear);
-                    runCap -= Math.max(0, dynamicNetAnnualExpenses - annualPublicPension);
+                    runCap -= Math.max(0, dynamicNetAnnualExpenses - annualPublicPension - runPensionAnnuity * 12);
                 } else {
                     let totalSavingsThisYear = 0;
                     for (let m = (y * 12); m < ((y + 1) * 12); m++) {
@@ -118,6 +129,26 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
 
                 if (enablePensionOptimizer && !isRetired) {
                     runCap += annualTaxRefund;
+                }
+
+                // Pension Fund Pot: grows with stochastic return (no bollo)
+                if (runPensionCap > 0 || totalAnnualPensionContribution > 0) {
+                    const pfRandomReturn = randomNormal(realReturnDecimal, stdDevDecimal); // No bollo
+                    runPensionCap = runPensionCap * (1 + pfRandomReturn);
+                    if (!isRetired && totalAnnualPensionContribution > 0) {
+                        runPensionCap += totalAnnualPensionContribution;
+                    }
+                    if (yAge === pensionFundAccessAge && runPensionCap > 0) {
+                        const net = runPensionCap * (1 - pensionFundExitTaxRate / 100);
+                        const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
+                        if (pensionExitMode === "hybrid") {
+                            runCap += net * 0.5;
+                            runPensionAnnuity = (net * 0.5) / annuityMonths;
+                        } else {
+                            runPensionAnnuity = net / annuityMonths;
+                        }
+                        runPensionCap = 0;
+                    }
                 }
 
                 if (runCap < 0) {

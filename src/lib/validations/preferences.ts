@@ -43,4 +43,13 @@ export const preferencesSchema = z.object({
     publicPensionAge: z.number().int().min(50).max(100).optional(),
     applyTaxStamp: z.boolean().optional(),
     separateEmergencyFund: z.boolean().optional(),
+    // Fondo Pensione Complementare
+    enablePensionOptimizer: z.boolean().optional(),
+    grossIncome: z.number().min(0).optional(),
+    pensionContribution: z.number().min(0).max(5164.57).optional(),
+    pensionFundAccessAge: z.number().int().min(50).max(100).optional(),
+    pensionFundExitTaxRate: z.number().min(9).max(15).optional(),
+    pensionExitMode: z.enum(["annuity", "hybrid"]).optional(),
+    employerContributionType: z.enum(["percent", "fixed"]).optional(),
+    employerContributionValue: z.number().min(0).optional(),
 });

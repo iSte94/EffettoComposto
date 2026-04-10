@@ -23,6 +23,15 @@ interface FireSettingsPanelProps {
     grossIncome: number;
     pensionContribution: number;
     annualTaxRefund: number;
+    pensionFundAccessAge: number;
+    pensionFundExitTaxRate: number;
+    pensionExitMode: "annuity" | "hybrid";
+    employerContributionType: "percent" | "fixed";
+    employerContributionValue: number;
+    tfrContribution: number;
+    employerContribution: number;
+    totalAnnualPensionContribution: number;
+    calculatedPensionAnnuity: number;
     applyTaxStamp: boolean;
     expectedPublicPension: number;
     publicPensionAge: number;
@@ -38,6 +47,11 @@ interface FireSettingsPanelProps {
     onEnablePensionOptimizerChange: (v: boolean) => void;
     onGrossIncomeChange: (v: number) => void;
     onPensionContributionChange: (v: number) => void;
+    onPensionFundAccessAgeChange: (v: number) => void;
+    onPensionFundExitTaxRateChange: (v: number) => void;
+    onPensionExitModeChange: (v: "annuity" | "hybrid") => void;
+    onEmployerContributionTypeChange: (v: "percent" | "fixed") => void;
+    onEmployerContributionValueChange: (v: number) => void;
     onApplyTaxStampChange: (v: boolean) => void;
     onExpectedPublicPensionChange: (v: number) => void;
     onPublicPensionAgeChange: (v: number) => void;
@@ -144,21 +158,121 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                             </div>
 
                             {props.enablePensionOptimizer && (
-                                <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white/75 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 sm:grid-cols-2">
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-bold uppercase text-slate-500">RAL (€)</Label>
-                                        <Input type="number" value={props.grossIncome} onChange={e => props.onGrossIncomeChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                                <div className="space-y-4 rounded-xl border border-slate-200 bg-white/75 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-500">RAL (€)</Label>
+                                            <Input type="number" value={props.grossIncome} onChange={e => props.onGrossIncomeChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-500">Versato Volontario (€/anno)</Label>
+                                            <Input type="number" value={props.pensionContribution} onChange={e => props.onPensionContributionChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" max={5164} />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-bold uppercase text-slate-500">Versato (€)</Label>
-                                        <Input type="number" value={props.pensionContribution} onChange={e => props.onPensionContributionChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" max={5164} />
+
+                                    {/* Contributo Datore di Lavoro */}
+                                    <div className="space-y-2 rounded-lg border border-slate-100 bg-slate-50/80 p-2.5 dark:border-slate-700 dark:bg-slate-800/40">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-900 dark:text-slate-100">Contributo Datore di Lavoro</Label>
+                                            <div className="flex rounded-full border border-slate-200 bg-white p-0.5 dark:border-slate-600 dark:bg-slate-800">
+                                                <button
+                                                    onClick={() => props.onEmployerContributionTypeChange("percent")}
+                                                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all ${props.employerContributionType === "percent" ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                                                >% RAL</button>
+                                                <button
+                                                    onClick={() => props.onEmployerContributionTypeChange("fixed")}
+                                                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold transition-all ${props.employerContributionType === "fixed" ? "bg-blue-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-400"}`}
+                                                >€ Fisso</button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                type="number"
+                                                step={props.employerContributionType === "percent" ? "0.1" : "100"}
+                                                value={props.employerContributionValue}
+                                                onChange={e => props.onEmployerContributionValueChange(Number(e.target.value))}
+                                                className="h-9 border-slate-200 bg-white/80 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100"
+                                            />
+                                            <span className="whitespace-nowrap text-[10px] text-slate-500">= {formatEuro(props.employerContribution)}/anno</span>
+                                        </div>
                                     </div>
+
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-500">Eta Accesso FP (RITA)</Label>
+                                            <Input type="number" value={props.pensionFundAccessAge} onChange={e => props.onPensionFundAccessAgeChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" min={50} max={100} />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-500">Tassazione Uscita FP (%)</Label>
+                                            <div className="flex items-center gap-3">
+                                                <Slider value={[props.pensionFundExitTaxRate]} min={9} max={15} step={0.3} onValueChange={(val) => props.onPensionFundExitTaxRateChange(val[0])} className="flex-1" />
+                                                <span className="min-w-[40px] text-right text-sm font-bold text-slate-900 dark:text-slate-100">{props.pensionFundExitTaxRate.toFixed(1)}%</span>
+                                            </div>
+                                            <p className="text-[9px] text-slate-500 dark:text-slate-400">15% base, -0.3%/anno oltre 15 anni, min 9%</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Modalita Uscita FP */}
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-bold uppercase text-slate-500">Modalita Uscita</Label>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                onClick={() => props.onPensionExitModeChange("hybrid")}
+                                                className={`rounded-xl border p-2.5 text-left transition-all ${props.pensionExitMode === "hybrid"
+                                                    ? "border-blue-400 bg-blue-50 shadow-sm dark:border-blue-600 dark:bg-blue-950/40"
+                                                    : "border-slate-200 bg-white/60 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600"}`}
+                                            >
+                                                <span className={`block text-xs font-bold ${props.pensionExitMode === "hybrid" ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"}`}>50% Capitale + 50% Rendita</span>
+                                                <span className="mt-0.5 block text-[9px] text-slate-500 dark:text-slate-400">Max consentito dalla legge. Prendi meta subito, meta come rendita mensile.</span>
+                                            </button>
+                                            <button
+                                                onClick={() => props.onPensionExitModeChange("annuity")}
+                                                className={`rounded-xl border p-2.5 text-left transition-all ${props.pensionExitMode === "annuity"
+                                                    ? "border-blue-400 bg-blue-50 shadow-sm dark:border-blue-600 dark:bg-blue-950/40"
+                                                    : "border-slate-200 bg-white/60 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600"}`}
+                                            >
+                                                <span className={`block text-xs font-bold ${props.pensionExitMode === "annuity" ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"}`}>100% Rendita</span>
+                                                <span className="mt-0.5 block text-[9px] text-slate-500 dark:text-slate-400">Tutto convertito in rendita mensile. Piu conservativo e stabile.</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <div className="sm:col-span-2 flex flex-col gap-2 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="flex flex-col">
                                             <span>Rimborso Annuo IRPEF 2024:</span>
                                             <span className="text-[9px] opacity-70">Reinvestito automaticamente a luglio nel calcolo FIRE.</span>
                                         </div>
                                         <span className="text-lg font-bold">+{formatEuro(props.annualTaxRefund)}</span>
+                                    </div>
+
+                                    <div className="rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2 dark:border-blue-900 dark:bg-blue-950/30">
+                                        <div className="space-y-1 text-xs text-blue-800 dark:text-blue-300">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-blue-600/80 dark:text-blue-400/60">Volontario</span>
+                                                <span className="font-medium">{formatEuro(Math.min(props.pensionContribution, 5164.57))}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-blue-600/80 dark:text-blue-400/60">TFR (~6.91% RAL)</span>
+                                                <span className="font-medium">{formatEuro(props.tfrContribution)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[10px] text-blue-600/80 dark:text-blue-400/60">Datore di lavoro</span>
+                                                <span className="font-medium">{formatEuro(props.employerContribution)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between border-t border-blue-200 pt-1 dark:border-blue-800">
+                                                <span className="font-bold">Totale FP/anno</span>
+                                                <span className="font-bold">{formatEuro(props.totalAnnualPensionContribution)}</span>
+                                            </div>
+                                        </div>
+                                        {props.calculatedPensionAnnuity > 0 && (
+                                            <div className="mt-2 flex items-center justify-between border-t border-blue-200 pt-1.5 text-xs text-blue-800 dark:border-blue-800 dark:text-blue-300">
+                                                <span className="font-medium">Rendita FP stimata:</span>
+                                                <span className="font-bold">{formatEuro(props.calculatedPensionAnnuity)}/mese</span>
+                                            </div>
+                                        )}
+                                        <p className="mt-1.5 text-[9px] leading-tight text-blue-600/80 dark:text-blue-400/70">
+                                            A {props.pensionFundAccessAge} anni: {props.pensionExitMode === "hybrid" ? "50% capitale + 50% rendita" : "100% rendita mensile"}. Il FP e esente da bollo e cresce separatamente.
+                                        </p>
                                     </div>
                                 </div>
                             )}

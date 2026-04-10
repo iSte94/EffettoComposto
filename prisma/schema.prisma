@@ -68,6 +68,16 @@ model Preference {
   applyTaxStamp            Boolean  @default(true)
   separateEmergencyFund    Boolean  @default(false)
 
+  // Fondo Pensione Complementare
+  enablePensionOptimizer   Boolean  @default(false)
+  grossIncome              Float    @default(35000)
+  pensionContribution      Float    @default(5164)
+  pensionFundAccessAge     Int      @default(62)    // Eta accesso RITA
+  pensionFundExitTaxRate   Float    @default(15)    // 9-15% in base ad anzianita
+  pensionExitMode          String   @default("hybrid") // "annuity" = 100% rendita, "hybrid" = 50/50
+  employerContributionType String   @default("percent") // "percent" o "fixed"
+  employerContributionValue Float   @default(1.5)    // % RAL o importo fisso annuo
+
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
