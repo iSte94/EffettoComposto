@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Snowflake, Flame, Scale } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -187,7 +188,10 @@ export function DebtStrategy() {
                     </div>
 
                     <div className="space-y-2 border-t border-border/70 pt-3">
-                        <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget Extra Mensile per Estinzione</Label>
+                        <div className="flex items-center gap-1">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Budget Extra Mensile per Estinzione</Label>
+                            <InfoTooltip>Importo aggiuntivo oltre le rate minime da destinare al debito prioritario secondo la strategia scelta.</InfoTooltip>
+                        </div>
                         <Input
                             type="number"
                             step={50}
@@ -195,7 +199,6 @@ export function DebtStrategy() {
                             onChange={(e) => setExtraMonthly(Number(e.target.value))}
                             className="min-h-11 border-indigo-200 bg-indigo-50/60 text-lg font-bold text-indigo-700 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-300"
                         />
-                        <p className="text-[10px] text-muted-foreground">Importo aggiuntivo oltre le rate minime da destinare al debito prioritario.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -206,8 +209,8 @@ export function DebtStrategy() {
                         <CardContent className="space-y-4 p-6">
                             <h4 className="flex items-center gap-2 text-lg font-bold text-blue-700 dark:text-blue-300">
                                 <Snowflake className="h-5 w-5" /> Metodo Snowball
+                                <InfoTooltip>Estingui prima il debito con il saldo piu&#768; basso. Motivazione psicologica: vedi risultati rapidi e mantieni lo slancio.</InfoTooltip>
                             </h4>
-                            <p className="text-xs text-blue-700/75 dark:text-blue-400/75">Estingui prima il debito con il saldo piu basso. Motivazione psicologica: vedi risultati rapidi.</p>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl bg-white/70 p-3 text-center dark:bg-slate-900/50">
                                     <div className="text-[10px] font-bold uppercase text-blue-500">Tempo Totale</div>
@@ -229,8 +232,8 @@ export function DebtStrategy() {
                         <CardContent className="space-y-4 p-6">
                             <h4 className="flex items-center gap-2 text-lg font-bold text-orange-700 dark:text-orange-300">
                                 <Flame className="h-5 w-5" /> Metodo Avalanche
+                                <InfoTooltip>Estingui prima il debito con il tasso piu&#768; alto. Matematicamente ottimale: risparmi il massimo sugli interessi totali.</InfoTooltip>
                             </h4>
-                            <p className="text-xs text-orange-700/75 dark:text-orange-400/75">Estingui prima il debito con il tasso piu alto. Matematicamente ottimale: risparmi piu interessi.</p>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="rounded-2xl bg-white/70 p-3 text-center dark:bg-slate-900/50">
                                     <div className="text-[10px] font-bold uppercase text-orange-500">Tempo Totale</div>

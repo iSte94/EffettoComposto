@@ -83,6 +83,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 12 aprile 2026
+
+- **Proiezione patrimonio con interesse composto** — nuova terza modalita' di proiezione: oltre a "Risparmio Netto" e "Trend Storico", ora disponibile "Risparmio + Rendimento" che combina il risparmio mensile con il rendimento atteso configurato nella sezione FIRE (interesse composto con versamenti periodici)
+- **Spiegazioni on-hover** — tutti i testi esplicativi che occupavano spazio nell'interfaccia sono stati convertiti in tooltip: passando il mouse sull'icona info accanto a ogni parametro si legge come viene calcolato, senza ingombrare la vista. Interessa proiezione patrimonio, parametri FIRE (SWR, inflazione, rendimento, volatilita', fondo pensione, bollo, pensione INPS), simulatore mutuo (DTI, cashflow, costo opportunita'), profilo finanziario, strategia debiti e calcolatore interesse composto
+- **Componente InfoTooltip riutilizzabile** — nuovo componente UI basato su Radix Tooltip per mostrare spiegazioni contestuali al passaggio del mouse, con icona Info e stile coerente in tutta l'app
+
 ### 11 aprile 2026 (mobile patrimonio)
 
 - **Card Patrimonio piu' chiare su smartphone** - superfici meno trasparenti e meno "annerite" nelle sezioni Patrimonio, Asset, Cashflow e Storico; tab attivo della navigazione Patrimonio ora usa un accento blu invece del blocco scuro

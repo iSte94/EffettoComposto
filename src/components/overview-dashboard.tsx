@@ -330,7 +330,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             </div>
 
             {/* Net Worth Projection */}
-            <NetWorthProjection history={history} monthlySavings={monthlySavings} currentNetWorth={metrics?.currentNetWorth} />
+            <NetWorthProjection history={history} monthlySavings={monthlySavings} currentNetWorth={metrics?.currentNetWorth} expectedReturnRate={Number(preferences.fireExpectedReturn) || undefined} />
 
             {/* Accepted Purchases Summary */}
             {acceptedPurchases.length > 0 && (

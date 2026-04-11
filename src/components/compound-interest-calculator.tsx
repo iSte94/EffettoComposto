@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Calculator, TrendingUp, Banknote, PiggyBank } from "lucide-react";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -138,10 +139,11 @@ export function CompoundInterestCalculator() {
                                 <div className="text-xl font-extrabold text-purple-600 dark:text-purple-400">{formatEuro(result.totalInterest)}</div>
                             </div>
                         </div>
-                        <div className="rounded-2xl border border-border/60 bg-muted/50 p-3 text-center">
-                            <span className="text-xs text-muted-foreground">
-                                Il {((result.totalInterest / result.finalBalance) * 100).toFixed(0)}% del capitale finale proviene dagli interessi composti
+                        <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-border/60 bg-muted/50 p-3 text-center">
+                            <span className="text-xs font-bold text-muted-foreground">
+                                {((result.totalInterest / result.finalBalance) * 100).toFixed(0)}% da interessi composti
                             </span>
+                            <InfoTooltip iconClassName="w-3 h-3">Quota del capitale finale generata esclusivamente dagli interessi sugli interessi (effetto compounding), non dai versamenti diretti.</InfoTooltip>
                         </div>
                     </div>
                 </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { formatEuro } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 interface DtiAnalysisProps {
     mortgagePayment: number;
@@ -34,7 +35,10 @@ export function DtiAnalysis({
 
             <div className={`rounded-3xl border border-slate-200 p-5 shadow-md transition-colors sm:p-8 ${sustainabilityRatio > 33 ? "bg-red-50/90 dark:bg-red-950/30" : "bg-emerald-50/90 dark:bg-emerald-950/50"}`}>
                 <div className="mb-4 flex items-end justify-between gap-4">
-                    <div className="text-lg font-bold text-slate-800 dark:text-slate-200">Indice Rata/Reddito Globale</div>
+                    <div className="flex items-center gap-1.5 text-lg font-bold text-slate-800 dark:text-slate-200">
+                        Indice Rata/Reddito Globale
+                        <InfoTooltip iconClassName="w-4 h-4">Rapporto tra tutti i debiti mensili (mutuo + prestiti) e il reddito netto. Le banche considerano sostenibile un valore sotto il 33%. Oltre questa soglia, l&apos;approvazione del mutuo diventa piu&#768; difficile e possono essere richieste garanzie aggiuntive.</InfoTooltip>
+                    </div>
                     <div className={`text-4xl font-extrabold ${sustainabilityRatio > 33 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}>
                         {sustainabilityRatio.toFixed(1)}%
                     </div>
@@ -51,10 +55,8 @@ export function DtiAnalysis({
                     <span>Spazio Residuo per Mutuo: <strong className={`font-bold ${maxNewMortgageAllowed < mortgagePayment ? "text-red-500" : "text-emerald-500"}`}>{formatEuro(maxNewMortgageAllowed)}</strong></span>
                 </div>
 
-                <p className={`mt-4 text-sm font-medium leading-relaxed sm:text-base ${sustainabilityRatio > 33 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}>
-                    {sustainabilityRatio <= 33
-                        ? "Eccellente. I tuoi debiti combinati rientrano comodamente nei parametri. Questo nuovo mutuo ha alte probabilita di essere approvato."
-                        : "Attenzione Rischio Sofferenza. Sommando i prestiti pregressi, superi la soglia del 33%. La banca potrebbe chiederti garanzie o un anticipo maggiore per concedere l'ipoteca."}
+                <p className={`mt-4 text-sm font-bold sm:text-base ${sustainabilityRatio > 33 ? "text-red-600" : "text-emerald-600 dark:text-emerald-400"}`}>
+                    {sustainabilityRatio <= 33 ? "Eccellente — sotto la soglia del 33%." : "Attenzione — superi la soglia del 33%."}
                 </p>
             </div>
         </div>

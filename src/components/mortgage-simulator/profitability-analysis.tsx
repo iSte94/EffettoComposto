@@ -1,6 +1,7 @@
 "use client";
 
 import { formatEuro } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 interface ProfitabilityAnalysisProps {
     grossYield: number;
@@ -42,7 +43,7 @@ export function ProfitabilityAnalysis({
                     <div className={`text-3xl font-extrabold ${cashflow >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                         {cashflow >= 0 ? "+" : ""}{formatEuro(cashflow)}
                     </div>
-                    <div className="mt-1 px-2 text-[9px] font-medium leading-tight text-slate-500 line-clamp-2">Extra ricavo dopo aver pagato tutte le spese e rata.</div>
+                    <div className="mt-1"><InfoTooltip iconClassName="w-3 h-3">Ricavo mensile netto dall&apos;affitto dopo aver sottratto rata mutuo, spese condominiali, tasse e manutenzione ordinaria.</InfoTooltip></div>
                 </div>
             </div>
 
@@ -71,18 +72,19 @@ export function ProfitabilityAnalysis({
                         </div>
 
                         <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:justify-between">
-                            <span className="font-bold text-slate-900 dark:text-slate-100">Guadagno/Perdita Cash Cumulata:</span>
+                            <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-900 dark:text-slate-100">Guadagno/Perdita Cash Cumulata</span>
+                                <InfoTooltip>
+                                    {pureRealEstateProfit >= 0
+                                        ? `Gli affitti cumulati in ${years} anni ripagano anticipo, costi iniziali (tasse/agenzia/notaio), manutenzione e interessi del mutuo. Il surplus di ${formatEuro(pureRealEstateProfit)} e&#768; il guadagno cash netto, e possiedi l'immobile al 100%.`
+                                        : `Gli affitti cumulati in ${years} anni NON coprono anticipo, costi iniziali, manutenzione e interessi bancari. Sei sotto di ${formatEuro(Math.abs(pureRealEstateProfit))}. Guadagnerai solo se l'immobile si rivalutera&#768; di almeno questa cifra.`}
+                                </InfoTooltip>
+                            </div>
                             <span className={`text-3xl font-extrabold tracking-tight ${pureRealEstateProfit >= 0 ? "text-emerald-500" : "text-red-500"}`}>
                                 {pureRealEstateProfit >= 0 ? "+" : ""}{formatEuro(pureRealEstateProfit)}
                             </span>
                         </div>
                     </div>
-
-                    <p className="mt-6 text-sm leading-relaxed font-medium text-slate-600 dark:text-slate-400">
-                        {pureRealEstateProfit >= 0
-                            ? `Positivo! L'affitto cumulato nei ${years} anni ripagherà interamente l'anticipo versato, tutti i costi iniziali (tasse/agenzia/notaio), le spese impreviste e tutti gli interessi del mutuo. Inoltre, manterrai un surplus cash di ${formatEuro(pureRealEstateProfit)} e possiederai l'immobile al 100%.`
-                            : `Attenzione: gli affitti cumulati nei ${years} anni NON bastano a coprire interamente l'esborso iniziale (anticipo + tasse/agenzia), la manutenzione extra e la valanga di interessi bancari. Sei "sotto" di ${formatEuro(Math.abs(pureRealEstateProfit))}. Guadagnerai solo se l'immobile si rivaluterà di almeno questa cifra.`}
-                    </p>
                 </div>
             </div>
 
@@ -93,11 +95,11 @@ export function ProfitabilityAnalysis({
 
                 <div className="space-y-4">
                     <div className="relative rounded-3xl border border-slate-200 bg-white p-5 shadow-md dark:bg-slate-900/70 sm:p-6">
-                        <div className="mb-2 text-sm font-bold text-slate-500">Scenario A: Immobili (L&apos;immobile ti resta pagato a vita)</div>
+                        <div className="mb-2 flex items-center gap-1.5 text-sm font-bold text-slate-500">
+                            Scenario A: Immobili
+                            <InfoTooltip>Valore stimato a fine ciclo (+2% inflazione/anno medio). L&apos;immobile ti resta pagato a vita. Non conta le entrate bonus da cashflow accumulato se le hai spese.</InfoTooltip>
+                        </div>
                         <div className="text-4xl font-extrabold text-slate-900 dark:text-slate-100">{formatEuro(propertyFutureValue)}</div>
-                        <p className="mt-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                            Valore stimato a fine ciclo (+2% inflazione/anno medio nel tempo). Non conta le entrate bonus da cashflow accumulato se le hai spese.
-                        </p>
                     </div>
 
                     <div className="relative z-10 -my-3 flex justify-center">
@@ -105,11 +107,11 @@ export function ProfitabilityAnalysis({
                     </div>
 
                     <div className="relative rounded-3xl border border-purple-200 bg-purple-50 p-5 shadow-[0_8px_30px_rgba(168,85,247,0.1)] dark:border-purple-900 dark:bg-purple-950/50 sm:p-6">
-                        <div className="mb-2 text-sm font-bold text-purple-600 dark:text-purple-400">Scenario B: Compounding nel Mercato Azionario ({marketReturn}%)</div>
+                        <div className="mb-2 flex items-center gap-1.5 text-sm font-bold text-purple-600 dark:text-purple-400">
+                            Scenario B: Mercato Azionario ({marketReturn}%)
+                            <InfoTooltip>Invece di comprare casa, investi i {formatEuro(totalCashNeeded)} (anticipo + tasse + agenzia) in ETF/azionario al {marketReturn}% annuo per {years} anni, continuando a pagare l&apos;affitto.</InfoTooltip>
+                        </div>
                         <div className="text-4xl font-extrabold text-purple-600 dark:text-purple-400">{formatEuro(investFutureValue)}</div>
-                        <p className="mt-3 text-xs leading-relaxed font-medium text-purple-500 dark:text-purple-300">
-                            Hai preso i <strong className="font-bold underline text-purple-700 dark:text-purple-300">{formatEuro(totalCashNeeded)}</strong> (che avresti speso in tasse, agenzie e anticipo) e li hai messi in un ETF/Azionario al {marketReturn}% per {years} anni, in santa pace, pagando l&apos;affitto mensilmente come sempre.
-                        </p>
                     </div>
                 </div>
             </div>

@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { Target, Activity } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 interface FireSettingsPanelProps {
     includeIlliquidInFire: boolean;
@@ -70,8 +71,10 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                     <div className="space-y-4">
                         <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-white/70 p-3 transition-all hover:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800/70">
                             <div className="space-y-0.5">
-                                <Label className="text-sm font-bold text-slate-900 dark:text-slate-100">Includi Immobili</Label>
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400">Usa tutto il Net Worth per il FIRE</p>
+                                <div className="flex items-center gap-1">
+                                    <Label className="text-sm font-bold text-slate-900 dark:text-slate-100">Includi Immobili</Label>
+                                    <InfoTooltip>Se attivo, il valore degli immobili viene incluso nel capitale per il calcolo FIRE. Disattiva se consideri gli immobili non liquidabili.</InfoTooltip>
+                                </div>
                             </div>
                             <Switch checked={props.includeIlliquidInFire} onCheckedChange={props.onIncludeIlliquidChange} />
                         </div>
@@ -110,7 +113,10 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                     <div className="space-y-5">
                         <div className="space-y-3">
                             <div className="flex items-end justify-between gap-3">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Safe Withdrawal Rate (%)</Label>
+                                <div className="flex items-center gap-1">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Safe Withdrawal Rate (%)</Label>
+                                    <InfoTooltip>Percentuale del patrimonio che puoi prelevare ogni anno senza esaurirlo. La regola del 4% e&#768; la piu&#768; nota, ma valori piu&#768; bassi (3-3.5%) offrono maggiore sicurezza su orizzonti lunghi.</InfoTooltip>
+                                </div>
                                 <span className="font-bold text-slate-900 dark:text-slate-100">{props.fireWithdrawalRate.toFixed(2)}%</span>
                             </div>
                             <Slider value={[props.fireWithdrawalRate]} min={2} max={6} step={0.25} onValueChange={(val) => props.onFireWithdrawalRateChange(val[0])} />
@@ -118,16 +124,21 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
 
                         <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <div className="flex items-end justify-between gap-3">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Inflazione Attesa (%)</Label>
+                                <div className="flex items-center gap-1">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Inflazione Attesa (%)</Label>
+                                    <InfoTooltip>L&apos;inflazione viene sottratta dal rendimento nominale. Tutti i valori FIRE sono espressi in euro odierni (potere d&apos;acquisto reale).</InfoTooltip>
+                                </div>
                                 <span className="font-bold text-amber-600 dark:text-amber-400">{props.expectedInflation.toFixed(1)}%</span>
                             </div>
                             <Slider value={[props.expectedInflation]} min={0} max={10} step={0.5} onValueChange={(val) => props.onExpectedInflationChange(val[0])} />
-                            <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">L&apos;inflazione viene sottratta dal rendimento. Tutti i valori sono in euro odierni (potere d&apos;acquisto reale).</p>
                         </div>
 
                         <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <div className="flex items-end justify-between gap-3">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rendimento Medio Reale (%)</Label>
+                                <div className="flex items-center gap-1">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Rendimento Medio Reale (%)</Label>
+                                    <InfoTooltip>Rendimento annuo nominale atteso del tuo portafoglio. Viene usato anche nella proiezione patrimonio con interesse composto dalla pagina Riepilogo.</InfoTooltip>
+                                </div>
                                 <span className="font-bold text-purple-600 dark:text-purple-400">{props.fireExpectedReturn.toFixed(1)}%</span>
                             </div>
                             <Slider value={[props.fireExpectedReturn]} min={1} max={12} step={0.5} onValueChange={(val) => props.onFireExpectedReturnChange(val[0])} />
@@ -135,18 +146,22 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
 
                         <div className="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <div className="flex items-end justify-between gap-3">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Volatilita Attesa (%)</Label>
+                                <div className="flex items-center gap-1">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Volatilita Attesa (%)</Label>
+                                    <InfoTooltip>Deviazione standard annua del portafoglio. Un portafoglio 100% azionario globale ha storicamente ~15%. Serve per le simulazioni Monte Carlo.</InfoTooltip>
+                                </div>
                                 <span className="font-bold text-rose-600 dark:text-rose-400">{props.fireVolatility.toFixed(1)}%</span>
                             </div>
                             <Slider value={[props.fireVolatility]} min={5} max={30} step={0.5} onValueChange={(val) => props.onFireVolatilityChange(val[0])} />
-                            <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Storicamente un portafoglio 100% azionario globale ha una deviazione standard del 15%. Serve per i test di Monte Carlo.</p>
                         </div>
 
                         <div className="space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <div className="flex items-center justify-between gap-4">
                                 <div>
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Ottimizzazione TFR / Fondo Pensione</Label>
-                                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Reinveste il rimborso IRPEF annuale sui tuoi versamenti.</p>
+                                    <div className="flex items-center gap-1">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Ottimizzazione TFR / Fondo Pensione</Label>
+                                        <InfoTooltip>Simula il fondo pensione complementare: TFR, contributi volontari e datoriali. Il rimborso IRPEF annuale viene reinvestito automaticamente nel calcolo FIRE.</InfoTooltip>
+                                    </div>
                                 </div>
                                 <button
                                     onClick={() => props.onEnablePensionOptimizerChange(!props.enablePensionOptimizer)}
@@ -203,18 +218,23 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                                             <Input type="number" value={props.pensionFundAccessAge} onChange={e => props.onPensionFundAccessAgeChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" min={50} max={100} />
                                         </div>
                                         <div className="space-y-2">
+                                            <div className="flex items-center gap-1">
                                             <Label className="text-[10px] font-bold uppercase text-slate-500">Tassazione Uscita FP (%)</Label>
+                                            <InfoTooltip>Aliquota agevolata: parte dal 15% e scende dello 0.3% per ogni anno di partecipazione oltre il 15°, fino a un minimo del 9%.</InfoTooltip>
+                                        </div>
                                             <div className="flex items-center gap-3">
                                                 <Slider value={[props.pensionFundExitTaxRate]} min={9} max={15} step={0.3} onValueChange={(val) => props.onPensionFundExitTaxRateChange(val[0])} className="flex-1" />
                                                 <span className="min-w-[40px] text-right text-sm font-bold text-slate-900 dark:text-slate-100">{props.pensionFundExitTaxRate.toFixed(1)}%</span>
                                             </div>
-                                            <p className="text-[9px] text-slate-500 dark:text-slate-400">15% base, -0.3%/anno oltre 15 anni, min 9%</p>
                                         </div>
                                     </div>
 
                                     {/* Modalita Uscita FP */}
                                     <div className="space-y-2">
-                                        <Label className="text-[10px] font-bold uppercase text-slate-500">Modalita Uscita</Label>
+                                        <div className="flex items-center gap-1">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-500">Modalita Uscita</Label>
+                                            <InfoTooltip>Come ricevere il fondo pensione: 50/50 (max consentito dalla legge, meta&#768; subito e meta&#768; come rendita mensile) oppure 100% rendita (piu&#768; conservativo e stabile).</InfoTooltip>
+                                        </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <button
                                                 onClick={() => props.onPensionExitModeChange("hybrid")}
@@ -223,7 +243,6 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                                                     : "border-slate-200 bg-white/60 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600"}`}
                                             >
                                                 <span className={`block text-xs font-bold ${props.pensionExitMode === "hybrid" ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"}`}>50% Capitale + 50% Rendita</span>
-                                                <span className="mt-0.5 block text-[9px] text-slate-500 dark:text-slate-400">Max consentito dalla legge. Prendi meta subito, meta come rendita mensile.</span>
                                             </button>
                                             <button
                                                 onClick={() => props.onPensionExitModeChange("annuity")}
@@ -232,7 +251,6 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                                                     : "border-slate-200 bg-white/60 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-800/40 dark:hover:border-slate-600"}`}
                                             >
                                                 <span className={`block text-xs font-bold ${props.pensionExitMode === "annuity" ? "text-blue-700 dark:text-blue-300" : "text-slate-700 dark:text-slate-300"}`}>100% Rendita</span>
-                                                <span className="mt-0.5 block text-[9px] text-slate-500 dark:text-slate-400">Tutto convertito in rendita mensile. Piu conservativo e stabile.</span>
                                             </button>
                                         </div>
                                     </div>
@@ -270,9 +288,6 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                                                 <span className="font-bold">{formatEuro(props.calculatedPensionAnnuity)}/mese</span>
                                             </div>
                                         )}
-                                        <p className="mt-1.5 text-[9px] leading-tight text-blue-600/80 dark:text-blue-400/70">
-                                            A {props.pensionFundAccessAge} anni: {props.pensionExitMode === "hybrid" ? "50% capitale + 50% rendita" : "100% rendita mensile"}. Il FP e esente da bollo e cresce separatamente.
-                                        </p>
                                     </div>
                                 </div>
                             )}
@@ -281,15 +296,19 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                         <div className="space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800">
                             <div className="flex items-center justify-between gap-4">
                                 <div>
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Pensione INPS e Tasse</Label>
-                                    <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Integra la previdenza pubblica e le tasse italiane.</p>
+                                    <div className="flex items-center gap-1">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Pensione INPS e Tasse</Label>
+                                        <InfoTooltip>Integra la previdenza pubblica e le tasse italiane. La pensione INPS ridurra&#768; la necessita&#768; di prelievo dal capitale dopo l&apos;eta&#768; pensionabile.</InfoTooltip>
+                                    </div>
                                 </div>
                             </div>
                             <div className="space-y-4 rounded-xl border border-slate-200 bg-white/75 p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
                                 <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-2 dark:border-slate-800">
                                     <div className="space-y-0.5">
-                                        <Label className="text-[10px] font-bold uppercase text-slate-900 dark:text-slate-100">Imposta di Bollo</Label>
-                                        <p className="text-[9px] text-slate-500 dark:text-slate-400">0.2% annuo sulle attivita finanziarie</p>
+                                        <div className="flex items-center gap-1">
+                                            <Label className="text-[10px] font-bold uppercase text-slate-900 dark:text-slate-100">Imposta di Bollo</Label>
+                                            <InfoTooltip>Tassa dello 0.2% annuo sul valore delle attivita&#768; finanziarie (conti deposito, ETF, azioni). Se attivo, viene sottratta dal rendimento nel calcolo FIRE.</InfoTooltip>
+                                        </div>
                                     </div>
                                     <Switch checked={props.applyTaxStamp} onCheckedChange={props.onApplyTaxStampChange} />
                                 </div>
@@ -303,9 +322,6 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                                         <Input type="number" value={props.publicPensionAge} onChange={e => props.onPublicPensionAgeChange(Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                                     </div>
                                 </div>
-                                <p className="rounded-lg bg-blue-50 p-2 text-[9px] leading-tight text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
-                                    La pensione pubblica ridurra la necessita di prelievo dal tuo capitale dopo i {props.publicPensionAge} anni.
-                                </p>
                             </div>
                         </div>
                     </div>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { HomeIcon, ScrollText, Briefcase, TrendingUp, Wallet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { formatEuro } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import type { MortgagePreferences } from "@/hooks/usePreferences";
 
 interface MortgageInputsProps {
@@ -30,8 +31,10 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                             <Wallet className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Reddito Netto Mensile</h3>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400">Usato per calcolare il rapporto rata/reddito</p>
+                            <div className="flex items-center gap-1">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">Reddito Netto Mensile</h3>
+                                <InfoTooltip>Usato per calcolare il rapporto rata/reddito (DTI). Le banche lo usano per valutare la sostenibilita&#768; del mutuo.</InfoTooltip>
+                            </div>
                         </div>
                     </div>
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -71,7 +74,6 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                     <h3 className="flex items-center text-xl font-bold text-slate-900 dark:text-slate-100">
                         <HomeIcon className="mr-3 h-5 w-5 text-blue-600 dark:text-blue-400" /> Dettagli Proprieta e Mutuo
                     </h3>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Costi dell&apos;immobile, tasse e mutuo futuro</p>
                 </div>
 
                 <div className="space-y-4">
@@ -130,7 +132,6 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                     <h3 className="flex items-center text-xl font-bold text-slate-900 dark:text-slate-100">
                         <Briefcase className="mr-3 h-5 w-5 text-purple-600 dark:text-purple-400" /> Affitto e Costo Opportunita
                     </h3>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Stima i ricavi se metti la proprieta a reddito.</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -166,10 +167,12 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
 
                 <div className="space-y-4 border-t border-slate-200 pt-4 dark:border-slate-800">
                     <div className="flex items-end justify-between gap-3">
-                        <Label htmlFor="market" className="font-semibold text-slate-700 dark:text-slate-300">Rendimento Alternativo Mercato (%)</Label>
+                        <div className="flex items-center gap-1">
+                            <Label htmlFor="market" className="font-semibold text-slate-700 dark:text-slate-300">Rendimento Alternativo Mercato (%)</Label>
+                            <InfoTooltip>Simula cosa succederebbe investendo la liquidita&#768; (anticipo + spese) in un ETF/azionario invece di comprare casa. Usato nel confronto costo opportunita&#768;.</InfoTooltip>
+                        </div>
                         <span className="font-mono text-lg font-bold text-purple-600 dark:text-purple-400">{marketReturn.toFixed(1)}%</span>
                     </div>
-                    <p className="mb-2 text-xs text-slate-500 dark:text-slate-400">Simula cosa succederebbe investendo questa liquidita in un ETF invece di comprare la casa.</p>
                     <Slider value={[marketReturn]} min={1} max={15} step={0.1} onValueChange={(val) => onUpdate("marketReturn", val[0])} className="py-2" />
                 </div>
             </section>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Wallet, Plus, Trash2, HomeIcon, CreditCard, CalendarClock, Calendar } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { cn } from "@/lib/utils";
 import type { MonthlyExpense } from "@/types";
 
@@ -198,13 +199,14 @@ export const FinancialProfile = memo(function FinancialProfile({
 
                     <div className={`flex flex-col items-start justify-between gap-2 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:gap-3 ${netIncome >= 0 ? "border-emerald-100 bg-emerald-50" : "border-rose-100 bg-rose-50"}`}>
                         <div>
-                            <span className={`text-xs font-bold uppercase tracking-wider ${netIncome >= 0 ? "text-emerald-700" : "text-rose-700"}`}>Risparmio Mensile Netto</span>
-                            <p className="mt-0.5 text-[11px] text-slate-500">Reddito familiare - spese personali - immobili - prestiti</p>
+                            <div className="flex items-center gap-1">
+                                <span className={`text-xs font-bold uppercase tracking-wider ${netIncome >= 0 ? "text-emerald-700" : "text-rose-700"}`}>Risparmio Mensile Netto</span>
+                                <InfoTooltip>Reddito lordo familiare meno tutte le spese: personali, costi immobili (IMU + manutenzione), rate prestiti e mutui. Questo valore viene usato nella proiezione patrimonio e nel calcolo FIRE.</InfoTooltip>
+                            </div>
                         </div>
                         <span className={`text-2xl font-black tabular-nums ${netIncome >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatEuro(netIncome)}/mese</span>
                     </div>
 
-                    <p className="mt-3 text-center text-[10px] font-medium text-slate-400 dark:text-slate-400">Sincronizzato con il simulatore mutuo e l&apos;indice di sopravvivenza.</p>
                 </CardContent>
             </Card>
         </div>

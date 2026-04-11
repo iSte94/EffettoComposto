@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { TrendingUp } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, ReferenceLine,
@@ -16,15 +17,18 @@ interface HistoryPoint {
     totalNetWorth?: number;
 }
 
+type ProjectionMode = "savings" | "trend" | "compound";
+
 interface NetWorthProjectionProps {
     history: HistoryPoint[];
     monthlySavings?: number;
     currentNetWorth?: number;
+    expectedReturnRate?: number; // rendimento annuo atteso (%) dal FIRE
 }
 
-export const NetWorthProjection = memo(function NetWorthProjection({ history, monthlySavings, currentNetWorth: currentNetWorthProp }: NetWorthProjectionProps) {
+export const NetWorthProjection = memo(function NetWorthProjection({ history, monthlySavings, currentNetWorth: currentNetWorthProp, expectedReturnRate }: NetWorthProjectionProps) {
     const [projectionYears, setProjectionYears] = useState(10);
-    const [useHistoricalTrend, setUseHistoricalTrend] = useState(false);
+    const [projectionMode, setProjectionMode] = useState<ProjectionMode>("savings");
 
     const data = useMemo(() => {
         const points = history
@@ -56,8 +60,10 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
             historicalMonthlyGrowth = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
         }
 
-        // Usa risparmio netto mensile (default) o trend storico (toggle)
-        const effectiveMonthlyGrowth = useHistoricalTrend ? historicalMonthlyGrowth : (monthlySavings ?? historicalMonthlyGrowth);
+        // Modalità: savings (risparmio netto lineare), trend (storico lineare), compound (risparmio + rendimento composto)
+        const isCompound = projectionMode === "compound";
+        const effectiveMonthlyGrowth = projectionMode === "trend" ? historicalMonthlyGrowth : (monthlySavings ?? historicalMonthlyGrowth);
+        const monthlyReturn = (expectedReturnRate ?? 0) / 100 / 12; // tasso mensile
 
         // Build historical + projected data
         const chartData: { label: string; Storico?: number; Proiezione?: number; "Caso Ottimista"?: number; "Caso Pessimista"?: number }[] = [];
@@ -89,13 +95,29 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
         chartData[chartData.length - 1]["Caso Ottimista"] = Math.round(baseValue);
         chartData[chartData.length - 1]["Caso Pessimista"] = Math.round(baseValue);
 
+        // Funzione per calcolo composto: FV = PV*(1+r)^n + PMT*((1+r)^n - 1)/r
+        const compoundFV = (pv: number, pmt: number, r: number, n: number) => {
+            if (r === 0) return pv + pmt * n;
+            return pv * Math.pow(1 + r, n) + pmt * (Math.pow(1 + r, n) - 1) / r;
+        };
+
         for (let y = 1; y <= projectionYears; y++) {
             const futureDate = new Date(baseDate);
             futureDate.setFullYear(futureDate.getFullYear() + y);
             const months = y * 12;
-            const projected = baseValue + effectiveMonthlyGrowth * months;
-            const optimistic = baseValue + effectiveMonthlyGrowth * months * 1.5;
-            const pessimistic = baseValue + effectiveMonthlyGrowth * months * 0.5;
+
+            let projected: number, optimistic: number, pessimistic: number;
+            if (isCompound) {
+                const pmt = monthlySavings ?? 0;
+                projected = compoundFV(baseValue, pmt, monthlyReturn, months);
+                // Ottimista: rendimento +50%, Pessimista: rendimento -50%
+                optimistic = compoundFV(baseValue, pmt, monthlyReturn * 1.5, months);
+                pessimistic = compoundFV(baseValue, pmt, monthlyReturn * 0.5, months);
+            } else {
+                projected = baseValue + effectiveMonthlyGrowth * months;
+                optimistic = baseValue + effectiveMonthlyGrowth * months * 1.5;
+                pessimistic = baseValue + effectiveMonthlyGrowth * months * 0.5;
+            }
 
             chartData.push({
                 label: `${futureDate.getFullYear()}`,
@@ -105,8 +127,18 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
             });
         }
 
-        const projectedFinal = baseValue + effectiveMonthlyGrowth * projectionYears * 12;
-        const annualizedGrowth = effectiveMonthlyGrowth * 12;
+        const totalMonths = projectionYears * 12;
+        const projectedFinal = isCompound
+            ? compoundFV(baseValue, monthlySavings ?? 0, monthlyReturn, totalMonths)
+            : baseValue + effectiveMonthlyGrowth * totalMonths;
+        const annualizedGrowth = isCompound
+            ? (projectedFinal - baseValue) / projectionYears
+            : effectiveMonthlyGrowth * 12;
+
+        // Info per spiegazione trend storico
+        const historySpanMonths = hasHistory
+            ? Math.round((points[points.length - 1].date.getTime() - points[0].date.getTime()) / (30.44 * 24 * 60 * 60 * 1000))
+            : 0;
 
         return {
             chartData,
@@ -116,13 +148,19 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
             annualizedGrowth,
             bridgeLabel,
             historicalMonthlyGrowth,
+            historyPointsCount: points.length,
+            historySpanMonths,
         };
-    }, [history, projectionYears, useHistoricalTrend, monthlySavings, currentNetWorthProp]);
+    }, [history, projectionYears, projectionMode, monthlySavings, currentNetWorthProp, expectedReturnRate]);
 
     if (!data) return null;
 
     const hasMonthlySavings = monthlySavings !== undefined;
     const hasHistory = history.filter(h => h.totalNetWorth !== undefined).length >= 2;
+    const hasReturnRate = expectedReturnRate !== undefined && expectedReturnRate > 0;
+    const hasCompound = hasMonthlySavings && hasReturnRate;
+    // Quante modalità sono disponibili?
+    const availableModes = [hasMonthlySavings, hasHistory, hasCompound].filter(Boolean).length;
 
     return (
         <Card className="rounded-2xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
@@ -131,6 +169,14 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
                     <div className="flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-blue-500" />
                         <h3 className="text-sm font-bold text-slate-600">Proiezione Patrimonio</h3>
+                        {availableModes <= 1 && (
+                            <InfoTooltip>
+                                {hasHistory
+                                    ? <>Proiezione basata sul trend storico: regressione lineare su {data.historyPointsCount} snapshot in {data.historySpanMonths} mesi ({formatEuro(data.historicalMonthlyGrowth)}/mese). Compila il profilo finanziario per abilitare anche la proiezione per risparmio netto.</>
+                                    : <>Proiezione basata sul risparmio netto mensile di {formatEuro(data.monthlyGrowth)} (entrate - uscite dal profilo). Registra almeno 2 snapshot per abilitare anche la proiezione per trend storico.</>
+                                }
+                            </InfoTooltip>
+                        )}
                     </div>
                     <div className="flex w-full items-center gap-3 sm:w-48">
                         <Label className="text-xs text-slate-400 whitespace-nowrap">{projectionYears} anni</Label>
@@ -145,21 +191,48 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
                     </div>
                 </div>
 
-                {/* Toggle trend storico / risparmio netto */}
-                {hasMonthlySavings && hasHistory && (
-                    <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center">
-                        <button
-                            onClick={() => setUseHistoricalTrend(false)}
-                            className={`px-3 py-1.5 rounded-lg font-bold transition-all ${!useHistoricalTrend ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Risparmio Netto ({formatEuro(monthlySavings)}/m)
-                        </button>
-                        <button
-                            onClick={() => setUseHistoricalTrend(true)}
-                            className={`px-3 py-1.5 rounded-lg font-bold transition-all ${useHistoricalTrend ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'text-slate-400 hover:text-slate-600'}`}
-                        >
-                            Trend Storico ({formatEuro(data.historicalMonthlyGrowth)}/m)
-                        </button>
+                {/* Toggle modalità proiezione */}
+                {availableModes > 1 && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                        {hasMonthlySavings && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setProjectionMode("savings")}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${projectionMode === "savings" ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Risparmio Netto ({formatEuro(monthlySavings)}/m)
+                                </button>
+                                <InfoTooltip>
+                                    Proiezione lineare basata sulla differenza tra entrate (redditi + affitti) e uscite (spese, costi immobili, rate prestiti) dal profilo finanziario. Assume un risparmio costante di {formatEuro(monthlySavings)}/mese.
+                                </InfoTooltip>
+                            </div>
+                        )}
+                        {hasHistory && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setProjectionMode("trend")}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${projectionMode === "trend" ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Trend Storico ({formatEuro(data.historicalMonthlyGrowth)}/m)
+                                </button>
+                                <InfoTooltip>
+                                    Regressione lineare su {data.historyPointsCount} snapshot in {data.historySpanMonths} mesi. La retta che meglio approssima l&apos;andamento reale del patrimonio indica una crescita media di {formatEuro(data.historicalMonthlyGrowth)}/mese. Tiene conto di tutto: risparmi, rendimenti, variazioni di mercato e spese straordinarie.
+                                </InfoTooltip>
+                            </div>
+                        )}
+                        {hasCompound && (
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setProjectionMode("compound")}
+                                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${projectionMode === "compound" ? 'bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Risparmio + Rendimento ({expectedReturnRate}%)
+                                </button>
+                                <InfoTooltip>
+                                    Ogni mese aggiungi {formatEuro(monthlySavings!)} di risparmio netto e l&apos;intero capitale matura un rendimento del {expectedReturnRate}% annuo con interesse composto (il rendimento genera altro rendimento). Il tasso utilizzato e&#768; quello impostato nella sezione FIRE. Bande: rendimento +50% / -50%.
+                                </InfoTooltip>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -201,10 +274,7 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
                 </div>
 
                 <p className="text-[10px] text-slate-400 text-center">
-                    {useHistoricalTrend || !hasMonthlySavings
-                        ? `Basato sul trend storico di ${formatEuro(data.monthlyGrowth)}/mese. Le bande mostrano scenario ottimista (+50%) e pessimista (-50%).`
-                        : `Basato sul risparmio netto mensile di ${formatEuro(data.monthlyGrowth)}/mese. Le bande mostrano scenario ottimista (+50%) e pessimista (-50%).`
-                    }
+                    Le bande mostrano scenario ottimista (+50%) e pessimista (-50%).
                 </p>
             </CardContent>
         </Card>
