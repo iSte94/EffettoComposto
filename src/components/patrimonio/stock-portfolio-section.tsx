@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Switch } from "@/components/ui/switch";
 import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote, HelpCircle } from "lucide-react";
 import { formatEuro } from "@/lib/format";
@@ -86,10 +86,10 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
 
     return (
         <>
-            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
-                <CardHeader className="flex flex-col gap-3 border-b border-slate-200/80 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-800/60 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-                    <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100">
-                        <Wallet className="mr-3 h-5 w-5 text-purple-600 dark:text-purple-400" /> Liquidita & Titoli
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
+                <CardHeader className="flex flex-col gap-3 border-b border-slate-200/80 bg-slate-50/85 p-4 sm:flex-row sm:items-center sm:justify-between sm:bg-white/70 sm:p-6">
+                    <CardTitle className="flex items-center text-lg text-slate-900">
+                        <Wallet className="mr-3 h-5 w-5 text-purple-600" /> Liquidita & Titoli
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5 p-4 sm:p-6">
@@ -117,7 +117,7 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                         {filteredStocks.map((stock, filteredIdx) => {
                             const idx = getOriginalIndex(filteredIdx);
                             return (
-                            <div key={stock.id} className="relative rounded-2xl border border-slate-200/80 bg-white/70 p-3 shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
+                            <div key={stock.id} className="relative rounded-2xl border border-slate-200/85 bg-slate-50/85 p-3 shadow-sm transition-all hover:shadow-md">
                                 <div className="mb-2">
                                     <OwnerBadgeSelect
                                         value={stock.owner}
@@ -378,43 +378,42 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
             </Card>
 
             {customStocksList.filter(s => s.ticker && s.shares > 0).length > 0 && (
-                <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
-                    <CardHeader className="flex flex-col gap-3 border-b border-slate-200/80 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-800/60 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <Card className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
+                    <CardHeader className="flex flex-col gap-3 border-b border-slate-200/80 bg-slate-50/85 p-4 sm:flex-row sm:items-center sm:justify-between sm:bg-white/70 sm:p-6">
                         <div>
-                            <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100">
-                                <TrendingUp className="mr-3 h-5 w-5 text-purple-600 dark:text-purple-400" /> Simulazione Portafoglio (Ultimi 5 Anni)
+                            <CardTitle className="flex items-center text-lg text-slate-900">
+                                <TrendingUp className="mr-3 h-5 w-5 text-purple-600" /> Simulazione Portafoglio (Ultimi 5 Anni)
                             </CardTitle>
-                            <CardDescription className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <CardDescription className="mt-1 text-xs text-slate-500">
                                 Rendimento passato dei tuoi ETF attuali, ipotizzando le stesse quote di oggi.
                             </CardDescription>
                         </div>
                         {isFetchingHistory && <Loader2 className="h-5 w-5 animate-spin text-purple-400" />}
                     </CardHeader>
-                    <CardContent className="h-72 p-4 sm:p-6">
+                    <CardContent className="h-64 p-3 sm:h-72 sm:p-6">
                         {portfolioHistory.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={portfolioHistory} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                <AreaChart data={portfolioHistory} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorValore" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
                                             <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} dy={10} interval="preserveStartEnd" minTickGap={30} />
+                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickMargin={8} interval="preserveStartEnd" minTickGap={16} />
                                     <YAxis tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} dx={-10} />
                                     <Tooltip
-                                        contentStyle={{ borderRadius: "16px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 10px 40px -10px rgba(0,0,0,0.2)", backgroundColor: "rgba(15, 23, 42, 0.96)", backdropFilter: "blur(10px)", padding: "16px", color: "#e2e8f0" }}
+                                        contentStyle={{ borderRadius: "14px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 10px 40px -10px rgba(15,23,42,0.18)", backgroundColor: "rgba(255,255,255,0.96)", backdropFilter: "blur(10px)", padding: "12px", color: "#334155" }}
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        formatter={(value: any) => [<span key="value" className="font-extrabold text-purple-300">{formatEuro(Number(value || 0))}</span>, "Valore Virtuale"]}
-                                        labelStyle={{ color: "#cbd5e1", fontWeight: 700, marginBottom: "8px", fontSize: "12px", textTransform: "uppercase", letterSpacing: "1px" }}
+                                        formatter={(value: any) => [<span key="value" className="font-extrabold text-purple-600">{formatEuro(Number(value || 0))}</span>, "Valore Virtuale"]}
+                                        labelStyle={{ color: "#475569", fontWeight: 700, marginBottom: "8px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px" }}
                                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate || label}
                                     />
-                                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: "11px", fontWeight: 600, color: "#64748b", paddingBottom: "10px" }} />
                                     <Area type="monotone" dataKey="Valore" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorValore)" className="drop-shadow-[0_4px_12px_rgba(168,85,247,0.3)]" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="flex h-full flex-col items-center justify-center text-slate-400 dark:text-slate-400">
+                            <div className="flex h-full flex-col items-center justify-center text-slate-400">
                                 {!isFetchingHistory && <p className="text-sm">Nessuno storico disponibile o in fase di caricamento.</p>}
                             </div>
                         )}

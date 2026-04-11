@@ -18,7 +18,7 @@ interface OwnerFilterBarProps {
     colorScheme?: "default" | "rose";
 }
 
-const filterBtnBase = "flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200";
+const filterBtnBase = "flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition-all duration-200 sm:flex-none";
 
 export const OwnerFilterBar = memo(function OwnerFilterBar({
     value, onChange, person1Name, person2Name,
@@ -34,7 +34,7 @@ export const OwnerFilterBar = memo(function OwnerFilterBar({
 
     return (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-1 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1">
                 <button
                     type="button"
                     className={cn(filterBtnBase, value === "all" ? activeBg : inactiveBg)}
@@ -69,11 +69,11 @@ export const OwnerFilterBar = memo(function OwnerFilterBar({
             </div>
 
             {formatValue && person1Total !== undefined && person2Total !== undefined && (
-                <div className="flex items-center gap-3 text-xs font-bold">
-                    <span className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300">
+                <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                    <span className="flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1 text-blue-700">
                         {person1Name}: {formatValue(person1Total)}
                     </span>
-                    <span className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-300">
+                    <span className="flex items-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-violet-700">
                         {person2Name}: {formatValue(person2Total)}
                     </span>
                 </div>

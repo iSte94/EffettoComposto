@@ -66,6 +66,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const [debtOwnerFilter, setDebtOwnerFilter] = useState<OwnerFilter>("all");
     const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
     const [saveTrigger, setSaveTrigger] = useState<number>(0);
+    const [isCompactHistoryChart, setIsCompactHistoryChart] = useState(false);
 
     const triggerSave = () => setSaveTrigger(Date.now());
 
@@ -74,6 +75,23 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
             performAutoSave();
         }
     }, [saveTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        const mediaQuery = window.matchMedia("(max-width: 640px)");
+        const handleMediaChange = (event: MediaQueryListEvent | MediaQueryList) => {
+            setIsCompactHistoryChart(event.matches);
+        };
+
+        handleMediaChange(mediaQuery);
+
+        if (typeof mediaQuery.addEventListener === "function") {
+            mediaQuery.addEventListener("change", handleMediaChange);
+            return () => mediaQuery.removeEventListener("change", handleMediaChange);
+        }
+
+        mediaQuery.addListener(handleMediaChange);
+        return () => mediaQuery.removeListener(handleMediaChange);
+    }, []);
 
     const performAutoSave = async () => {
         if (!user) return;
@@ -640,12 +658,26 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         triggerSave();
     };
 
+    const surfaceCardClass =
+        "overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] transition-all duration-300 hover:shadow-[0_24px_65px_-35px_rgba(15,23,42,0.36)] sm:bg-white/90 sm:backdrop-blur-xl";
+    const sectionPanelClass =
+        "rounded-[2rem] border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.38)] sm:bg-white/90 sm:backdrop-blur-xl";
+    const insetStatClass =
+        "rounded-[1.5rem] border border-slate-200/85 bg-slate-50/90 p-4 shadow-sm";
     const mainSectionTriggerClass =
-        "h-auto min-h-[56px] min-w-0 justify-start overflow-hidden rounded-2xl border border-slate-200/80 bg-white/70 px-4 py-3 text-left shadow-sm transition-all duration-200 data-[state=active]:border-slate-900 data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-lg dark:border-slate-700 dark:bg-slate-800/70 dark:data-[state=active]:border-slate-100 dark:data-[state=active]:bg-slate-100 dark:data-[state=active]:text-slate-900";
+        "h-auto min-h-[58px] min-w-[148px] shrink-0 justify-start overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-slate-700 shadow-sm transition-all duration-200 data-[state=active]:border-blue-200 data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-[0_18px_36px_-24px_rgba(37,99,235,0.75)] sm:min-w-0 sm:bg-white/90 sm:backdrop-blur-xl";
     const assetSectionTriggerClass =
-        "h-auto min-h-11 justify-start rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 data-[state=active]:border-blue-200 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-md dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300 dark:data-[state=active]:border-blue-900 dark:data-[state=active]:bg-blue-950/50 dark:data-[state=active]:text-blue-300";
+        "h-auto min-h-11 min-w-[156px] shrink-0 justify-start rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 shadow-sm transition-all duration-200 data-[state=active]:border-blue-200 data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 data-[state=active]:shadow-md sm:min-w-0 sm:bg-white/90 sm:backdrop-blur-xl";
     const quickActionClass =
-        "group h-auto min-h-14 min-w-0 justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-3 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800/70 dark:hover:border-slate-600";
+        "group h-auto min-h-14 min-w-0 justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md sm:bg-white/90 sm:backdrop-blur-xl";
+    const historyLegendItems = [
+        { key: "Patrimonio", label: "Patrimonio", color: "bg-emerald-500" },
+        { key: "Debiti", label: "Debiti", color: "bg-rose-500" },
+        { key: "Immobili", label: "Immobili", color: "bg-blue-500" },
+        { key: "Liquidita", label: "Liquidita", color: "bg-violet-500" },
+        { key: "AltreAttivita", label: "Altri asset", color: "bg-slate-500" },
+        { key: "Bitcoin", label: "Bitcoin", color: "bg-amber-500" },
+    ];
 
     return (
         <div className="space-y-10 animate-in fade-in duration-700 pb-20">
@@ -686,89 +718,89 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 pt-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-5">
-                    <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
-                        <CardContent className="flex h-full flex-col items-center justify-center p-6 text-center xl:p-8">
-                            <div className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-500 xl:text-sm">Net Worth Globale Attuale</div>
-                            {loading ? <Skeleton className="h-12 w-48 rounded-xl" /> : <div className="text-3xl font-extrabold tracking-tighter text-emerald-600 tabular-nums dark:text-emerald-400 lg:text-4xl xl:text-5xl">{formatEuro(currentNetWorth)}</div>}
+                <div className="grid grid-cols-1 gap-3 pt-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+                    <Card className={surfaceCardClass}>
+                        <CardContent className="flex h-full flex-col items-start justify-center p-5 text-left sm:p-6 xl:p-8">
+                            <div className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-slate-500">Net Worth Globale Attuale</div>
+                            {loading ? <Skeleton className="h-12 w-48 rounded-xl" /> : <div className="text-2xl font-extrabold tracking-tighter text-emerald-600 tabular-nums min-[390px]:text-3xl lg:text-4xl xl:text-5xl">{formatEuro(currentNetWorth)}</div>}
                         </CardContent>
                     </Card>
 
-                    <Card className="flex flex-col justify-center overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
-                        <CardHeader className="border-b border-slate-200/80 bg-white/60 p-4 text-center dark:border-slate-800 dark:bg-slate-800/60 xl:p-6 xl:text-left">
-                            <CardTitle className="flex items-center justify-center text-sm text-slate-900 dark:text-slate-100 xl:justify-start xl:text-base">
-                                <HomeIcon className="mr-3 hidden h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400 sm:block" />
+                    <Card className={cn(surfaceCardClass, "flex flex-col justify-center")}>
+                        <CardHeader className="border-b border-slate-200/80 bg-slate-50/80 p-4 sm:bg-white/70 sm:p-6">
+                            <CardTitle className="flex items-center text-sm text-slate-900 xl:text-base">
+                                <HomeIcon className="mr-3 h-5 w-5 shrink-0 text-emerald-600" />
                                 Totale Immobili (Netto)
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="flex flex-grow flex-col justify-center p-4 text-center xl:p-6 xl:text-left">
-                            {loading ? <Skeleton className="mb-2 h-9 w-36 rounded-xl" /> : <div className="mb-2 text-2xl font-bold text-emerald-600 tabular-nums dark:text-emerald-400 xl:text-3xl">{formatEuro(realEstateNetValue)}</div>}
-                            {loading ? <Skeleton className="h-5 w-40 rounded-lg" /> : <div className="mx-auto inline-flex items-center rounded-lg bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 xl:mx-0">Da base lorda: {formatEuro(realEstateGrossValue)}</div>}
+                        <CardContent className="flex flex-grow flex-col justify-center p-4 text-left sm:p-6">
+                            {loading ? <Skeleton className="mb-2 h-9 w-36 rounded-xl" /> : <div className="mb-2 text-2xl font-bold text-emerald-600 tabular-nums xl:text-3xl">{formatEuro(realEstateNetValue)}</div>}
+                            {loading ? <Skeleton className="h-5 w-40 rounded-lg" /> : <div className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">Da base lorda: {formatEuro(realEstateGrossValue)}</div>}
                         </CardContent>
                     </Card>
 
-                    <Card className="flex flex-col justify-center overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75">
-                        <CardHeader className="border-b border-slate-200/80 bg-white/60 p-4 text-center dark:border-slate-800 dark:bg-slate-800/60 xl:p-6 xl:text-left">
-                            <CardTitle className="flex items-center justify-center text-sm text-slate-900 dark:text-slate-100 xl:justify-start xl:text-base">
-                                <PiggyBank className="mr-3 hidden h-5 w-5 shrink-0 text-purple-600 dark:text-purple-400 sm:block" />
+                    <Card className={cn(surfaceCardClass, "flex flex-col justify-center")}>
+                        <CardHeader className="border-b border-slate-200/80 bg-slate-50/80 p-4 sm:bg-white/70 sm:p-6">
+                            <CardTitle className="flex items-center text-sm text-slate-900 xl:text-base">
+                                <PiggyBank className="mr-3 h-5 w-5 shrink-0 text-purple-600" />
                                 Investimenti Finanziari
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="flex flex-grow flex-col justify-center p-4 text-center xl:p-6 xl:text-left">
-                            {loading ? <Skeleton className="mb-2 h-9 w-36 rounded-xl" /> : <div className="mb-2 text-2xl font-bold text-purple-600 tabular-nums dark:text-purple-400 xl:text-3xl">{formatEuro(totalFinancialInvestments)}</div>}
-                            {loading ? <Skeleton className="h-5 w-44 rounded-lg" /> : <div className="mx-auto inline-flex items-center rounded-lg bg-purple-50 px-2 py-1 text-[10px] font-medium text-purple-700 dark:bg-purple-950/50 dark:text-purple-300 xl:mx-0">Azioni, liquidita e criptovalute</div>}
+                        <CardContent className="flex flex-grow flex-col justify-center p-4 text-left sm:p-6">
+                            {loading ? <Skeleton className="mb-2 h-9 w-36 rounded-xl" /> : <div className="mb-2 text-2xl font-bold text-purple-600 tabular-nums xl:text-3xl">{formatEuro(totalFinancialInvestments)}</div>}
+                            {loading ? <Skeleton className="h-5 w-44 rounded-lg" /> : <div className="inline-flex items-center rounded-full bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700">Azioni, liquidita e criptovalute</div>}
                         </CardContent>
                     </Card>
 
-                    <Card className="flex flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 text-center shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75 xl:text-left">
+                    <Card className={cn(surfaceCardClass, "flex flex-col text-left")}>
                         <div className={`h-1 w-full ${runwayBg.split(" ")[0]}`} />
-                        <CardContent className="flex h-full flex-grow flex-col justify-between p-4 xl:p-6">
+                        <CardContent className="flex h-full flex-grow flex-col justify-between p-4 sm:p-6">
                             <div>
-                                <div className="mb-2 flex items-center justify-center text-slate-700 dark:text-slate-300 xl:justify-start">
+                                <div className="mb-2 flex items-center text-slate-700">
                                     <PlaneTakeoff className={`mr-2 h-5 w-5 ${runwayColor}`} />
-                                    <span className="text-xs font-semibold uppercase tracking-wide xl:text-sm">Indice di Sopravvivenza</span>
+                                    <span className="text-xs font-semibold uppercase tracking-wide sm:text-sm">Indice di Sopravvivenza</span>
                                 </div>
                                 {loading ? <Skeleton className="mt-2 h-9 w-28 rounded-xl" /> : <>
-                                    <div className="mt-2 text-2xl font-extrabold text-slate-900 dark:text-slate-100 xl:text-3xl">
-                                        {survivalMonths.toFixed(1)} <span className="text-lg font-medium text-slate-500 xl:text-xl">mesi</span>
+                                    <div className="mt-2 text-2xl font-extrabold text-slate-900 min-[390px]:text-3xl xl:text-3xl">
+                                        {survivalMonths.toFixed(1)} <span className="text-base font-medium text-slate-500 sm:text-xl">mesi</span>
                                     </div>
-                                    <div className={`mt-2 inline-block rounded-full px-2 py-1 text-[10px] font-bold xl:text-xs ${runwayBg}`}>{runwayText}</div>
+                                    <div className={`mt-2 inline-flex rounded-full px-3 py-1.5 text-xs font-bold ${runwayBg}`}>{runwayText}</div>
                                 </>}
                             </div>
                             <div className="mt-4 border-t border-slate-100/50 pt-3">
-                                <Label className="mb-1.5 block text-[9px] font-bold uppercase tracking-wider text-slate-500 xl:text-[10px]">Spese Mensili (dal Profilo)</Label>
-                                <div className="text-center text-sm font-bold text-slate-700 dark:text-slate-300 xl:text-left">{formatEuro(monthlyExpenses)}/mese</div>
-                                <p className="mt-1.5 text-[8px] leading-tight text-slate-400 dark:text-slate-400 xl:text-[9px]">Quanti mesi puoi vivere con liquidita e fondo emergenza. Modifica le spese nell&apos;area Passivita & Cashflow.</p>
+                                <Label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Spese Mensili (dal Profilo)</Label>
+                                <div className="text-sm font-bold text-slate-700">{formatEuro(monthlyExpenses)}/mese</div>
+                                <p className="mt-1.5 text-xs leading-5 text-slate-500">Quanti mesi puoi vivere con liquidita e fondo emergenza. Modifica le spese nell&apos;area Passivita & Cashflow.</p>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 text-center shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75 xl:text-left">
-                        <CardContent className="flex h-full flex-col justify-center p-4 xl:p-6">
-                            <div className="mb-2 flex items-center justify-center text-slate-700 dark:text-slate-300 xl:justify-start">
+                    <Card className={cn(surfaceCardClass, "text-left")}>
+                        <CardContent className="flex h-full flex-col justify-center p-4 sm:p-6">
+                            <div className="mb-2 flex items-center text-slate-700">
                                 <Bitcoin className="mr-2 h-5 w-5 text-amber-500" />
-                                <span className="text-xs font-semibold uppercase tracking-wide xl:text-sm">Bitcoin Live</span>
+                                <span className="text-xs font-semibold uppercase tracking-wide sm:text-sm">Bitcoin Live</span>
                             </div>
                             {loading ? <Skeleton className="h-9 w-36 rounded-xl" /> : <>
-                                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100 xl:text-3xl">{formatEuro(bitcoinAmount * currentBtcPrice)}</div>
-                                <div className="mt-1 text-[10px] font-medium text-slate-500 xl:text-xs">{bitcoinAmount} BTC @ {formatEuro(currentBtcPrice)}</div>
+                                <div className="text-2xl font-bold text-slate-900 xl:text-3xl">{formatEuro(bitcoinAmount * currentBtcPrice)}</div>
+                                <div className="mt-1 text-xs font-medium text-slate-500">{bitcoinAmount} BTC @ {formatEuro(currentBtcPrice)}</div>
                             </>}
                         </CardContent>
                     </Card>
 
-                    <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 text-center shadow-md backdrop-blur-xl transition-all duration-500 hover:shadow-lg dark:border-slate-800 dark:bg-slate-900/75 xl:text-left">
-                        <CardContent className="flex h-full flex-col justify-center p-4 xl:p-6">
-                            <div className="mb-3 flex items-center justify-center text-slate-700 dark:text-slate-300 xl:justify-start">
-                                <TrendingUp className="mr-2 h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                <span className="text-xs font-semibold uppercase tracking-wide xl:text-sm">Cashflow Atteso</span>
+                    <Card className={cn(surfaceCardClass, "text-left")}>
+                        <CardContent className="flex h-full flex-col justify-center p-4 sm:p-6">
+                            <div className="mb-3 flex items-center text-slate-700">
+                                <TrendingUp className="mr-2 h-5 w-5 text-blue-600" />
+                                <span className="text-xs font-semibold uppercase tracking-wide sm:text-sm">Cashflow Atteso</span>
                             </div>
                             {loading ? <Skeleton className="mb-2 h-9 w-32 rounded-xl" /> : <>
-                                <div className={cn("mb-2 text-3xl font-bold", monthlyCashflow >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>
+                                <div className={cn("mb-2 text-2xl font-bold min-[390px]:text-3xl", monthlyCashflow >= 0 ? "text-emerald-600" : "text-rose-600")}>
                                     {monthlyCashflow >= 0 ? "+" : ""}{formatEuro(monthlyCashflow)}
                                 </div>
-                                <div className="flex flex-col gap-1.5 border-t border-slate-100/50 pt-2 text-[10px] font-medium xl:text-xs">
-                                    <div className="flex items-center justify-between px-1 text-emerald-600 dark:text-emerald-400"><span>Reddito:</span><span>+{formatEuro(grossIncome)}/m</span></div>
-                                    {realEstateRent > 0 && <div className="flex items-center justify-between px-1 text-emerald-600 dark:text-emerald-400"><span>Affitti (lordo):</span><span>+{formatEuro(realEstateRent / 12)}/m</span></div>}
+                                <div className="flex flex-col gap-1.5 border-t border-slate-100/50 pt-2 text-xs font-medium">
+                                    <div className="flex items-center justify-between px-1 text-emerald-600"><span>Reddito:</span><span>+{formatEuro(grossIncome)}/m</span></div>
+                                    {realEstateRent > 0 && <div className="flex items-center justify-between px-1 text-emerald-600"><span>Affitti (lordo):</span><span>+{formatEuro(realEstateRent / 12)}/m</span></div>}
                                     {manualExpenses > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Spese personali:</span><span>-{formatEuro(manualExpenses)}/m</span></div>}
                                     {realEstateCosts > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Costi immobili:</span><span>-{formatEuro(realEstateCosts / 12)}/m</span></div>}
                                     {calculatedExistingInstallment > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Rate prestiti:</span><span>-{formatEuro(calculatedExistingInstallment)}/m</span></div>}
@@ -781,21 +813,21 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
             <Tabs value={activePatrimonioTab} onValueChange={(value) => setActivePatrimonioTab(value as PatrimonioTab)} className="gap-6">
                 <div className="z-20 md:sticky md:top-4">
-                    <div className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-3 shadow-lg backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
+                    <div className={cn(sectionPanelClass, "p-3 sm:p-4")}>
                         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div className="space-y-1">
-                                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Navigazione Patrimonio</p>
-                                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Navigazione Patrimonio</p>
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
                                     <span>Scegli l&apos;area da aggiornare o consultare senza perdere il contesto.</span>
-                                    {latestSnapshotLabel && <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">Ultimo snapshot: {latestSnapshotLabel}</span>}
+                                    {latestSnapshotLabel && <span className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">Ultimo snapshot: {latestSnapshotLabel}</span>}
                                 </div>
                             </div>
 
-                            <TabsList className="grid w-full grid-cols-2 gap-2 border-none bg-transparent p-0 md:w-auto md:grid-cols-4">
-                                <TabsTrigger value="overview" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><LayoutDashboard className="size-4 shrink-0" /> <span className="truncate">Panoramica</span></span><span className="hidden w-full truncate text-xs opacity-80 md:block">Salute finanziaria e azioni rapide</span></div></TabsTrigger>
-                                <TabsTrigger value="asset" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><HomeIcon className="size-4 shrink-0" /> <span className="truncate">Asset</span></span><span className="hidden w-full truncate text-xs opacity-80 md:block">Immobili, investimenti e altre attivita</span></div></TabsTrigger>
-                                <TabsTrigger value="cashflow" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><CreditCard className="size-4 shrink-0" /> <span className="truncate">Passivita & Cashflow</span></span><span className="hidden w-full truncate text-xs opacity-80 md:block">Debiti, entrate, uscite e risparmio</span></div></TabsTrigger>
-                                <TabsTrigger value="history" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><History className="size-4 shrink-0" /> <span className="truncate">Storico</span></span><span className="hidden w-full truncate text-xs opacity-80 md:block">Grafico e snapshot salvati</span></div></TabsTrigger>
+                            <TabsList className="flex w-full gap-2 overflow-x-auto border-none bg-transparent p-0 md:grid md:w-auto md:grid-cols-4 md:overflow-visible">
+                                <TabsTrigger value="overview" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><LayoutDashboard className="size-4 shrink-0" /> <span className="whitespace-normal leading-tight sm:truncate">Panoramica</span></span><span className="line-clamp-2 w-full text-xs leading-4 opacity-80 md:line-clamp-1">Salute finanziaria e azioni rapide</span></div></TabsTrigger>
+                                <TabsTrigger value="asset" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><HomeIcon className="size-4 shrink-0" /> <span className="whitespace-normal leading-tight sm:truncate">Asset</span></span><span className="line-clamp-2 w-full text-xs leading-4 opacity-80 md:line-clamp-1">Immobili, investimenti e altre attivita</span></div></TabsTrigger>
+                                <TabsTrigger value="cashflow" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><CreditCard className="size-4 shrink-0" /> <span className="whitespace-normal leading-tight sm:truncate">Passivita & Cashflow</span></span><span className="line-clamp-2 w-full text-xs leading-4 opacity-80 md:line-clamp-1">Debiti, entrate, uscite e risparmio</span></div></TabsTrigger>
+                                <TabsTrigger value="history" className={mainSectionTriggerClass}><div className="flex min-w-0 flex-col items-start gap-1 overflow-hidden"><span className="flex min-w-0 items-center gap-2 text-sm font-semibold"><History className="size-4 shrink-0" /> <span className="whitespace-normal leading-tight sm:truncate">Storico</span></span><span className="line-clamp-2 w-full text-xs leading-4 opacity-80 md:line-clamp-1">Grafico e snapshot salvati</span></div></TabsTrigger>
                             </TabsList>
                         </div>
                     </div>
@@ -804,36 +836,36 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                 <TabsContent value="overview" className="mt-0 animate-in fade-in-50 duration-300">
                     <div className="space-y-6">
                         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
-                            <Card className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-lg backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-                                <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
-                                    <CardTitle className="flex items-center gap-3 text-xl text-slate-900 dark:text-slate-100"><LayoutDashboard className="size-5 text-blue-600 dark:text-blue-400" /> Cabina di Regia</CardTitle>
+                            <Card className={surfaceCardClass}>
+                                <CardHeader className="border-b border-slate-200/80 bg-slate-50/85 p-5 sm:bg-white/70 sm:p-6">
+                                    <CardTitle className="flex items-center gap-3 text-xl text-slate-900"><LayoutDashboard className="size-5 text-blue-600" /> Cabina di Regia</CardTitle>
                                     <CardDescription className="text-sm text-slate-500">Le metriche in alto restano sempre visibili. Qui sotto trovi le scorciatoie per entrare subito nell&apos;area giusta.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-5 p-6">
+                                <CardContent className="space-y-4 p-5 sm:p-6">
                                     <div className="grid gap-3 sm:grid-cols-2">
-                                        <Button variant="ghost" className={quickActionClass} onClick={() => { setActivePatrimonioTab("asset"); setActiveAssetSubTab("realestate"); }}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-emerald-50 p-2 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300"><HomeIcon className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">Aggiorna immobili</span><span className="truncate text-xs text-slate-500 dark:text-slate-400">Valori, costi, affitti e mutui collegati</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
-                                        <Button variant="ghost" className={quickActionClass} onClick={() => { setActivePatrimonioTab("asset"); setActiveAssetSubTab("investments"); }}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-purple-50 p-2 text-purple-600 dark:bg-purple-950/50 dark:text-purple-300"><PiggyBank className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">Aggiorna investimenti</span><span className="truncate text-xs text-slate-500 dark:text-slate-400">ETF, azioni, liquidita e fondo emergenza</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
-                                        <Button variant="ghost" className={quickActionClass} onClick={() => setActivePatrimonioTab("cashflow")}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-rose-50 p-2 text-rose-600 dark:bg-rose-950/50 dark:text-rose-300"><CreditCard className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">Gestisci debiti</span><span className="truncate text-xs text-slate-500 dark:text-slate-400">Prestiti, rate e profilo di spesa familiare</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
-                                        <Button variant="ghost" className={quickActionClass} onClick={() => setActivePatrimonioTab("history")}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-amber-50 p-2 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300"><History className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">Apri storico</span><span className="truncate text-xs text-slate-500 dark:text-slate-400">Grafico e modifica rapida degli snapshot salvati</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
+                                        <Button variant="ghost" className={quickActionClass} onClick={() => { setActivePatrimonioTab("asset"); setActiveAssetSubTab("realestate"); }}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-emerald-50 p-2 text-emerald-600"><HomeIcon className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">Aggiorna immobili</span><span className="line-clamp-2 text-xs leading-4 text-slate-500">Valori, costi, affitti e mutui collegati</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
+                                        <Button variant="ghost" className={quickActionClass} onClick={() => { setActivePatrimonioTab("asset"); setActiveAssetSubTab("investments"); }}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-purple-50 p-2 text-purple-600"><PiggyBank className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">Aggiorna investimenti</span><span className="line-clamp-2 text-xs leading-4 text-slate-500">ETF, azioni, liquidita e fondo emergenza</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
+                                        <Button variant="ghost" className={quickActionClass} onClick={() => setActivePatrimonioTab("cashflow")}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-rose-50 p-2 text-rose-600"><CreditCard className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">Gestisci debiti</span><span className="line-clamp-2 text-xs leading-4 text-slate-500">Prestiti, rate e profilo di spesa familiare</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
+                                        <Button variant="ghost" className={quickActionClass} onClick={() => setActivePatrimonioTab("history")}><span className="flex min-w-0 items-center gap-3"><span className="shrink-0 rounded-2xl bg-amber-50 p-2 text-amber-600"><History className="size-4" /></span><span className="flex min-w-0 flex-col items-start"><span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-900">Apri storico</span><span className="line-clamp-2 text-xs leading-4 text-slate-500">Grafico e modifica rapida degli snapshot salvati</span></span></span><ArrowRight className="size-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5" /></Button>
                                     </div>
 
-                                    <div className="rounded-[1.5rem] border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/50">
-                                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Quadro rapido</p>
-                                        <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{latestSnapshotLabel ? `Hai ${history.length} snapshot salvati. L'ultimo e del ${latestSnapshotLabel}: usa lo Storico per ricaricarlo e continuare una revisione.` : "Non hai ancora uno storico completo: aggiorna gli Asset e lascia che il salvataggio automatico costruisca la tua traccia temporale."}</p>
+                                    <div className="rounded-[1.5rem] border border-slate-200/85 bg-slate-50/85 p-4">
+                                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Quadro rapido</p>
+                                        <p className="mt-2 text-sm leading-6 text-slate-600">{latestSnapshotLabel ? `Hai ${history.length} snapshot salvati. L'ultimo e del ${latestSnapshotLabel}: usa lo Storico per ricaricarlo e continuare una revisione.` : "Non hai ancora uno storico completo: aggiorna gli Asset e lascia che il salvataggio automatico costruisca la tua traccia temporale."}</p>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            <Card className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-lg backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-                                <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
-                                    <CardTitle className="flex items-center gap-3 text-xl text-slate-900 dark:text-slate-100"><TrendingUp className="size-5 text-blue-600 dark:text-blue-400" /> Salute Finanziaria</CardTitle>
+                            <Card className={surfaceCardClass}>
+                                <CardHeader className="border-b border-slate-200/80 bg-slate-50/85 p-5 sm:bg-white/70 sm:p-6">
+                                    <CardTitle className="flex items-center gap-3 text-xl text-slate-900"><TrendingUp className="size-5 text-blue-600" /> Salute Finanziaria</CardTitle>
                                     <CardDescription className="text-sm text-slate-500">Indicatori operativi per capire subito se intervenire su liquidita, spese o leva.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="grid gap-3 p-6 sm:grid-cols-2">
-                                    <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-800/60"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Cashflow Atteso</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", monthlyCashflow >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>{monthlyCashflow >= 0 ? "+" : ""}{formatEuro(monthlyCashflow)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Entrate nette di affitti e redditi meno rate, immobili e spese personali.</p></div>
-                                    <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-800/60"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Mesi di Sopravvivenza</div><div className="mt-3 flex items-end gap-2"><span className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">{survivalMonths.toFixed(1)}</span><span className="pb-1 text-sm text-slate-500 dark:text-slate-400">mesi</span></div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{runwayText}. Basato su liquidita e fondo emergenza utilizzabili.</p></div>
-                                    <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-800/60"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Liquidita Utile</div><div className="mt-3 text-2xl font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">{formatEuro(totalLiquidForSurvival)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Disponibilita immediata per coprire spese ricorrenti o imprevisti.</p></div>
-                                    <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-800/60"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Peso Debiti</div><div className="mt-3 text-2xl font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">{debtWeightPercent.toFixed(1)}%</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Quota delle passivita rispetto agli asset che stai monitorando ora.</p></div>
+                                <CardContent className="grid gap-3 p-5 min-[420px]:grid-cols-2 sm:p-6">
+                                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Cashflow Atteso</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", monthlyCashflow >= 0 ? "text-emerald-600" : "text-rose-600")}>{monthlyCashflow >= 0 ? "+" : ""}{formatEuro(monthlyCashflow)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Entrate nette di affitti e redditi meno rate, immobili e spese personali.</p></div>
+                                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Mesi di Sopravvivenza</div><div className="mt-3 flex items-end gap-2"><span className="text-2xl font-extrabold text-slate-900">{survivalMonths.toFixed(1)}</span><span className="pb-1 text-sm text-slate-500">mesi</span></div><p className="mt-2 text-xs leading-5 text-slate-500">{runwayText}. Basato su liquidita e fondo emergenza utilizzabili.</p></div>
+                                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Liquidita Utile</div><div className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{formatEuro(totalLiquidForSurvival)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Disponibilita immediata per coprire spese ricorrenti o imprevisti.</p></div>
+                                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Peso Debiti</div><div className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{debtWeightPercent.toFixed(1)}%</div><p className="mt-2 text-xs leading-5 text-slate-500">Quota delle passivita rispetto agli asset che stai monitorando ora.</p></div>
                                 </CardContent>
                             </Card>
                         </div>
@@ -854,14 +886,14 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                             </div>
                         )}
 
-                        <Card className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-lg backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-                            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
-                                <CardTitle className="flex items-center gap-3 text-xl text-slate-900 dark:text-slate-100"><HomeIcon className="size-5 text-blue-600 dark:text-blue-400" /> Gestione Asset</CardTitle>
+                        <Card className={surfaceCardClass}>
+                            <CardHeader className="border-b border-slate-200/80 bg-slate-50/85 p-5 sm:bg-white/70 sm:p-6">
+                                <CardTitle className="flex items-center gap-3 text-xl text-slate-900"><HomeIcon className="size-5 text-blue-600" /> Gestione Asset</CardTitle>
                                 <CardDescription className="text-sm text-slate-500">Aggiorna una categoria alla volta per ridurre il rumore e mantenere il focus operativo.</CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-6 p-6">
+                            <CardContent className="space-y-6 p-5 sm:p-6">
                                 <Tabs value={activeAssetSubTab} onValueChange={(value) => setActiveAssetSubTab(value as AssetSubTab)} className="gap-6">
-                                    <TabsList className="grid w-full grid-cols-1 gap-2 border-none bg-transparent p-0 sm:grid-cols-3">
+                                    <TabsList className="flex w-full gap-2 overflow-x-auto border-none bg-transparent p-0 sm:grid sm:grid-cols-3 sm:overflow-visible">
                                         <TabsTrigger value="realestate" className={assetSectionTriggerClass}><span className="flex items-center gap-2"><HomeIcon className="size-4" /> Immobili</span></TabsTrigger>
                                         <TabsTrigger value="investments" className={assetSectionTriggerClass}><span className="flex items-center gap-2"><PiggyBank className="size-4" /> Investimenti</span></TabsTrigger>
                                         <TabsTrigger value="other" className={assetSectionTriggerClass}><span className="flex items-center gap-2"><Gem className="size-4" /> Altri Asset</span></TabsTrigger>
@@ -987,18 +1019,18 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
                 <TabsContent value="cashflow" forceMount className={cn("mt-0 animate-in fade-in-50 duration-300", activePatrimonioTab !== "cashflow" && "hidden")}>
                     <div className="space-y-6">
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <div className="rounded-[1.5rem] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Debito Residuo</div><div className="mt-3 text-2xl font-extrabold text-rose-600 dark:text-rose-400 tabular-nums">{formatEuro(totalPassivita)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Somma dei debiti ancora aperti collegati a mutui e finanziamenti.</p></div>
-                            <div className="rounded-[1.5rem] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Rate Mensili Stimate</div><div className="mt-3 text-2xl font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">{formatEuro(calculatedExistingInstallment)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Impatto delle rate correnti sul cashflow familiare mensile.</p></div>
-                            <div className="rounded-[1.5rem] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Totale Spese</div><div className="mt-3 text-2xl font-extrabold text-slate-900 dark:text-slate-100 tabular-nums">{formatEuro(totalExpenses)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Somma di spese personali, costi immobiliari e rate automatiche.</p></div>
-                            <div className="rounded-[1.5rem] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Risparmio Netto</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", netIncome >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>{formatEuro(netIncome)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Reddito familiare meno spese e passivita ricorrenti ogni mese.</p></div>
-                        </div>
+                <div className="grid gap-3 min-[420px]:grid-cols-2 xl:grid-cols-4">
+                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Debito Residuo</div><div className="mt-3 text-2xl font-extrabold text-rose-600 tabular-nums">{formatEuro(totalPassivita)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Somma dei debiti ancora aperti collegati a mutui e finanziamenti.</p></div>
+                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Rate Mensili Stimate</div><div className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{formatEuro(calculatedExistingInstallment)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Impatto delle rate correnti sul cashflow familiare mensile.</p></div>
+                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Totale Spese</div><div className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{formatEuro(totalExpenses)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Somma di spese personali, costi immobiliari e rate automatiche.</p></div>
+                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Risparmio Netto</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", netIncome >= 0 ? "text-emerald-600" : "text-rose-600")}>{formatEuro(netIncome)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Reddito familiare meno spese e passivita ricorrenti ogni mese.</p></div>
+                </div>
 
                         <div id="cashflow-section" className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] xl:items-start">
                             <div className="space-y-3">
                                 <div className="px-1">
-                                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Profilo Familiare</p>
-                                    <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Entrate, uscite e risparmio convivono qui per leggere subito l&apos;effetto delle tue decisioni.</p>
+                                    <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Profilo Familiare</p>
+                                    <p className="mt-1 text-sm text-slate-600">Entrate, uscite e risparmio convivono qui per leggere subito l&apos;effetto delle tue decisioni.</p>
                                 </div>
                                 <FinancialProfile
                                     person1Name={person1Name}
@@ -1023,13 +1055,13 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                 />
                             </div>
 
-                            <Card className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-lg backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-                                <CardHeader className="border-b border-slate-200/80 bg-white/60 p-6 dark:border-slate-800 dark:bg-slate-800/60">
-                                    <CardTitle className="flex items-center text-lg text-slate-900 dark:text-slate-100"><CreditCard className="mr-3 h-5 w-5 text-rose-600 dark:text-rose-400" /> Passivita (Debiti)</CardTitle>
+                            <Card className={surfaceCardClass}>
+                                <CardHeader className="border-b border-slate-200/80 bg-slate-50/85 p-5 sm:bg-white/70 sm:p-6">
+                                    <CardTitle className="flex items-center text-lg text-slate-900"><CreditCard className="mr-3 h-5 w-5 text-rose-600" /> Passivita (Debiti)</CardTitle>
                                     <CardDescription className="text-sm text-slate-500">Tutti i debiti restano qui, separati dagli asset ma sempre collegati alle metriche in alto.</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-4 p-6">
-                                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm dark:border-rose-900 dark:bg-rose-950/50"><p className="text-sm font-medium text-rose-700 dark:text-rose-300">Gestisci qui i tuoi mutui, finanziamenti auto e altri debiti. Il debito residuo viene sottratto automaticamente dal tuo Patrimonio Netto.</p></div>
+                                <CardContent className="space-y-4 p-5 sm:p-6">
+                                    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 shadow-sm"><p className="text-sm font-medium text-rose-700">Gestisci qui i tuoi mutui, finanziamenti auto e altri debiti. Il debito residuo viene sottratto automaticamente dal tuo Patrimonio Netto.</p></div>
 
                                     {existingLoansList.length > 0 && (
                                         <OwnerFilterBar
@@ -1045,10 +1077,10 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     )}
 
                                     <div className="space-y-3">
-                                        {existingLoansList.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">Nessun debito configurato. Se ne hai uno, aggiungilo qui per calcolare correttamente patrimonio netto e cashflow.</div>}
+                                        {existingLoansList.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4 text-sm text-slate-500">Nessun debito configurato. Se ne hai uno, aggiungilo qui per calcolare correttamente patrimonio netto e cashflow.</div>}
 
                                         {existingLoansList.filter(l => debtOwnerFilter === "all" || l.owner === debtOwnerFilter).map((loan) => (
-                                            <div key={loan.id} className="rounded-2xl border border-slate-200/80 bg-white/70 p-3 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
+                                            <div key={loan.id} className="rounded-2xl border border-slate-200/85 bg-slate-50/85 p-3 shadow-sm transition-all hover:shadow-md">
                                                 <div className="mb-2">
                                                     <OwnerBadgeSelect
                                                         value={loan.owner}
@@ -1061,20 +1093,20 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                         person2Name={person2Name}
                                                     />
                                                 </div>
-                                                <div className="flex items-center justify-between">
+                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                                 <div className="flex-1">
                                                     <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-slate-800 dark:text-slate-200">{loan.name}</span>
-                                                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-500 dark:bg-slate-700 dark:text-slate-300">{loan.category}</span>
+                                                        <span className="font-bold text-slate-800">{loan.name}</span>
+                                                        <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-bold uppercase text-slate-500 shadow-sm">{loan.category}</span>
                                                     </div>
-                                                    <div className="mt-1 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                                                        <span>Rata: <strong className="text-rose-600 dark:text-rose-400">{formatEuro(loan.installment)}</strong></span>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                                        <span>Rata: <strong className="text-rose-600">{formatEuro(loan.installment)}</strong></span>
                                                         <span className="flex items-center"><Calendar className="mr-1 h-3 w-3" /> {loan.endDate}</span>
                                                     </div>
                                                 </div>
 
-                                                <div className="border-l border-slate-100 px-3 dark:border-slate-700">
-                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Debito Residuo</div>
+                                                <div className="border-t border-slate-200 pt-3 sm:border-l sm:border-t-0 sm:px-3 sm:pt-0">
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Debito Residuo</div>
                                                     {editingDebtId === loan.id ? (
                                                         <Input
                                                             type="number"
@@ -1093,12 +1125,12 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                                 if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                                                                 if (e.key === "Escape") setEditingDebtId(null);
                                                             }}
-                                                            className="h-8 w-28 border-rose-200 bg-rose-50/60 text-right text-xs font-bold text-rose-600 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+                                                            className="h-9 w-full min-w-[7rem] border-rose-200 bg-white text-right text-xs font-bold text-rose-600 sm:w-28"
                                                         />
                                                     ) : (
                                                         <button
                                                             type="button"
-                                                            className="cursor-pointer text-sm font-extrabold text-rose-600 underline-offset-2 hover:underline dark:text-rose-400"
+                                                            className="cursor-pointer text-left text-sm font-extrabold text-rose-600 underline-offset-2 hover:underline"
                                                             title="Clicca per modificare"
                                                             onClick={() => {
                                                                 setEditingDebtId(loan.id);
@@ -1110,11 +1142,11 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                     )}
                                                 </div>
 
-                                                <div className="ml-2 flex items-center gap-1">
-                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-slate-400 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-300" onClick={() => { setEditingLoan(loan); setIsLoanModalOpen(true); }}>
+                                                <div className="flex items-center gap-1 sm:ml-2">
+                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-slate-400 hover:text-blue-600" onClick={() => { setEditingLoan(loan); setIsLoanModalOpen(true); }}>
                                                         <Pencil className="h-3.5 w-3.5" />
                                                     </Button>
-                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-rose-400 hover:text-rose-600 dark:text-rose-400" onClick={() => handleRemoveLoan(loan.id)}>
+                                                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full text-rose-400 hover:text-rose-600" onClick={() => handleRemoveLoan(loan.id)}>
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </div>
@@ -1122,15 +1154,15 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                             </div>
                                         ))}
 
-                                        <Button variant="outline" className="w-full border-2 border-dashed py-6 text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 dark:border-rose-900 dark:bg-rose-950/50 dark:text-rose-400 dark:hover:bg-rose-950/70" onClick={() => { setEditingLoan(null); setNewLoan(initialLoanState); setIsLoanModalOpen(true); }}>
+                                        <Button variant="outline" className="w-full border-2 border-dashed py-6 text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600" onClick={() => { setEditingLoan(null); setNewLoan(initialLoanState); setIsLoanModalOpen(true); }}>
                                             <Plus className="mr-2 h-4 w-4" /> Aggiungi Debito / Mutuo
                                         </Button>
                                     </div>
 
-                                    <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
-                                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-3 dark:border-rose-900 dark:bg-rose-950/50">
-                                            <span className="text-sm font-bold uppercase text-slate-600 dark:text-slate-400">Totale Passivita</span>
-                                            <span className="text-xl font-extrabold text-rose-600 dark:text-rose-400">{formatEuro(totalPassivita)}</span>
+                                    <div className="border-t border-slate-200 pt-4">
+                                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-3">
+                                            <span className="text-sm font-bold uppercase text-slate-600">Totale Passivita</span>
+                                            <span className="text-xl font-extrabold text-rose-600">{formatEuro(totalPassivita)}</span>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -1141,60 +1173,68 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
                 <TabsContent value="history" className="mt-0 animate-in fade-in-50 duration-300">
                     <div className="space-y-6">
-                        <div className="rounded-[1.75rem] border border-slate-200/80 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80">
-                            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Storico Patrimonio</p>
-                            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Leggi il trend e poi agisci: da qui puoi riaprire uno snapshot per modificarlo senza perdere il sottotab asset che stavi usando.</p>
+                        <div className={cn(sectionPanelClass, "p-5")}>
+                            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">Storico Patrimonio</p>
+                            <p className="mt-2 text-sm text-slate-600">Leggi il trend e poi agisci: da qui puoi riaprire uno snapshot per modificarlo senza perdere il sottotab asset che stavi usando.</p>
                         </div>
 
-                        <Card className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/75 shadow-xl backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
-                            <CardHeader className="border-b border-slate-200/80 bg-white/60 px-6 py-6 dark:border-slate-800 dark:bg-slate-800/60 md:px-8">
+                        <Card className={cn(surfaceCardClass, "shadow-[0_20px_60px_-35px_rgba(15,23,42,0.42)]")}>
+                            <CardHeader className="border-b border-slate-200/80 bg-slate-50/85 px-5 py-5 sm:bg-white/70 md:px-8 md:py-6">
                                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                                     <div>
-                                        <CardTitle className="flex items-center text-2xl font-bold text-slate-900 dark:text-slate-100"><LineChartIcon className="mr-3 h-6 w-6 text-blue-600 dark:text-blue-400" /> Andamento nel Tempo</CardTitle>
+                                        <CardTitle className="flex items-center text-2xl font-bold text-slate-900"><LineChartIcon className="mr-3 h-6 w-6 text-blue-600" /> Andamento nel Tempo</CardTitle>
                                         <CardDescription className="mt-1 text-sm text-slate-500">Traccia la crescita del tuo patrimonio netto inserendo periodicamente dei nuovi snapshot.</CardDescription>
                                     </div>
-                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">{history.length > 0 ? `${history.length} snapshot salvati` : "Nessuno snapshot ancora salvato"}</div>
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{history.length > 0 ? `${history.length} snapshot salvati` : "Nessuno snapshot ancora salvato"}</div>
                                 </div>
                             </CardHeader>
-                            <CardContent className="p-2 pt-8 md:p-8">
+                            <CardContent className="p-3 pt-5 sm:p-6 md:p-8">
                                 {loading ? (
-                                    <Skeleton className="h-[400px] w-full rounded-2xl bg-slate-100/80 dark:bg-slate-800/50" />
+                                    <Skeleton className="h-[320px] w-full rounded-2xl bg-slate-100/80 sm:h-[400px]" />
                                 ) : history.length === 0 ? (
-                                    <div role="status" className="flex h-[400px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 text-slate-500 dark:border-slate-700 dark:bg-slate-800/50">
+                                    <div role="status" className="flex h-[320px] flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/80 text-slate-500 sm:h-[400px]">
                                         <LineChartIcon className="mb-4 h-12 w-12 text-slate-400 opacity-50" aria-hidden="true" />
-                                        <p className="font-medium text-slate-700 dark:text-slate-300">Nessun dato storico.</p>
+                                        <p className="font-medium text-slate-700">Nessun dato storico.</p>
                                         <p className="text-sm">Salva il tuo primo snapshot per iniziare il tracciamento!</p>
                                     </div>
                                 ) : (
                                     <>
                                         <p className="sr-only">Grafico storico del patrimonio con serie dedicate a patrimonio totale, debiti, immobili, liquidita, altre attivita e bitcoin.</p>
-                                        <div className="h-[450px] w-full">
+                                        <div className="h-[320px] w-full rounded-2xl bg-slate-50/70 p-2 sm:h-[450px] sm:bg-transparent sm:p-0">
                                             <ResponsiveContainer width="100%" height="100%">
-                                                <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                                                <ComposedChart data={chartData} margin={isCompactHistoryChart ? { top: 8, right: 8, left: 0, bottom: 8 } : { top: 20, right: 20, left: 20, bottom: 20 }}>
                                                     <defs>
                                                         <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient>
                                                         <linearGradient id="colorDebiti" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ef4444" stopOpacity={0} /><stop offset="95%" stopColor="#ef4444" stopOpacity={0.2} /></linearGradient>
                                                     </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 12 }} dy={10} />
-                                                    <YAxis tickFormatter={(val) => `EUR ${Math.round(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: 12 }} dx={-10} />
+                                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.28)" />
+                                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: isCompactHistoryChart ? 10 : 12, fontWeight: isCompactHistoryChart ? 600 : 500 }} tickMargin={isCompactHistoryChart ? 8 : 10} interval="preserveStartEnd" minTickGap={isCompactHistoryChart ? 16 : 28} />
+                                                    <YAxis width={isCompactHistoryChart ? 48 : 68} tickFormatter={(val) => `€${Math.round(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: "#64748b", fontSize: isCompactHistoryChart ? 10 : 12 }} />
                                                     <Tooltip
-                                                        contentStyle={{ backgroundColor: "rgba(15, 23, 42, 0.96)", backdropFilter: "blur(16px)", borderRadius: "1rem", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 20px 40px -10px rgba(0,0,0,0.12)", color: "#e2e8f0" }}
-                                                        labelStyle={{ fontWeight: "bold", color: "#0f172a", marginBottom: "8px" }}
-                                                        itemStyle={{ color: "#334155", border: "none" }}
+                                                        contentStyle={{ backgroundColor: "rgba(255,255,255,0.96)", backdropFilter: "blur(12px)", borderRadius: isCompactHistoryChart ? "0.875rem" : "1rem", border: "1px solid rgba(148,163,184,0.24)", boxShadow: "0 20px 40px -10px rgba(15,23,42,0.16)", padding: isCompactHistoryChart ? "10px 12px" : "14px 16px" }}
+                                                        labelStyle={{ fontWeight: "bold", color: "#0f172a", marginBottom: "8px", fontSize: isCompactHistoryChart ? "11px" : "12px" }}
+                                                        itemStyle={{ color: "#334155", border: "none", fontSize: isCompactHistoryChart ? "11px" : "12px" }}
                                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                         formatter={(value: any) => [formatEuro(Number(value)), undefined]}
                                                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate || label}
                                                     />
-                                                    <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: "#475569", paddingBottom: "20px" }} />
-                                                    <Area type="monotone" dataKey="Patrimonio" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorPatrimonio)" activeDot={{ r: 8, strokeWidth: 0, fill: "#10b981", filter: "drop-shadow(0 0 10px rgba(16,185,129,0.4))" }} />
+                                                    {!isCompactHistoryChart && <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: "#475569", paddingBottom: "20px" }} />}
+                                                    <Area type="monotone" dataKey="Patrimonio" stroke="#10b981" strokeWidth={isCompactHistoryChart ? 3 : 4} fillOpacity={1} fill="url(#colorPatrimonio)" activeDot={{ r: isCompactHistoryChart ? 5 : 8, strokeWidth: 0, fill: "#10b981", filter: "drop-shadow(0 0 10px rgba(16,185,129,0.28))" }} />
                                                     <Area type="monotone" dataKey="Debiti" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorDebiti)" activeDot={false} />
-                                                    <Line type="monotone" dataKey="Immobili" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                                                    <Line type="monotone" dataKey="Liquidita" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                                                    <Line type="monotone" dataKey="AltreAttivita" stroke="#64748b" strokeWidth={2} dot={false} />
+                                                    {!isCompactHistoryChart && <Line type="monotone" dataKey="Immobili" stroke="#3b82f6" strokeWidth={2.2} dot={false} />}
+                                                    <Line type="monotone" dataKey="Liquidita" stroke="#8b5cf6" strokeWidth={2.2} dot={false} />
+                                                    {!isCompactHistoryChart && <Line type="monotone" dataKey="AltreAttivita" stroke="#475569" strokeWidth={2.2} dot={false} />}
                                                     <Line type="monotone" dataKey="Bitcoin" stroke="#f59e0b" strokeWidth={2} dot={false} />
                                                 </ComposedChart>
                                             </ResponsiveContainer>
+                                        </div>
+                                        <div className="mt-4 flex flex-wrap gap-2 sm:hidden">
+                                            {historyLegendItems.map((item) => (
+                                                <span key={item.key} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+                                                    <span className={cn("h-2.5 w-2.5 rounded-full", item.color)} />
+                                                    {item.label}
+                                                </span>
+                                            ))}
                                         </div>
                                     </>
                                 )}

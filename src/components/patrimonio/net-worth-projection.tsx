@@ -125,14 +125,14 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
     const hasHistory = history.filter(h => h.totalNetWorth !== undefined).length >= 2;
 
     return (
-        <Card className="bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-white dark:border-slate-800 rounded-2xl shadow-md">
+        <Card className="rounded-2xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
             <CardContent className="p-5 space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                         <TrendingUp className="w-5 h-5 text-blue-500" />
-                        <h3 className="text-sm font-bold text-slate-600 dark:text-slate-400">Proiezione Patrimonio</h3>
+                        <h3 className="text-sm font-bold text-slate-600">Proiezione Patrimonio</h3>
                     </div>
-                    <div className="flex items-center gap-3 w-48">
+                    <div className="flex w-full items-center gap-3 sm:w-48">
                         <Label className="text-xs text-slate-400 whitespace-nowrap">{projectionYears} anni</Label>
                         <Slider
                             value={[projectionYears]}
@@ -147,7 +147,7 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
 
                 {/* Toggle trend storico / risparmio netto */}
                 {hasMonthlySavings && hasHistory && (
-                    <div className="flex items-center gap-2 text-xs">
+                    <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center">
                         <button
                             onClick={() => setUseHistoricalTrend(false)}
                             className={`px-3 py-1.5 rounded-lg font-bold transition-all ${!useHistoricalTrend ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'text-slate-400 hover:text-slate-600'}`}
@@ -164,32 +164,32 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
                 )}
 
                 {/* Quick stats */}
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-2.5">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl bg-slate-50 p-3">
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Attuale</p>
-                        <p className="text-sm font-extrabold text-slate-700 dark:text-slate-300">{formatEuro(data.currentNetWorth)}</p>
+                        <p className="text-sm font-extrabold text-slate-700">{formatEuro(data.currentNetWorth)}</p>
                     </div>
-                    <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-2.5">
+                    <div className="rounded-xl bg-blue-50 p-3">
                         <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Proiezione {projectionYears}a</p>
-                        <p className="text-sm font-extrabold text-blue-600 dark:text-blue-400">{formatEuro(data.projectedNetWorth)}</p>
+                        <p className="text-sm font-extrabold text-blue-600">{formatEuro(data.projectedNetWorth)}</p>
                     </div>
-                    <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-2.5">
+                    <div className="rounded-xl bg-emerald-50 p-3">
                         <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Crescita/anno</p>
-                        <p className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400">{formatEuro(data.annualizedGrowth)}</p>
+                        <p className="text-sm font-extrabold text-emerald-600">{formatEuro(data.annualizedGrowth)}</p>
                     </div>
                 </div>
 
                 {/* Chart */}
-                <div className="h-56">
+                <div className="h-64 sm:h-56">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={data.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="label" tick={{ fontSize: 9 }} interval={Math.max(0, Math.floor(data.chartData.length / 8))} />
-                            <YAxis tick={{ fontSize: 9 }} tickFormatter={(v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={16} interval={Math.max(0, Math.floor(data.chartData.length / 8))} />
+                            <YAxis width={44} tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
                             <Tooltip
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 formatter={(value: any) => formatEuro(Number(value))}
-                                contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)" }}
+                                contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 8px 24px rgba(15,23,42,0.12)", backgroundColor: "rgba(255,255,255,0.96)" }}
                             />
                             <ReferenceLine x={data.bridgeLabel} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "Oggi", fontSize: 10, fill: "#94a3b8" }} />
                             <Area type="monotone" dataKey="Caso Ottimista" stroke="transparent" fill="#10b981" fillOpacity={0.08} />

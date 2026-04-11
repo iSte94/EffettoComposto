@@ -83,6 +83,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 11 aprile 2026 (mobile patrimonio)
+
+- **Card Patrimonio piu' chiare su smartphone** - superfici meno trasparenti e meno "annerite" nelle sezioni Patrimonio, Asset, Cashflow e Storico; tab attivo della navigazione Patrimonio ora usa un accento blu invece del blocco scuro
+- **Navigazione mobile piu' leggibile** - tab principali, sottotab Asset e scorciatoie overview ottimizzati per viewport strette con testi meno troncati e scorrimento orizzontale dove serve
+- **Grafici piu' leggibili da telefono** - migliorati margini, tooltip, tick e legenda mobile dello storico Patrimonio; semplificata anche la simulazione portafoglio per lasciare piu' spazio al grafico
+- **Storico e ribilanciamento mobile-friendly** - la tabella snapshot ora mostra card compatte su smartphone e il ribilanciamento ha un layout dedicato mobile invece della griglia compressa da desktop
+- **Form debiti e cashflow rifiniti** - card debiti con layout verticale piu' comodo su schermi piccoli, filtri proprietario piu' flessibili e modal prestiti con campi a una colonna su mobile
+
 ### 11 aprile 2026 (brand refresh)
 
 - **Logo ufficiale in UI** - nuovo `BrandLogo` con crop dedicato del wordmark per eliminare gli spazi vuoti del PNG e mantenere proporzioni corrette; header principale, onboarding e pagina `/login` ora usano il marchio in modo coerente su desktop e mobile

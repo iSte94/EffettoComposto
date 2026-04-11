@@ -51,7 +51,7 @@ export function LoanManagerModal({
                             placeholder="es. Mutuo Prima Casa, Prestito Auto..."
                             className="h-11 bg-white border-slate-200" />
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label>Categoria</Label>
                             <Select value={loan.category} onValueChange={(val: ExistingLoan['category']) => updateField("category", val)}>
@@ -80,7 +80,7 @@ export function LoanManagerModal({
                             </Select>
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label>Rata Mensile</Label>
                             <Input type="number" value={loan.installment}
@@ -88,7 +88,7 @@ export function LoanManagerModal({
                                 className="h-11 bg-white border-slate-200 text-rose-600 dark:text-rose-400 font-bold" />
                         </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
+                    <div className="grid grid-cols-1 gap-4 border-t border-slate-100 pt-4 sm:grid-cols-2">
                         <div className="space-y-2">
                             <Label>Mese Inizio (YYYY-MM)</Label>
                             <Input type="month" value={loan.startDate} onChange={(e) => updateField("startDate", e.target.value)} className="h-11 bg-white border-slate-200" />
@@ -100,7 +100,7 @@ export function LoanManagerModal({
                     </div>
                     <div className="pt-2">
                         <Label className="text-xs text-slate-400 dark:text-slate-400 font-bold uppercase tracking-widest mb-3 block italic">Dati Extra (Opzionali per precisione debito residuo)</Label>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label className="text-xs">Importo Originario (&euro;)</Label>
                                 <Input type="number" placeholder="Opzionale" value={loan.originalAmount || ''} onChange={(e) => updateField("originalAmount", Number(e.target.value))} className="h-9 bg-slate-50 border-slate-200 text-xs" />

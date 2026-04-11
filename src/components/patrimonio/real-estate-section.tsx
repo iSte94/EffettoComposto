@@ -44,13 +44,13 @@ export const RealEstateSection = memo(function RealEstateSection({
     };
 
     return (
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
-            <CardHeader className="border-b border-slate-200/80 bg-white/60 p-4 dark:border-slate-800 dark:bg-slate-800/60 sm:p-6">
-                <CardTitle className="flex flex-col gap-3 text-lg text-slate-900 dark:text-slate-100 sm:flex-row sm:items-center sm:justify-between">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
+            <CardHeader className="border-b border-slate-200/80 bg-slate-50/85 p-4 sm:bg-white/70 sm:p-6">
+                <CardTitle className="flex flex-col gap-3 text-lg text-slate-900 sm:flex-row sm:items-center sm:justify-between">
                     <span className="flex items-center gap-3">
-                        <HomeIcon className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> Immobili Reali
+                        <HomeIcon className="h-5 w-5 text-emerald-600" /> Immobili Reali
                     </span>
-                    <span className="w-fit rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-600 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-400">
+                    <span className="w-fit rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-sm font-bold text-emerald-600 shadow-sm">
                         Totale Netto: {formatEuro(realEstateNetValue)}
                     </span>
                 </CardTitle>
@@ -69,7 +69,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                 )}
 
                 {filteredList.map((prop) => (
-                    <div key={prop.id} className="group relative rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-sm transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-800/50">
+                    <div key={prop.id} className="group relative rounded-2xl border border-slate-200/85 bg-slate-50/85 p-4 shadow-sm transition-all hover:shadow-md">
                         <div className="flex items-center justify-between">
                             <OwnerBadgeSelect
                                 value={prop.owner}
@@ -160,7 +160,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                     <div className="space-y-0.5">
                                         <Label className="text-sm font-semibold text-slate-800 dark:text-slate-200">Prima Casa?</Label>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">Se e prima casa, il costo IMU non viene sottratto dai flussi di cassa.</p>
+                                        <p className="text-xs text-slate-500">Se e prima casa, il costo IMU non viene sottratto dai flussi di cassa.</p>
                                     </div>
                                     <Switch
                                         checked={prop.isPrimaryResidence || false}
@@ -176,7 +176,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div className="space-y-0.5">
                                             <Label className="text-sm font-semibold text-slate-800 dark:text-slate-200">Immobile a rendita attiva?</Label>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">Se attivo, l&apos;affitto corrente entra nel cashflow.</p>
+                                            <p className="text-xs text-slate-500">Se attivo, l&apos;affitto corrente entra nel cashflow.</p>
                                         </div>
                                         <Switch
                                             checked={prop.isRented || false}
@@ -189,7 +189,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     </div>
 
                                     {!prop.isRented && (
-                                        <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-800/40 sm:flex-row sm:items-center">
+                                        <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-3 sm:flex-row sm:items-center">
                                             <div className="space-y-0.5 sm:mr-4 sm:w-1/2">
                                                 <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Inizio Rendita Previsto</Label>
                                                 <p className="text-[10px] leading-tight text-slate-500 dark:text-slate-400">Mese/Anno da cui iniziera a staccare affitto per FIRE.</p>

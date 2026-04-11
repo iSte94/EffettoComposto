@@ -50,8 +50,8 @@ export const PortfolioRebalance = memo(function PortfolioRebalance({
 
     if (totalValue === 0) {
         return (
-            <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
-                <CardContent className="p-6 text-center text-slate-400 dark:text-slate-500">
+            <Card className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
+                <CardContent className="p-6 text-center text-slate-400">
                     <RefreshCw className="mx-auto mb-2 h-10 w-10 opacity-50" />
                     <p className="text-sm">Aggiungi asset nel patrimonio per vedere i suggerimenti di ribilanciamento.</p>
                 </CardContent>
@@ -60,14 +60,14 @@ export const PortfolioRebalance = memo(function PortfolioRebalance({
     }
 
     return (
-        <Card className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/75 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+        <Card className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_20px_55px_-35px_rgba(15,23,42,0.42)] sm:bg-white/90 sm:backdrop-blur-xl">
             <CardContent className="space-y-5 p-4 sm:p-6">
-                <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-slate-100">
+                <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900">
                     <RefreshCw className="h-5 w-5 text-indigo-500" /> Ribilanciamento Portafoglio
                 </h3>
 
                 {targetSum !== 100 && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-center text-xs font-medium text-amber-700 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-3 text-center text-xs font-medium text-amber-700">
                         La somma dei target e {targetSum}% (dovrebbe essere 100%)
                     </div>
                 )}
@@ -96,8 +96,8 @@ export const PortfolioRebalance = memo(function PortfolioRebalance({
                     ))}
                 </div>
 
-                <div className="space-y-2 border-t border-slate-200/80 pt-4 dark:border-slate-800">
-                    <div className="grid grid-cols-12 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <div className="space-y-2 border-t border-slate-200/80 pt-4">
+                    <div className="hidden grid-cols-12 px-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 sm:grid">
                         <div className="col-span-4">Asset</div>
                         <div className="col-span-2 text-right">Attuale</div>
                         <div className="col-span-2 text-right">Target</div>
@@ -113,7 +113,7 @@ export const PortfolioRebalance = memo(function PortfolioRebalance({
                         return (
                             <div
                                 key={a.name}
-                                className={`grid grid-cols-12 items-center gap-2 rounded-xl p-3 text-sm ${isOver
+                                className={`hidden grid-cols-12 items-center gap-2 rounded-xl p-3 text-sm sm:grid ${isOver
                                     ? "bg-red-50/70 dark:bg-red-950/20"
                                     : isUnder
                                         ? "bg-emerald-50/70 dark:bg-emerald-950/20"
@@ -145,9 +145,41 @@ export const PortfolioRebalance = memo(function PortfolioRebalance({
                             </div>
                         );
                     })}
+                    {allocations.map(a => {
+                        const diff = a.target - a.actual;
+                        const diffValue = (diff / 100) * totalValue;
+                        const isOver = diff < -1;
+                        const isUnder = diff > 1;
+
+                        return (
+                            <div key={`${a.name}-mobile`} className={`rounded-2xl border p-3 shadow-sm sm:hidden ${isOver ? "border-red-100 bg-red-50/80" : isUnder ? "border-emerald-100 bg-emerald-50/80" : "border-slate-200 bg-slate-50/80"}`}>
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="text-sm font-bold text-slate-800">{a.name}</div>
+                                    <div className={`text-xs font-bold ${isOver ? "text-red-500" : isUnder ? "text-emerald-600" : "text-slate-400"}`}>
+                                        {diff > 0 ? "+" : ""}{diff.toFixed(1)}%
+                                    </div>
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                    <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                        <div className="font-bold uppercase tracking-wider text-slate-400">Attuale</div>
+                                        <div className="mt-1 font-semibold text-slate-700">{a.actual.toFixed(1)}%</div>
+                                    </div>
+                                    <div className="rounded-xl bg-white px-3 py-2 shadow-sm">
+                                        <div className="font-bold uppercase tracking-wider text-slate-400">Target</div>
+                                        <div className="mt-1 font-semibold text-slate-700">{a.target}%</div>
+                                    </div>
+                                </div>
+                                <div className="mt-3 text-xs font-medium text-slate-600">
+                                    {isUnder && <span className="inline-flex items-center gap-1 text-emerald-600"><ArrowUp className="h-3 w-3" /> Compra {formatEuro(Math.abs(diffValue))}</span>}
+                                    {isOver && <span className="inline-flex items-center gap-1 text-red-500"><ArrowDown className="h-3 w-3" /> Vendi {formatEuro(Math.abs(diffValue))}</span>}
+                                    {!isOver && !isUnder && <span className="inline-flex items-center gap-1 text-slate-400"><Minus className="h-3 w-3" /> Allocazione in linea</span>}
+                                </div>
+                            </div>
+                        );
+                    })}
                 </div>
 
-                <p className="pt-2 text-center text-[10px] text-slate-400 dark:text-slate-500">
+                <p className="pt-2 text-center text-[10px] text-slate-400">
                     I suggerimenti sono indicativi. Considera costi di transazione e implicazioni fiscali prima di ribilanciare.
                 </p>
             </CardContent>
