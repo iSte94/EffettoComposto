@@ -64,10 +64,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#0f172a" },
-  ],
+  themeColor: "#f8fafc",
 };
 
 export default function RootLayout({
@@ -80,8 +77,8 @@ export default function RootLayout({
       <body className={`${outfit.className} antialiased min-h-dvh flex flex-col overflow-x-hidden relative bg-background text-foreground`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="light"
+          forcedTheme="light"
           disableTransitionOnChange
         >
           <div

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import {
@@ -299,11 +299,16 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         toast.success("Prestito rimosso");
     };
 
+    const hasInitialData = useRef(false);
+
     useEffect(() => {
-        fetchBtcPrice();
         if (user) {
-            fetchHistory();
+            // Fetch BTC price and history in parallel, then auto-save with fresh prices
+            Promise.all([fetchBtcPrice(), fetchHistory()]).then(() => {
+                if (hasInitialData.current) triggerSave();
+            });
         } else {
+            fetchBtcPrice();
             setLoading(false);
         }
     }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -457,6 +462,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                 setHistory(processedHistory);
 
                 if (prepopulateForms && processedHistory.length > 0) {
+                    hasInitialData.current = true;
                     const last = processedHistory[processedHistory.length - 1];
                     let parsedList: RealEstateProperty[] = [];
                     try {
@@ -485,7 +491,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
                     setRealEstateList(parsedList);
                     setCustomStocksList(parsedStocks);
-                    if (parsedStocks.length > 0) updateStockPrices(parsedStocks.map((stock) => ({ ...stock, isLoading: true })));
+                    if (parsedStocks.length > 0) await updateStockPrices(parsedStocks.map((stock) => ({ ...stock, isLoading: true })));
 
                     setLiquidStockValue(last.liquidStockValue);
                     // Per-person split: carica da snapshot se disponibile, altrimenti tutto in P1 (retrocompat)

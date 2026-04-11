@@ -16,7 +16,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { Flame } from "lucide-react";
-import { useTheme } from "next-themes";
+
 import { SalaryCalculator, type SavedSalaryCalculation } from "@/components/salary-calculator";
 
 interface Bonus {
@@ -59,7 +59,7 @@ function parseStoredValue<T>(raw: string | null | undefined, fallback: T): T {
 export function ProgressioneDashboard() {
     const { user } = useAuth();
     const { preferences, updatePreference, isLoaded, isSaving } = usePreferences();
-    const { resolvedTheme } = useTheme();
+
     const [progressionData, setProgressionData] = useState<CareerProgressionData>(DEFAULT_PROGRESSION);
     const [salaryHistory, setSalaryHistory] = useState<SavedSalaryCalculation[]>([]);
     const [activePersonTab, setActivePersonTab] = useState<"person1" | "person2">("person1");
@@ -67,7 +67,7 @@ export function ProgressioneDashboard() {
     const [currentNetWorth, setCurrentNetWorth] = useState<number>(0);
 
     const [initialLoadDone, setInitialLoadDone] = useState(false);
-    const isDark = resolvedTheme === "dark";
+    const isDark = false;
 
     useEffect(() => {
         // Fetch current NetWorth for accurate FIRE estimations

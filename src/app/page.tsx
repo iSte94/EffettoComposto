@@ -3,9 +3,11 @@
 import { lazy, Suspense, useState } from "react";
 import { BarChart3, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { HeaderKpisBar } from "@/components/header-kpis";
+
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/auth-context";
+import { useHeaderKpis } from "@/hooks/useHeaderKpis";
 
 const OverviewDashboard = lazy(() => import("@/components/overview-dashboard").then((m) => ({ default: m.OverviewDashboard })));
 const PatrimonioDashboard = lazy(() => import("@/components/patrimonio-dashboard").then((m) => ({ default: m.PatrimonioDashboard })));
@@ -27,6 +29,7 @@ function TabFallback() {
 export default function CalculatorPage() {
   const { user, login, logout } = useAuth();
   const [activeTab, setActiveTab] = useState("overview");
+  const { kpis } = useHeaderKpis(user);
 
   const triggerClass =
     "min-h-11 rounded-xl px-3 py-2 text-xs sm:text-sm font-semibold text-muted-foreground transition-colors data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:shadow-black/5 dark:data-[state=active]:shadow-black/20";
@@ -49,6 +52,7 @@ export default function CalculatorPage() {
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-2 md:w-auto md:justify-end">
+          {kpis && <HeaderKpisBar kpis={kpis} onNavigate={setActiveTab} />}
           <a
             href="https://github.com/iSte94/EffettoComposto"
             target="_blank"
@@ -59,7 +63,6 @@ export default function CalculatorPage() {
             <Github className="size-4" />
             <span>Open Source</span>
           </a>
-          <ThemeToggle />
           <AuthModal user={user} onLogin={login} onLogout={logout} />
         </div>
       </header>
