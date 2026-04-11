@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { TrendingUp, TrendingDown, Flame, PiggyBank } from "lucide-react";
+import { TrendingUp, TrendingDown, Flame, PiggyBank, Rocket } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import type { HeaderKpis } from "@/hooks/useHeaderKpis";
 
@@ -56,19 +56,26 @@ export const HeaderKpisBar = memo(function HeaderKpisBar({ kpis, onNavigate }: H
                 <button
                     onClick={() => {
                         onNavigate("patrimonio");
-                        requestAnimationFrame(() => {
-                            setTimeout(() => {
-                                document.getElementById("cashflow-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
-                            }, 150);
-                        });
+                        setTimeout(() => {
+                            const el = document.getElementById("cashflow-section");
+                            if (el) {
+                                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                            } else {
+                                // lazy-loaded tab may need more time
+                                setTimeout(() => {
+                                    document.getElementById("cashflow-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                }, 500);
+                            }
+                        }, 200);
                     }}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary/80 px-3 min-h-10 text-sm font-semibold transition-colors hover:bg-accent cursor-pointer"
                     title="Cashflow familiare — tasso di risparmio"
                 >
                     <PiggyBank className="size-3.5 text-violet-500" />
-                    <span className={`text-xs tabular-nums ${kpis.savingsRate >= 20 ? "text-emerald-600" : kpis.savingsRate >= 0 ? "text-amber-600" : "text-rose-600"}`}>
+                    <span className={`text-xs tabular-nums ${kpis.savingsRate > 50 ? "text-emerald-400 font-bold" : kpis.savingsRate >= 36 ? "text-emerald-600" : kpis.savingsRate >= 20 ? "text-amber-600" : "text-rose-600"}`}>
                         {kpis.savingsRate}%
                     </span>
+                    {kpis.savingsRate > 50 && <Rocket className="size-3 text-emerald-400" />}
                 </button>
             )}
         </div>

@@ -58,7 +58,7 @@ export function useHeaderKpis(user: { username: string } | null) {
             let manualExpenses = 0;
             try {
                 const list = JSON.parse(String(preferences.expensesList || "[]"));
-                manualExpenses = list.reduce((acc: number, e: { amount?: number }) => acc + (e.amount || 0), 0);
+                manualExpenses = list.reduce((acc: number, e: { amount?: number; isAnnual?: boolean }) => acc + ((e.amount || 0) / (e.isAnnual ? 12 : 1)), 0);
             } catch { /* empty */ }
 
             let realEstateMonthlyCosts = 0;
