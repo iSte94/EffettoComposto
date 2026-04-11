@@ -14,7 +14,7 @@ import { NetWorthProjection } from "@/components/patrimonio/net-worth-projection
 
 import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
-import type { AssetRecord, AcceptedPurchase, ExistingLoan } from "@/types";
+import type { AssetRecord, AcceptedPurchase } from "@/types";
 
 interface OverviewDashboardProps {
     user: { username: string } | null;
@@ -52,7 +52,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [preferences, setPreferences] = useState<Record<string, number | string | null>>({});
     const [loading, setLoading] = useState(true);
     const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
-    const [existingLoans, setExistingLoans] = useState<ExistingLoan[]>([]);
 
     useEffect(() => {
         if (!user) { setLoading(false); return; }
@@ -74,7 +73,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             if (prefData.preferences) {
                 setPreferences(prefData.preferences);
                 try { setAcceptedPurchases(JSON.parse(prefData.preferences.acceptedPurchases || "[]")); } catch { /* empty */ }
-                try { setExistingLoans(JSON.parse(prefData.preferences.existingLoansList || "[]")); } catch { /* empty */ }
             }
         }).catch(console.error)
             .finally(() => setLoading(false));
@@ -142,45 +140,13 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         };
     }, [history, preferences]);
 
-    // Calcola risparmio netto mensile dalle preferenze (stesso calcolo del patrimonio-dashboard)
+    // Usa il netIncome salvato dal patrimonio-dashboard (single source of truth)
     const monthlySavings = useMemo(() => {
-        const grossIncome = Number(preferences.person1Income || 0) + Number(preferences.person2Income || 0);
-        if (grossIncome <= 0) return undefined;
-
-        // Spese manuali
-        let manualExpenses = 0;
-        try {
-            const list = JSON.parse(String(preferences.expensesList || "[]"));
-            manualExpenses = list.reduce((acc: number, e: { amount?: number; isAnnual?: boolean }) => acc + ((e.amount || 0) / (e.isAnnual ? 12 : 1)), 0);
-        } catch { /* empty */ }
-
-        // Costi e affitti immobili (annuali → mensili)
-        let realEstateMonthlyCosts = 0;
-        let realEstateMonthlyRent = 0;
-        try {
-            const reList = JSON.parse(String(preferences.realEstateList || "[]"));
-            const annualCosts = reList.reduce((acc: number, p: { costs?: number; imu?: number; isPrimaryResidence?: boolean }) => {
-                const costs = p.costs || 0;
-                const imu = (!p.isPrimaryResidence ? (p.imu || 0) : 0);
-                return acc + costs + imu;
-            }, 0);
-            realEstateMonthlyCosts = annualCosts / 12;
-            const annualRent = reList.reduce((acc: number, p: { monthlyRent?: number }) => acc + ((p.monthlyRent || 0) * 12), 0);
-            realEstateMonthlyRent = annualRent / 12;
-        } catch { /* empty */ }
-
-        // Rate prestiti (rata già disponibile nel tipo ExistingLoan)
-        let monthlyLoanPayments = 0;
-        const now = new Date();
-        for (const loan of existingLoans) {
-            const end = new Date(loan.endDate + "-01");
-            if (end > now) {
-                monthlyLoanPayments += loan.installment || 0;
-            }
-        }
-
-        return grossIncome + realEstateMonthlyRent - manualExpenses - realEstateMonthlyCosts - monthlyLoanPayments;
-    }, [preferences, existingLoans]);
+        const saved = Number(preferences.netIncome);
+        if (!isNaN(saved) && saved !== 0) return saved;
+        // Fallback: nessun netIncome salvato, l'utente non ha ancora compilato il profilo
+        return undefined;
+    }, [preferences]);
 
     if (!user) {
         return <WelcomeOnboarding />;
