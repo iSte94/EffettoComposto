@@ -214,10 +214,11 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const manualExpenses = expensesList.reduce((acc, expense) => acc + ((expense.amount || 0) / (expense.isAnnual ? 12 : 1)), 0);
     const autoMonthlyRealEstateCosts = realEstateCosts / 12;
     const autoMonthlyLoanPayments = calculatedExistingInstallment;
+    const autoMonthlyRealEstateRent = realEstateRent / 12;
     const totalAutoExpenses = autoMonthlyRealEstateCosts + autoMonthlyLoanPayments;
     const totalExpenses = manualExpenses + totalAutoExpenses;
     const grossIncome = person1Income + person2Income;
-    const netIncome = grossIncome - totalExpenses;
+    const netIncome = grossIncome + autoMonthlyRealEstateRent - totalExpenses;
     const monthlyExpenses = totalExpenses > 0 ? totalExpenses : 2500;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -618,7 +619,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const effectiveEmergencyFund = separateEmergencyFund ? emergencyFund : 0;
     const totalGrossAssets = activeLiquidValue + safeHavens + effectiveEmergencyFund + pensionFund + (bitcoinAmount * currentBtcPrice);
     const currentNetWorth = totalGrossAssets - totalPassivita;
-    const monthlyCashflow = grossIncome + ((realEstateRent - realEstateCosts) / 12) - calculatedExistingInstallment - manualExpenses;
+    const monthlyCashflow = grossIncome + autoMonthlyRealEstateRent - totalExpenses;
     const totalFinancialInvestments = activeLiquidValue + effectiveEmergencyFund + (bitcoinAmount * currentBtcPrice);
     const totalLiquidForSurvival = separateEmergencyFund ? liquidStockValue + emergencyFund : liquidStockValue;
     const survivalMonths = monthlyExpenses > 0 ? totalLiquidForSurvival / monthlyExpenses : 0;
@@ -800,7 +801,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                 </div>
                                 <div className="flex flex-col gap-1.5 border-t border-slate-100/50 pt-2 text-xs font-medium">
                                     <div className="flex items-center justify-between px-1 text-emerald-600"><span>Reddito:</span><span>+{formatEuro(grossIncome)}/m</span></div>
-                                    {realEstateRent > 0 && <div className="flex items-center justify-between px-1 text-emerald-600"><span>Affitti (lordo):</span><span>+{formatEuro(realEstateRent / 12)}/m</span></div>}
+                                    {autoMonthlyRealEstateRent > 0 && <div className="flex items-center justify-between px-1 text-emerald-600"><span>Affitti (lordo):</span><span>+{formatEuro(autoMonthlyRealEstateRent)}/m</span></div>}
                                     {manualExpenses > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Spese personali:</span><span>-{formatEuro(manualExpenses)}/m</span></div>}
                                     {realEstateCosts > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Costi immobili:</span><span>-{formatEuro(realEstateCosts / 12)}/m</span></div>}
                                     {calculatedExistingInstallment > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Rate prestiti:</span><span>-{formatEuro(calculatedExistingInstallment)}/m</span></div>}
