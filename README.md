@@ -88,6 +88,7 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 - **Proiezione patrimonio con interesse composto** — nuova terza modalita' di proiezione: oltre a "Risparmio Netto" e "Trend Storico", ora disponibile "Risparmio + Rendimento" che combina il risparmio mensile con il rendimento atteso configurato nella sezione FIRE (interesse composto con versamenti periodici)
 - **Spiegazioni on-hover** — tutti i testi esplicativi che occupavano spazio nell'interfaccia sono stati convertiti in tooltip: passando il mouse sull'icona info accanto a ogni parametro si legge come viene calcolato, senza ingombrare la vista. Interessa proiezione patrimonio, parametri FIRE (SWR, inflazione, rendimento, volatilita', fondo pensione, bollo, pensione INPS), simulatore mutuo (DTI, cashflow, costo opportunita'), profilo finanziario, strategia debiti e calcolatore interesse composto
 - **Componente InfoTooltip riutilizzabile** — nuovo componente UI basato su Radix Tooltip per mostrare spiegazioni contestuali al passaggio del mouse, con icona Info e stile coerente in tutta l'app
+- **Fix risparmio netto in proiezione** — la proiezione patrimonio nel Riepilogo ora usa il netIncome salvato dal Profilo Finanziario (single source of truth) invece di ricalcolarlo con una formula diversa che non teneva conto delle rate dinamiche dei prestiti, causando un valore piu' alto del reale
 
 ### 11 aprile 2026 (mobile patrimonio)
 
