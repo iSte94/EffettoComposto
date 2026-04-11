@@ -39,11 +39,11 @@ export default function CalculatorPage() {
       <header className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-xl sm:p-5 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <BrandLogo
-            className="w-full max-w-[13rem] sm:max-w-[18rem] md:max-w-[20rem]"
-            imageClassName="drop-shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+            className="w-full max-w-[14rem] sm:max-w-[18rem] md:max-w-[21rem]"
+            imageClassName="drop-shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
             priority
             subtitle="Il cruscotto della tua liberta finanziaria"
-            subtitleClassName="pl-2"
+            subtitleClassName="pl-2 pt-1"
           />
         </div>
 

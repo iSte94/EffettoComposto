@@ -59,8 +59,8 @@ export default function LoginPage() {
         <div className="text-center">
           <BrandLogo
             href="/"
-            className="items-center"
-            imageClassName="max-w-[15rem] drop-shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+            className="mx-auto w-full max-w-[15rem] items-center"
+            imageClassName="drop-shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
             priority
           />
         </div>
@@ -84,7 +84,6 @@ export default function LoginPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="es: stefano_inv"
                   className="min-h-11 border-border bg-background/80 focus-visible:ring-blue-500"
-                  autoFocus
                   required
                 />
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { BarChart3, LineChart, Landmark, Flame, TrendingDown, ShieldCheck, ArrowRight, Sparkles } from "lucide-react";
+import { BarChart3, LineChart, Landmark, Flame, TrendingDown, ShieldCheck, ArrowRight } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 
 interface WelcomeOnboardingProps {
     onNavigate?: (tab: string) => void;
@@ -69,15 +70,17 @@ export function WelcomeOnboarding({ onNavigate }: WelcomeOnboardingProps) {
             {/* Hero */}
             <div className="text-center space-y-4 pt-8">
                 <div className="flex justify-center">
-                    <div className="p-4 bg-blue-50/80 dark:bg-blue-950/35 rounded-2xl ring-1 ring-blue-200/70 dark:ring-blue-900/70">
-                        <Sparkles className="w-10 h-10 text-blue-500" />
-                    </div>
+                    <BrandLogo
+                        className="w-full max-w-[15rem] sm:max-w-[18rem]"
+                        imageClassName="drop-shadow-[0_14px_28px_rgba(15,23,42,0.08)]"
+                        priority
+                    />
                 </div>
                 <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-foreground">
-                    Benvenuto in <span className="text-blue-600 dark:text-blue-400">FI</span>
+                    Pianifica la tua indipendenza finanziaria
                 </h1>
                 <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                    Il tuo calcolatore immobiliare e finanziario completo. Gestisci mutuo, patrimonio, FIRE e molto altro.
+                    Il tuo cruscotto finanziario completo per mutuo, patrimonio, FIRE, budget e simulazioni in un&apos;unica webapp.
                 </p>
             </div>
 

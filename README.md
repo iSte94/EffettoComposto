@@ -83,6 +83,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 11 aprile 2026 (brand refresh)
+
+- **Logo ufficiale in UI** - nuovo `BrandLogo` con crop dedicato del wordmark per eliminare gli spazi vuoti del PNG e mantenere proporzioni corrette; header principale, onboarding e pagina `/login` ora usano il marchio in modo coerente su desktop e mobile
+- **Favicon e icone PWA** - collegate le nuove risorse favicon in Next.js, `manifest.json`, `site.webmanifest`, `favicon.ico` e Service Worker, cosi' browser tab, shortcut mobile e installazione PWA usano lo stesso set di icone
+- **Login piu' pulita** - rimosso l'autofocus iniziale del campo username che faceva scorrere subito la viewport e poteva nascondere il logo nelle schermate piu' piccole
+
 ### 11 aprile 2026 (pomeriggio)
 
 - **Logo e branding** — nuovo logo grafico con componente `BrandLogo` riutilizzabile; header principale e pagina /login ora usano l'immagine al posto di icona+testo
