@@ -1,10 +1,10 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
+import { BarChart3, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, Wallet, Wrench } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
+import { BrandLogo } from "@/components/brand-logo";
 import { HeaderKpisBar } from "@/components/header-kpis";
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/auth-context";
 import { useHeaderKpis } from "@/hooks/useHeaderKpis";
@@ -37,18 +37,14 @@ export default function CalculatorPage() {
   return (
     <div className="space-y-8 pb-24">
       <header className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-xl sm:p-5 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 p-2.5 shadow-lg shadow-emerald-500/20">
-            <TrendingUp className="size-6 md:size-7 text-white" />
-          </div>
-          <div className="flex flex-col">
-            <h1 className="bg-clip-text text-2xl font-extrabold tracking-tight text-transparent bg-gradient-to-r from-foreground via-foreground/80 to-foreground md:text-3xl">
-              Effetto<span className="font-black text-emerald-500">Composto</span>
-            </h1>
-            <p className="text-xs font-medium uppercase tracking-[0.22em] text-muted-foreground">
-              Il cruscotto della tua libertà
-            </p>
-          </div>
+        <div className="min-w-0">
+          <BrandLogo
+            className="w-full max-w-[13rem] sm:max-w-[18rem] md:max-w-[20rem]"
+            imageClassName="drop-shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+            priority
+            subtitle="Il cruscotto della tua liberta finanziaria"
+            subtitleClassName="pl-2"
+          />
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-2 md:w-auto md:justify-end">

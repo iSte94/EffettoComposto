@@ -1,7 +1,12 @@
-const CACHE_NAME = 'fi-cache-v2';
+const CACHE_NAME = 'fi-cache-v3';
 const STATIC_ASSETS = [
   '/manifest.json',
-  '/icons/icon.svg',
+  '/favicon/favicon.svg',
+  '/favicon/favicon-96x96.png',
+  '/favicon/favicon.ico',
+  '/favicon/apple-touch-icon.png',
+  '/favicon/web-app-manifest-192x192.png',
+  '/favicon/web-app-manifest-512x512.png',
 ];
 
 // Install: pre-cache static assets

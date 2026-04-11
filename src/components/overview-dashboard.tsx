@@ -151,11 +151,12 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         let manualExpenses = 0;
         try {
             const list = JSON.parse(String(preferences.expensesList || "[]"));
-            manualExpenses = list.reduce((acc: number, e: { amount?: number }) => acc + (e.amount || 0), 0);
+            manualExpenses = list.reduce((acc: number, e: { amount?: number; isAnnual?: boolean }) => acc + ((e.amount || 0) / (e.isAnnual ? 12 : 1)), 0);
         } catch { /* empty */ }
 
-        // Costi immobili (annuali → mensili)
+        // Costi e affitti immobili (annuali → mensili)
         let realEstateMonthlyCosts = 0;
+        let realEstateMonthlyRent = 0;
         try {
             const reList = JSON.parse(String(preferences.realEstateList || "[]"));
             const annualCosts = reList.reduce((acc: number, p: { costs?: number; imu?: number; isPrimaryResidence?: boolean }) => {
@@ -164,6 +165,8 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                 return acc + costs + imu;
             }, 0);
             realEstateMonthlyCosts = annualCosts / 12;
+            const annualRent = reList.reduce((acc: number, p: { monthlyRent?: number }) => acc + ((p.monthlyRent || 0) * 12), 0);
+            realEstateMonthlyRent = annualRent / 12;
         } catch { /* empty */ }
 
         // Rate prestiti (rata già disponibile nel tipo ExistingLoan)
@@ -176,7 +179,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             }
         }
 
-        return grossIncome - manualExpenses - realEstateMonthlyCosts - monthlyLoanPayments;
+        return grossIncome + realEstateMonthlyRent - manualExpenses - realEstateMonthlyCosts - monthlyLoanPayments;
     }, [preferences, existingLoans]);
 
     if (!user) {

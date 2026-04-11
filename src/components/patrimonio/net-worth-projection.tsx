@@ -41,10 +41,19 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
 
         let historicalMonthlyGrowth = 0;
         if (hasHistory) {
-            const first = points[0];
-            const last = points[points.length - 1];
-            const monthsElapsed = Math.max(1, (last.date.getTime() - first.date.getTime()) / (30.44 * 24 * 60 * 60 * 1000));
-            historicalMonthlyGrowth = (last.value - first.value) / monthsElapsed;
+            // Regressione lineare (least squares) su tutti i punti
+            // x = mesi dal primo snapshot, y = net worth
+            const MS_PER_MONTH = 30.44 * 24 * 60 * 60 * 1000;
+            const t0 = points[0].date.getTime();
+            const xs = points.map(p => (p.date.getTime() - t0) / MS_PER_MONTH);
+            const ys = points.map(p => p.value);
+            const n = points.length;
+            const sumX = xs.reduce((a, b) => a + b, 0);
+            const sumY = ys.reduce((a, b) => a + b, 0);
+            const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0);
+            const sumX2 = xs.reduce((a, x) => a + x * x, 0);
+            const denom = n * sumX2 - sumX * sumX;
+            historicalMonthlyGrowth = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
         }
 
         // Usa risparmio netto mensile (default) o trend storico (toggle)

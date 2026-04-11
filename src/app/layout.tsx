@@ -10,6 +10,7 @@ const outfit = Outfit({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://effettocomposto.it"),
+  applicationName: "EffettoComposto",
   title: {
     default: "Effetto Composto - Pianifica la tua indipendenza finanziaria",
     template: "%s | Effetto Composto",
@@ -57,9 +58,16 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  other: {
+    "apple-mobile-web-app-title": "EffettoComposto",
+  },
   icons: {
-    icon: "/icons/icon.svg",
-    apple: "/icons/icon.svg",
+    icon: [
+      { url: "/favicon/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon/favicon-96x96.png", sizes: "96x96", type: "image/png" },
+    ],
+    shortcut: "/favicon/favicon.ico",
+    apple: [{ url: "/favicon/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
 };
 
