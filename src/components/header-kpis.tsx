@@ -54,9 +54,16 @@ export const HeaderKpisBar = memo(function HeaderKpisBar({ kpis, onNavigate }: H
             {/* Savings rate */}
             {kpis.savingsRate !== null && (
                 <button
-                    onClick={() => onNavigate("budgeting")}
+                    onClick={() => {
+                        onNavigate("patrimonio");
+                        requestAnimationFrame(() => {
+                            setTimeout(() => {
+                                document.getElementById("cashflow-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                            }, 150);
+                        });
+                    }}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary/80 px-3 min-h-10 text-sm font-semibold transition-colors hover:bg-accent cursor-pointer"
-                    title="Tasso di risparmio mensile"
+                    title="Cashflow familiare — tasso di risparmio"
                 >
                     <PiggyBank className="size-3.5 text-violet-500" />
                     <span className={`text-xs tabular-nums ${kpis.savingsRate >= 20 ? "text-emerald-600" : kpis.savingsRate >= 0 ? "text-amber-600" : "text-rose-600"}`}>

@@ -994,7 +994,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                             <div className="rounded-[1.5rem] border border-slate-200/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/80"><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Risparmio Netto</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", netIncome >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400")}>{formatEuro(netIncome)}</div><p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Reddito familiare meno spese e passivita ricorrenti ogni mese.</p></div>
                         </div>
 
-                        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] xl:items-start">
+                        <div id="cashflow-section" className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] xl:items-start">
                             <div className="space-y-3">
                                 <div className="px-1">
                                     <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500 dark:text-slate-400">Profilo Familiare</p>
