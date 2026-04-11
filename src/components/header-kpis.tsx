@@ -56,17 +56,17 @@ export const HeaderKpisBar = memo(function HeaderKpisBar({ kpis, onNavigate }: H
                 <button
                     onClick={() => {
                         onNavigate("patrimonio");
-                        setTimeout(() => {
+                        // Poll for the element since the tab is lazy-loaded
+                        let attempts = 0;
+                        const poll = setInterval(() => {
                             const el = document.getElementById("cashflow-section");
                             if (el) {
+                                clearInterval(poll);
                                 el.scrollIntoView({ behavior: "smooth", block: "center" });
-                            } else {
-                                // lazy-loaded tab may need more time
-                                setTimeout(() => {
-                                    document.getElementById("cashflow-section")?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                }, 500);
+                            } else if (++attempts > 20) {
+                                clearInterval(poll);
                             }
-                        }, 200);
+                        }, 150);
                     }}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary/80 px-3 min-h-10 text-sm font-semibold transition-colors hover:bg-accent cursor-pointer"
                     title="Cashflow familiare — tasso di risparmio"
