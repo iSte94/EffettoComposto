@@ -83,6 +83,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 12 aprile 2026 (dettaglio snapshot)
+
+- **Liquidita ed ETF separati nello storico snapshot** — la tabella Dettaglio Snapshot ora mostra due colonne distinte: "Liquidita" (conto, contante) ed "ETF / Strumenti" (titoli e strumenti finanziari), invece di sommarli in un'unica voce confusa
+- **Ordinamento discendente degli snapshot** — lo storico ora mostra sempre gli snapshot dal piu' recente al piu' lontano nel tempo, sia su desktop che su mobile
+- **Tendina espandibile con dettaglio completo** — ogni riga/card snapshot puo' essere espansa per mostrare un pannello con tutti i componenti del patrimonio a quella data: breakdown per immobile (da `realEstateList`), breakdown per ticker ETF (da `customStocksList`), liquidita, fondo emergenza, fondo pensione, beni rifugio, bitcoin (quantita x prezzo), debiti totali
+- **Variazioni 1g / 7g / 30g per ogni componente** — ogni card del pannello dettaglio mostra le variazioni rispetto a 1, 7 e 30 giorni prima per il singolo componente (non solo il totale): immobili, liquidita, ETF, bitcoin, fondo emergenza, fondo pensione, beni rifugio, debiti e patrimonio netto totale. Ogni badge mostra sia il delta in euro sia la percentuale, colorato verde se positivo / rosso se negativo, con icona trend e data di riferimento
+- **Helper `findPastSnapshot`** — trova lo snapshot piu' recente con data <= (target - N giorni), cosi' le variazioni funzionano anche con snapshot non giornalieri (prende il piu' vicino disponibile)
+
 ### 12 aprile 2026
 
 - **Proiezione patrimonio con interesse composto** — nuova terza modalita' di proiezione: oltre a "Risparmio Netto" e "Trend Storico", ora disponibile "Risparmio + Rendimento" che combina il risparmio mensile con il rendimento atteso configurato nella sezione FIRE (interesse composto con versamenti periodici)
