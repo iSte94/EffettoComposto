@@ -17,9 +17,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  preferences  Preference?
-  assets       AssetRecord[]
-  savingsGoals SavingsGoal[]
+  preferences        Preference?
+  assets             AssetRecord[]
+  savingsGoals       SavingsGoal[]
+  budgetTransactions BudgetTransaction[]
 }
 
 model Preference {
@@ -77,6 +78,10 @@ model Preference {
   pensionExitMode          String   @default("hybrid") // "annuity" = 100% rendita, "hybrid" = 50/50
   employerContributionType String   @default("percent") // "percent" o "fixed"
   employerContributionValue Float   @default(1.5)    // % RAL o importo fisso annuo
+
+  // Budget Tracker
+  budgetCategoriesList String @default("[]") // JSON: [{id,name,limit,color,icon,keywords:string[]}]
+  budgetSettings       String @default("{}") // JSON: {currentMonth?, viewMode: "month"|"avg"|"all"}
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -142,6 +147,23 @@ model StockHistoryCache {
   ticker    String   @id
   history   String   // JSON string of the [{timestamp, date, price, originalCurrency}] array
   updatedAt DateTime @updatedAt
+}
+
+model BudgetTransaction {
+  id               String   @id @default(uuid())
+  date             String   // YYYY-MM-DD
+  description      String
+  amount           Float    // negativo = uscita, positivo = entrata
+  category         String
+  categoryOverride Boolean  @default(false)
+  hash             String   // dedupe key
+  importedAt       DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, hash])
+  @@index([userId, date])
 }
 
 model MortgageMarketCache {

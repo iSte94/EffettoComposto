@@ -83,6 +83,19 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 12 aprile 2026 (istruzioni import Directa)
+
+- **Guida "Come scaricare il file da Directa"** — il riquadro iniziale di Importa Movimenti Directa ora mostra i 5 passaggi per ottenere il CSV: accedi a Directa versione Libera, apri la sezione Movimenti, seleziona il periodo temporale dal calendario, clicca sull'icona del file Excel per scaricare il CSV, carica il file nell'app. Cosi' chi non conosce l'interfaccia Directa non deve cercare altrove
+
+### 12 aprile 2026 (budget tracker v2)
+
+- **Budget persistente con categorie personalizzate** — il Budget Mensile non e' piu' un semplice viewer dell'ultimo CSV: categorie, limiti, colore, icona e parole chiave vengono salvati nel database (`budgetCategoriesList` nelle preferenze utente) e sopravvivono al refresh e al cambio dispositivo. Ogni utente configura le proprie categorie con il pannello dedicato (crea, rinomina, cambia limite, elimina, assegna parole chiave per l'auto-categorizzazione)
+- **Transazioni salvate con dedupe** — nuova tabella `BudgetTransaction` nel database per persistere le transazioni importate dai CSV bancari. Ogni transazione ha un `hash` univoco (data + descrizione + importo) che impedisce doppi inserimenti: re-importare lo stesso CSV non crea duplicati, importi storici di mesi diversi si accumulano nel tempo. Nuove API `GET/POST/DELETE /api/budget/transactions`, `PATCH /api/budget/transactions/[id]` e `POST /api/budget/transactions/reapply`
+- **Auto-categorizzazione con keyword utente** — le parole chiave definite dall'utente per ogni categoria hanno la precedenza sulle regole built-in del parser bank-csv. Al momento dell'import ogni transazione viene assegnata in base alle keyword (match case-insensitive, min 2 caratteri) e l'assegnazione puo' sempre essere corretta manualmente dal drawer transazioni. Nuovo endpoint `reapply` per ricategorizzare tutte le transazioni quando cambi le keyword, preservando gli override manuali
+- **Modalita' visualizzazione multiple** — switch tra "Mese corrente" (spesa del singolo mese), "Media mensile" (media su tutti i mesi con transazioni) e "Totale" (somma di tutte le transazioni importate). Persistente come preferenza utente in `budgetSettings`
+- **KPI, grafici e alert** — nuova intestazione con KPI cards (speso totale, limite, residuo, % utilizzo), grafico di confronto categorie (spesa vs limite con colori dinamici), grafico trend mensile sulle ultime 6 mensilita', alert per le transazioni non categorizzate ("Altro") con link diretto al drawer per assegnare la categoria corretta
+- **Drawer transazioni** — nuovo pannello laterale con elenco completo, filtri per categoria/periodo, possibilita' di cambiare categoria inline (con flag `categoryOverride` per proteggere la scelta dalla ricategorizzazione automatica), eliminare singole transazioni o ripulire tutto. L'intero Budget Tracker e' stato decomposto in 7 sotto-componenti memo (`budget-header`, `budget-kpi-cards`, `uncategorized-alert`, `budget-categories-panel`, `budget-comparison-chart`, `budget-trend-chart`, `transaction-drawer`) orchestrati da `budget-tracker.tsx` e dal nuovo hook `useBudget` che incapsula fetch, import, update e delete
+
 ### 12 aprile 2026 (fix variazioni ETF)
 
 - **Fix variazioni ETF errate su ticker duplicati e holding nuove** — nel dettaglio snapshot le holding con ticker duplicato (es. SUSW.MI 2130 e SUSW.MI 825, o lotti diversi dello stesso ISIN) mostravano variazioni assurde perche' il fallback per ticker associava la holding sbagliata nello snapshot passato. Allo stesso modo, holding nuove assenti nel passato apparivano con `+€totale (+0.00%)`. Ora il matching e' strict: si usa `id`; se fallisce, il fallback per ticker si applica solo quando il ticker e' unico in entrambi gli snapshot (current e passato). Negli altri casi la variazione e' "n/d"

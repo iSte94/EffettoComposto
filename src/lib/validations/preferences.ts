@@ -52,4 +52,7 @@ export const preferencesSchema = z.object({
     pensionExitMode: z.enum(["annuity", "hybrid"]).optional(),
     employerContributionType: z.enum(["percent", "fixed"]).optional(),
     employerContributionValue: z.number().min(0).optional(),
+    // Budget
+    budgetCategoriesList: z.string().optional(),
+    budgetSettings: z.string().optional(),
 });

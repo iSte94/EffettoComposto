@@ -1,253 +1,282 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Wallet, Upload, AlertTriangle, CheckCircle, Pencil, X, Check } from "lucide-react";
-import { formatEuro } from "@/lib/format";
-import { parseBankCSV, type ImportResult } from "@/lib/import/bank-csv";
-import {
-    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
-} from "recharts";
+import { useMemo, useState, useCallback } from "react";
+import { toast } from "sonner";
+import { parseBankCSV, categorizeTransaction, type BankTransaction } from "@/lib/import/bank-csv";
+import { useBudget } from "@/hooks/useBudget";
+import type { BudgetTransaction, BudgetViewMode } from "@/types/budget";
+import { BudgetHeader } from "@/components/budget/budget-header";
+import { BudgetKpiCards } from "@/components/budget/budget-kpi-cards";
+import { UncategorizedAlert } from "@/components/budget/uncategorized-alert";
+import { BudgetCategoriesPanel } from "@/components/budget/budget-categories-panel";
+import { BudgetComparisonChart, type ComparisonRow } from "@/components/budget/budget-comparison-chart";
+import { BudgetTrendChart, type TrendRow } from "@/components/budget/budget-trend-chart";
+import { TransactionDrawer } from "@/components/budget/transaction-drawer";
 
-interface BudgetCategory {
-    name: string;
-    limit: number;
+const MONTH_LABELS = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+
+async function hashTransaction(date: string, description: string, amount: number): Promise<string> {
+    const input = `${date}|${description}|${amount.toFixed(2)}`;
+    if (typeof window !== "undefined" && window.crypto?.subtle) {
+        const bytes = new TextEncoder().encode(input);
+        const buf = await window.crypto.subtle.digest("SHA-256", bytes);
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+    }
+    // Fallback deterministico
+    let h = 0;
+    for (let i = 0; i < input.length; i++) h = ((h << 5) - h + input.charCodeAt(i)) | 0;
+    return `fb_${h}_${input.length}`;
 }
 
-const DEFAULT_CATEGORIES: BudgetCategory[] = [
-    { name: "Spesa", limit: 400 },
-    { name: "Utenze", limit: 200 },
-    { name: "Trasporti", limit: 150 },
-    { name: "Ristorazione", limit: 100 },
-    { name: "Shopping Online", limit: 100 },
-    { name: "Assicurazione", limit: 100 },
-    { name: "Altro", limit: 300 },
-];
+function formatMonthShort(month: string): string {
+    const [y, m] = month.split("-").map(Number);
+    return `${MONTH_LABELS[m - 1]} ${String(y).slice(2)}`;
+}
 
 export function BudgetTracker() {
-    const [categories, setCategories] = useState<BudgetCategory[]>(DEFAULT_CATEGORIES);
-    const [importResult, setImportResult] = useState<ImportResult | null>(null);
-    const [editingIdx, setEditingIdx] = useState<number | null>(null);
-    const [editLimit, setEditLimit] = useState("");
-    const fileRef = useRef<HTMLInputElement>(null);
+    const {
+        categories,
+        transactions,
+        settings,
+        addCategory,
+        updateCategory,
+        removeCategory,
+        setViewMode,
+        setCurrentMonth,
+        importTransactions,
+        updateTransactionCategory,
+        deleteTransaction,
+        deleteTransactionsByMonth,
+        reapplyCategoryRules,
+    } = useBudget();
 
-    const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const text = await file.text();
-        const result = parseBankCSV(text);
-        if (result.transactions.length > 0) setImportResult(result);
-    };
+    const [drawerCategory, setDrawerCategory] = useState<string | null>(null);
 
-    const startEdit = (idx: number) => {
-        setEditingIdx(idx);
-        setEditLimit(String(categories[idx].limit));
-    };
+    // ---- Mesi disponibili (dal set di transazioni) ----
+    const availableMonths = useMemo(() => {
+        const set = new Set<string>();
+        for (const t of transactions) set.add(t.date.substring(0, 7));
+        return Array.from(set).sort().reverse();
+    }, [transactions]);
 
-    const saveEdit = (idx: number) => {
-        const newCategories = [...categories];
-        newCategories[idx] = { ...newCategories[idx], limit: Math.max(0, Number(editLimit) || 0) };
-        setCategories(newCategories);
-        setEditingIdx(null);
-    };
+    const viewMode: BudgetViewMode = settings.viewMode || "avg";
+    const currentMonth = settings.currentMonth;
 
-    const categorySpending = useMemo(() => {
-        if (!importResult || importResult.monthlySummary.length === 0) return null;
-
-        const categoryTotals = new Map<string, number>();
-        for (const transaction of importResult.transactions) {
-            if (transaction.amount >= 0) continue;
-            const category = transaction.category || "Altro";
-            categoryTotals.set(category, (categoryTotals.get(category) || 0) + Math.abs(transaction.amount));
+    // ---- Transazioni filtrate per periodo ----
+    const filteredTransactions = useMemo(() => {
+        if (viewMode === "month" && currentMonth) {
+            return transactions.filter(t => t.date.startsWith(currentMonth));
         }
+        return transactions;
+    }, [transactions, viewMode, currentMonth]);
 
-        const months = importResult.monthlySummary.length;
-        const monthlyAvg = new Map<string, number>();
-        for (const [category, total] of categoryTotals) {
-            monthlyAvg.set(category, Math.round(total / months));
+    // ---- Divisore per calcolo medie (per view "avg") ----
+    const monthDivisor = useMemo(() => {
+        if (viewMode === "avg" && availableMonths.length > 0) return availableMonths.length;
+        return 1;
+    }, [viewMode, availableMonths]);
+
+    // ---- Spese per categoria (gia' normalizzate per periodo) ----
+    const spendingByCategory = useMemo(() => {
+        const map = new Map<string, number>();
+        for (const tx of filteredTransactions) {
+            if (tx.amount >= 0) continue;
+            const prev = map.get(tx.category) || 0;
+            map.set(tx.category, prev + Math.abs(tx.amount));
         }
+        if (monthDivisor > 1) {
+            for (const [k, v] of map) map.set(k, v / monthDivisor);
+        }
+        return map;
+    }, [filteredTransactions, monthDivisor]);
 
-        return monthlyAvg;
-    }, [importResult]);
+    // ---- Totali ----
+    const income = useMemo(() => {
+        const sum = filteredTransactions.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+        return monthDivisor > 1 ? sum / monthDivisor : sum;
+    }, [filteredTransactions, monthDivisor]);
 
-    const comparisonData = useMemo(() => {
-        return categories.map((category) => {
-            const actual = categorySpending?.get(category.name) || 0;
-            const overBudget = actual > category.limit;
+    const expenses = useMemo(() => {
+        const sum = filteredTransactions.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
+        return monthDivisor > 1 ? sum / monthDivisor : sum;
+    }, [filteredTransactions, monthDivisor]);
+
+    const budgetTotal = useMemo(() => categories.reduce((s, c) => s + c.limit, 0), [categories]);
+
+    const overBudgetCount = useMemo(() => {
+        let count = 0;
+        for (const cat of categories) {
+            const actual = spendingByCategory.get(cat.name) || 0;
+            if (actual > cat.limit && actual > 0) count++;
+        }
+        return count;
+    }, [categories, spendingByCategory]);
+
+    // ---- Confronto per bar chart ----
+    const comparisonData: ComparisonRow[] = useMemo(() => {
+        return categories.map(cat => {
+            const actual = spendingByCategory.get(cat.name) || 0;
             return {
-                name: category.name,
-                Budget: category.limit,
-                "Spesa Media": actual,
-                overBudget,
+                name: cat.name,
+                Budget: cat.limit,
+                Speso: Math.round(actual),
+                overBudget: actual > cat.limit && actual > 0,
             };
         });
-    }, [categories, categorySpending]);
+    }, [categories, spendingByCategory]);
 
-    const totalBudget = categories.reduce((sum, category) => sum + category.limit, 0);
-    const totalActual = comparisonData.reduce((sum, category) => sum + category["Spesa Media"], 0);
-    const overBudgetCount = comparisonData.filter((category) => category.overBudget && category["Spesa Media"] > 0).length;
+    // ---- Andamento mensile ----
+    const trendData: TrendRow[] = useMemo(() => {
+        const map = new Map<string, { income: number; expenses: number }>();
+        for (const tx of transactions) {
+            const month = tx.date.substring(0, 7);
+            const entry = map.get(month) || { income: 0, expenses: 0 };
+            if (tx.amount > 0) entry.income += tx.amount;
+            else entry.expenses += Math.abs(tx.amount);
+            map.set(month, entry);
+        }
+        return Array.from(map.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-12)
+            .map(([month, v]) => ({
+                month,
+                label: formatMonthShort(month),
+                Entrate: Math.round(v.income),
+                Spese: Math.round(v.expenses),
+                Risparmio: Math.round(v.income - v.expenses),
+            }));
+    }, [transactions]);
+
+    // ---- Transazioni non categorizzate nel periodo ----
+    const uncategorizedCount = useMemo(() => {
+        return filteredTransactions.filter(t => t.amount < 0 && t.category === "Altro").length;
+    }, [filteredTransactions]);
+
+    // ---- Import CSV ----
+    const handleImport = useCallback(async (file: File) => {
+        try {
+            const text = await file.text();
+            const rules = categories.map(c => ({ name: c.name, keywords: c.keywords || [] }));
+            const parsed = parseBankCSV(text, rules);
+
+            if (parsed.transactions.length === 0) {
+                toast.error("Nessuna transazione trovata nel file");
+                return;
+            }
+
+            const enriched: BudgetTransaction[] = await Promise.all(
+                parsed.transactions.map(async (t: BankTransaction) => ({
+                    id: "",
+                    date: t.date,
+                    description: t.description,
+                    amount: t.amount,
+                    category: t.category || "Altro",
+                    hash: await hashTransaction(t.date, t.description, t.amount),
+                }))
+            );
+
+            const result = await importTransactions(enriched);
+            toast.success(
+                `${result.inserted} nuove transazioni · ${result.skipped} duplicate ignorate (${parsed.detectedBank})`
+            );
+        } catch (err) {
+            console.error(err);
+            toast.error("Errore durante l'import del CSV");
+        }
+    }, [categories, importTransactions]);
+
+    // ---- Reset mese corrente (o tutto se in avg) ----
+    const handleReset = useCallback(() => {
+        const target = viewMode === "month" && currentMonth ? currentMonth : "all";
+        const label = target === "all" ? "tutte le transazioni" : `le transazioni di ${target}`;
+        if (!window.confirm(`Eliminare ${label}? L'operazione non e' reversibile.`)) return;
+        deleteTransactionsByMonth(target);
+        toast.success("Transazioni eliminate");
+    }, [viewMode, currentMonth, deleteTransactionsByMonth]);
+
+    // ---- Re-apply regole ----
+    const handleReapply = useCallback(() => {
+        const rules = categories.map(c => ({ name: c.name, keywords: c.keywords || [] }));
+        reapplyCategoryRules((desc: string) => categorizeTransaction(desc, rules));
+    }, [categories, reapplyCategoryRules]);
+
+    // ---- Drawer per categoria ----
+    const drawerTransactions = useMemo(() => {
+        if (!drawerCategory) return [];
+        return filteredTransactions.filter(t => t.category === drawerCategory);
+    }, [filteredTransactions, drawerCategory]);
+
+    const openDrawer = useCallback((name: string) => setDrawerCategory(name), []);
+    const closeDrawer = useCallback((open: boolean) => { if (!open) setDrawerCategory(null); }, []);
+
+    const periodLabel = viewMode === "month" && currentMonth
+        ? new Date(Number(currentMonth.slice(0, 4)), Number(currentMonth.slice(5, 7)) - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })
+        : availableMonths.length > 1 ? `Media su ${availableMonths.length} mesi` : "Periodo";
+
+    const hasData = filteredTransactions.length > 0;
 
     return (
         <div className="space-y-6">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                    <div className="rounded-xl bg-violet-50 p-2.5 dark:bg-violet-950/50">
-                        <Wallet className="h-6 w-6 text-violet-600 dark:text-violet-400" />
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-foreground">Budget Mensile</h2>
-                        <p className="text-xs text-muted-foreground">Imposta limiti per categoria e confrontali con le spese reali</p>
-                    </div>
-                </div>
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="min-h-10 rounded-xl text-xs sm:self-auto"
-                    onClick={() => fileRef.current?.click()}
-                >
-                    <Upload className="mr-1 h-3.5 w-3.5" /> {importResult ? "Aggiorna CSV" : "Importa CSV"}
-                </Button>
-                <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={handleImport} />
-            </div>
+            <BudgetHeader
+                availableMonths={availableMonths}
+                currentMonth={currentMonth}
+                viewMode={viewMode}
+                hasTransactions={transactions.length > 0}
+                onViewModeChange={setViewMode}
+                onMonthChange={setCurrentMonth}
+                onImport={handleImport}
+                onReset={handleReset}
+            />
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-3xl border border-violet-200 bg-violet-50/90 p-4 dark:border-violet-800 dark:bg-violet-950/30">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400">Budget Totale</p>
-                    <p className="mt-1 text-xl font-extrabold text-violet-600 dark:text-violet-400">{formatEuro(totalBudget)}</p>
-                    <p className="text-[10px] text-violet-400">/mese</p>
-                </div>
-                <div className={`rounded-3xl border p-4 ${totalActual > totalBudget ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30" : "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30"}`}>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Spesa Media</p>
-                    <p className={`mt-1 text-xl font-extrabold ${totalActual > totalBudget ? "text-red-600" : "text-emerald-600"}`}>
-                        {importResult ? formatEuro(totalActual) : "—"}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground">/mese</p>
-                </div>
-                <div className="rounded-3xl border border-border/70 bg-muted/30 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Categorie Oltre</p>
-                    <p className="mt-1 text-xl font-extrabold text-foreground">{importResult ? overBudgetCount : "—"}</p>
-                    <p className="text-[10px] text-muted-foreground">su {categories.length}</p>
-                </div>
-            </div>
+            <BudgetKpiCards
+                income={income}
+                expenses={expenses}
+                budgetTotal={budgetTotal}
+                overBudgetCount={overBudgetCount}
+                totalCategories={categories.length}
+                hasData={hasData}
+            />
 
-            <Card className="rounded-3xl border border-border/70 bg-card/80 backdrop-blur-xl">
-                <CardContent className="space-y-3 p-5">
-                    <h3 className="text-sm font-bold text-muted-foreground">Budget per Categoria</h3>
-                    <div className="space-y-2">
-                        {comparisonData.map((item, idx) => {
-                            const pct = item.Budget > 0 ? Math.min(100, (item["Spesa Media"] / item.Budget) * 100) : 0;
-                            const isEditing = editingIdx === idx;
+            <UncategorizedAlert
+                count={uncategorizedCount}
+                onOpen={() => openDrawer("Altro")}
+                onReapply={handleReapply}
+            />
 
-                            return (
-                                <div key={item.name} className="space-y-2 rounded-2xl border border-border/60 bg-background/50 p-3">
-                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {item.overBudget && item["Spesa Media"] > 0 ? (
-                                                <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
-                                            ) : item["Spesa Media"] > 0 ? (
-                                                <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
-                                            ) : null}
-                                            <span className="text-sm font-medium text-foreground">{item.name}</span>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                                            {isEditing ? (
-                                                <div className="flex items-center gap-1">
-                                                    <Input
-                                                        type="number"
-                                                        value={editLimit}
-                                                        onChange={(e) => setEditLimit(e.target.value)}
-                                                        className="h-9 w-24 rounded-xl text-xs"
-                                                        autoFocus
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => saveEdit(idx)}
-                                                        className="rounded-lg p-1 text-emerald-500 transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/20"
-                                                    >
-                                                        <Check className="h-3.5 w-3.5" />
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setEditingIdx(null)}
-                                                        className="rounded-lg p-1 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/20"
-                                                    >
-                                                        <X className="h-3.5 w-3.5" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    {importResult && (
-                                                        <span className={`text-xs font-bold ${item.overBudget ? "text-red-500" : "text-emerald-600"}`}>
-                                                            {formatEuro(item["Spesa Media"])}
-                                                        </span>
-                                                    )}
-                                                    <span className="text-xs text-muted-foreground">/ {formatEuro(item.Budget)}</span>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => startEdit(idx)}
-                                                        className="rounded-lg p-1 text-slate-300 transition-colors hover:bg-blue-50 hover:text-blue-500 dark:hover:bg-blue-950/20"
-                                                    >
-                                                        <Pencil className="h-3 w-3" />
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {importResult && (
-                                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/70">
-                                            <div
-                                                className={`h-full rounded-full transition-all duration-500 ${item.overBudget ? "bg-red-500" : "bg-emerald-500"}`}
-                                                style={{ width: `${pct}%` }}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </CardContent>
-            </Card>
+            <BudgetCategoriesPanel
+                categories={categories}
+                spendingByCategory={spendingByCategory}
+                hasData={hasData}
+                onAdd={addCategory}
+                onUpdate={updateCategory}
+                onRemove={removeCategory}
+                onOpenTransactions={openDrawer}
+                onReapply={handleReapply}
+            />
 
-            {importResult && (
-                <Card className="rounded-3xl border border-border/70 bg-card/80 backdrop-blur-xl">
-                    <CardContent className="p-5">
-                        <h3 className="mb-4 text-sm font-bold text-muted-foreground">Budget vs Spesa Reale</h3>
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={comparisonData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-                                    <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} tickFormatter={(value: number) => `${value}`} />
-                                    <Tooltip
-                                        formatter={(value: number | string | undefined) => formatEuro(Number(value ?? 0))}
-                                        contentStyle={{
-                                            borderRadius: "16px",
-                                            border: "1px solid var(--border)",
-                                            backgroundColor: "var(--popover)",
-                                            color: "var(--popover-foreground)",
-                                            boxShadow: "0 16px 40px -16px rgba(15, 23, 42, 0.45)",
-                                        }}
-                                    />
-                                    <Bar dataKey="Budget" fill="#c4b5fd" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="Spesa Media" radius={[4, 4, 0, 0]}>
-                                        {comparisonData.map((entry, index) => (
-                                            <Cell key={index} fill={entry.overBudget ? "#ef4444" : "#10b981"} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </CardContent>
-                </Card>
+            {hasData && (
+                <BudgetComparisonChart data={comparisonData} periodLabel={periodLabel} />
             )}
 
-            {!importResult && (
+            <BudgetTrendChart data={trendData} budgetTotal={budgetTotal} />
+
+            {!hasData && (
                 <div className="rounded-2xl border border-dashed border-border/80 bg-muted/20 py-8 text-center text-sm text-muted-foreground">
-                    Importa un estratto conto CSV per confrontare le tue spese reali con il budget.
+                    Importa un estratto conto CSV per iniziare a tracciare il tuo budget.
+                    Le transazioni vengono salvate e categorizzate automaticamente.
                 </div>
             )}
+
+            <TransactionDrawer
+                open={drawerCategory !== null}
+                onOpenChange={closeDrawer}
+                title={drawerCategory || ""}
+                description={`${drawerTransactions.length} transazioni nel periodo selezionato`}
+                transactions={drawerTransactions}
+                categories={categories}
+                onChangeCategory={updateTransactionCategory}
+                onDelete={deleteTransaction}
+            />
         </div>
     );
 }

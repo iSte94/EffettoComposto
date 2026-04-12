@@ -62,9 +62,26 @@ function parseDate(s: string): string | null {
     return null;
 }
 
-// Auto-detect category from description
-function categorizeTransaction(desc: string): string {
+export interface CategoryRule {
+    name: string;
+    keywords: string[];
+}
+
+// Auto-detect category from description.
+// Se passato customCategories, le keyword dell'utente hanno la precedenza sulle regole built-in.
+export function categorizeTransaction(desc: string, customCategories?: CategoryRule[]): string {
     const d = desc.toLowerCase();
+
+    if (customCategories && customCategories.length > 0) {
+        for (const cat of customCategories) {
+            if (!cat.keywords || cat.keywords.length === 0) continue;
+            for (const rawKw of cat.keywords) {
+                const kw = rawKw.trim().toLowerCase();
+                if (kw.length >= 2 && d.includes(kw)) return cat.name;
+            }
+        }
+    }
+
     if (d.includes('stipendio') || d.includes('salario') || d.includes('ral')) return 'Stipendio';
     if (d.includes('affitto') || d.includes('canone locazione')) return 'Affitto';
     if (d.includes('mutuo') || d.includes('rata finanziamento')) return 'Mutuo/Prestito';
@@ -101,7 +118,7 @@ function splitCSVLine(line: string, delimiter: string): string[] {
     return result;
 }
 
-export function parseBankCSV(csvContent: string): ImportResult {
+export function parseBankCSV(csvContent: string, customCategories?: CategoryRule[]): ImportResult {
     const lines = csvContent.split(/\r?\n/).filter(l => l.trim().length > 0);
     if (lines.length < 2) {
         return { transactions: [], detectedBank: 'Sconosciuto', totalIncome: 0, totalExpenses: 0, monthlySummary: [] };
@@ -142,7 +159,7 @@ export function parseBankCSV(csvContent: string): ImportResult {
         }
 
         const balance = balanceIdx >= 0 ? parseItalianNumber(cols[balanceIdx]) : undefined;
-        const category = categorizeTransaction(description);
+        const category = categorizeTransaction(description, customCategories);
 
         transactions.push({ date: dateStr, description, amount, balance, category });
     }

@@ -543,6 +543,16 @@ export function DirectaMovementsViewer() {
               un&apos;analisi completa dello storico operazioni.
             </p>
           </div>
+          <div className="w-full max-w-md rounded-xl border border-border/60 bg-secondary/40 p-4 text-left">
+            <p className="text-xs font-semibold text-foreground mb-2">Come scaricare il file da Directa</p>
+            <ol className="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside leading-relaxed">
+              <li>Accedi a Directa nella versione <span className="font-medium text-foreground">Libera</span> (web).</li>
+              <li>Apri la sezione <span className="font-medium text-foreground">Movimenti</span>.</li>
+              <li>Seleziona il periodo temporale desiderato tramite il calendario.</li>
+              <li>Clicca sul pulsante con l&apos;icona del file <span className="font-medium text-foreground">Excel</span> per scaricare il CSV.</li>
+              <li>Carica qui sotto il file appena scaricato.</li>
+            </ol>
+          </div>
           <label className="cursor-pointer">
             <input type="file" accept=".csv" onChange={handleFile} className="hidden" />
             <div className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/20 transition-all hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95">
