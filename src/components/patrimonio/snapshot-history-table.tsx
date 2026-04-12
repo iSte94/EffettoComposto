@@ -60,6 +60,20 @@ const computeVariation = (
     return { diff, pct, pastDate: past.date };
 };
 
+const singleStockValue = (s: CustomStock): number => {
+    if (typeof s.manualValue === "number" && s.manualValue > 0) return s.manualValue;
+    return (s.shares || 0) * (s.currentPrice || 0);
+};
+
+const stockValueInRecord = (record: AssetRecord, refId: string, refTicker: string): number => {
+    const list = parseList<CustomStock>(record.customStocksList);
+    if (list.length === 0) return 0;
+    const byId = list.find(s => s.id === refId);
+    if (byId) return singleStockValue(byId);
+    const byTicker = list.find(s => s.ticker === refTicker);
+    return byTicker ? singleStockValue(byTicker) : 0;
+};
+
 function VariationBadge({ variation, compact = false }: { variation: Variation | null; compact?: boolean }) {
     if (!variation) {
         return (
@@ -112,6 +126,42 @@ function DetailRow({ label, value, accent }: { label: string; value: string; acc
     );
 }
 
+function StockDetailRow({
+    stock,
+    current,
+    sortedDesc,
+}: {
+    stock: CustomStock;
+    current: AssetRecord;
+    sortedDesc: AssetRecord[];
+}) {
+    const getter = (r: AssetRecord) => stockValueInRecord(r, stock.id, stock.ticker);
+    const v1 = computeVariation(current, findPastSnapshot(current, sortedDesc, 1), getter);
+    const v7 = computeVariation(current, findPastSnapshot(current, sortedDesc, 7), getter);
+    const v30 = computeVariation(current, findPastSnapshot(current, sortedDesc, 30), getter);
+    const value = singleStockValue(stock);
+
+    return (
+        <div className="border-b border-slate-100 py-2 last:border-b-0 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                    {stock.ticker}
+                    {stock.shares ? <span className="text-slate-400"> · {stock.shares}</span> : null}
+                </span>
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">{formatEuro(value)}</span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] uppercase text-slate-400">1g</span>
+                <VariationBadge variation={v1} compact />
+                <span className="ml-1 text-[10px] uppercase text-slate-400">7g</span>
+                <VariationBadge variation={v7} compact />
+                <span className="ml-1 text-[10px] uppercase text-slate-400">30g</span>
+                <VariationBadge variation={v30} compact />
+            </div>
+        </div>
+    );
+}
+
 function MetricWithVariations({
     label,
     value,
@@ -160,11 +210,6 @@ function SnapshotDetailPanel({ item, sortedDesc }: { item: AssetRecord; sortedDe
     const realEstateList = parseList<RealEstateProperty>(item.realEstateList);
     const stocksList = parseList<CustomStock>(item.customStocksList);
     const bitcoinValue = (item.bitcoinAmount || 0) * (item.bitcoinPrice || 0);
-
-    const stockValue = (s: CustomStock) => {
-        if (typeof s.manualValue === "number" && s.manualValue > 0) return s.manualValue;
-        return (s.shares || 0) * (s.currentPrice || 0);
-    };
 
     return (
         <div className="space-y-4 bg-slate-50/80 p-4 sm:p-6 dark:bg-slate-900/40">
@@ -259,13 +304,9 @@ function SnapshotDetailPanel({ item, sortedDesc }: { item: AssetRecord; sortedDe
                 <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Dettaglio ETF / Strumenti</div>
                     {stocksList.length > 0 ? (
-                        <div className="space-y-1">
+                        <div>
                             {stocksList.map(s => (
-                                <DetailRow
-                                    key={s.id}
-                                    label={`${s.ticker}${s.shares ? ` · ${s.shares}` : ""}`}
-                                    value={formatEuro(stockValue(s))}
-                                />
+                                <StockDetailRow key={s.id} stock={s} current={item} sortedDesc={sortedDesc} />
                             ))}
                         </div>
                     ) : (
