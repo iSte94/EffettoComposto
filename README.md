@@ -83,6 +83,10 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 12 aprile 2026 (fix variazioni ETF)
+
+- **Fix variazioni ETF errate su ticker duplicati e holding nuove** — nel dettaglio snapshot le holding con ticker duplicato (es. SUSW.MI 2130 e SUSW.MI 825, o lotti diversi dello stesso ISIN) mostravano variazioni assurde perche' il fallback per ticker associava la holding sbagliata nello snapshot passato. Allo stesso modo, holding nuove assenti nel passato apparivano con `+€totale (+0.00%)`. Ora il matching e' strict: si usa `id`; se fallisce, il fallback per ticker si applica solo quando il ticker e' unico in entrambi gli snapshot (current e passato). Negli altri casi la variazione e' "n/d"
+
 ### 12 aprile 2026 (variazioni per ETF)
 
 - **Variazioni 1g / 7g / 30g per singolo ETF** — nel pannello espanso del Dettaglio Snapshot, ogni riga della sezione "Dettaglio ETF / Strumenti" ora mostra le variazioni (euro + percentuale, verde/rosso) rispetto a 1, 7 e 30 giorni prima per quel specifico titolo. Il matching avviene per `id` con fallback sul ticker, cosi' segue lo stesso holding anche se il record storico aveva prezzi diversi

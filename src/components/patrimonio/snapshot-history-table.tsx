@@ -65,13 +65,40 @@ const singleStockValue = (s: CustomStock): number => {
     return (s.shares || 0) * (s.currentPrice || 0);
 };
 
-const stockValueInRecord = (record: AssetRecord, refId: string, refTicker: string): number => {
+// Cerca il valore di una specifica holding in uno snapshot passato.
+// Ritorna null quando il match non e' affidabile: holding nuova (assente),
+// oppure ticker duplicato in uno dei due snapshot e nessun match per id.
+const stockValueInRecordStrict = (
+    record: AssetRecord,
+    refId: string,
+    refTicker: string,
+    currentList: CustomStock[]
+): number | null => {
     const list = parseList<CustomStock>(record.customStocksList);
-    if (list.length === 0) return 0;
+    if (list.length === 0) return null;
     const byId = list.find(s => s.id === refId);
     if (byId) return singleStockValue(byId);
-    const byTicker = list.find(s => s.ticker === refTicker);
-    return byTicker ? singleStockValue(byTicker) : 0;
+    const pastSame = list.filter(s => s.ticker === refTicker);
+    const currentSame = currentList.filter(s => s.ticker === refTicker);
+    if (pastSame.length === 1 && currentSame.length === 1) {
+        return singleStockValue(pastSame[0]);
+    }
+    return null;
+};
+
+const computeStockVariation = (
+    current: AssetRecord,
+    past: AssetRecord | null,
+    stock: CustomStock,
+    currentList: CustomStock[]
+): Variation | null => {
+    if (!past) return null;
+    const prev = stockValueInRecordStrict(past, stock.id, stock.ticker, currentList);
+    if (prev === null) return null;
+    const cur = singleStockValue(stock);
+    const diff = cur - prev;
+    const pct = prev !== 0 ? (diff / Math.abs(prev)) * 100 : 0;
+    return { diff, pct, pastDate: past.date };
 };
 
 function VariationBadge({ variation, compact = false }: { variation: Variation | null; compact?: boolean }) {
@@ -129,16 +156,17 @@ function DetailRow({ label, value, accent }: { label: string; value: string; acc
 function StockDetailRow({
     stock,
     current,
+    currentList,
     sortedDesc,
 }: {
     stock: CustomStock;
     current: AssetRecord;
+    currentList: CustomStock[];
     sortedDesc: AssetRecord[];
 }) {
-    const getter = (r: AssetRecord) => stockValueInRecord(r, stock.id, stock.ticker);
-    const v1 = computeVariation(current, findPastSnapshot(current, sortedDesc, 1), getter);
-    const v7 = computeVariation(current, findPastSnapshot(current, sortedDesc, 7), getter);
-    const v30 = computeVariation(current, findPastSnapshot(current, sortedDesc, 30), getter);
+    const v1 = computeStockVariation(current, findPastSnapshot(current, sortedDesc, 1), stock, currentList);
+    const v7 = computeStockVariation(current, findPastSnapshot(current, sortedDesc, 7), stock, currentList);
+    const v30 = computeStockVariation(current, findPastSnapshot(current, sortedDesc, 30), stock, currentList);
     const value = singleStockValue(stock);
 
     return (
@@ -306,7 +334,7 @@ function SnapshotDetailPanel({ item, sortedDesc }: { item: AssetRecord; sortedDe
                     {stocksList.length > 0 ? (
                         <div>
                             {stocksList.map(s => (
-                                <StockDetailRow key={s.id} stock={s} current={item} sortedDesc={sortedDesc} />
+                                <StockDetailRow key={s.id} stock={s} current={item} currentList={stocksList} sortedDesc={sortedDesc} />
                             ))}
                         </div>
                     ) : (
