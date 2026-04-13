@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Wallet, Plus, Trash2, HomeIcon, CreditCard, CalendarClock, Calendar } from "lucide-react";
+import { Wallet, Plus, Trash2, HomeIcon, CreditCard, CalendarClock, Calendar, Repeat } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ interface FinancialProfileProps {
     expensesList: MonthlyExpense[];
     autoMonthlyRealEstateCosts: number;
     autoMonthlyLoanPayments: number;
+    autoMonthlySubscriptions: number;
     totalAutoExpenses: number;
     manualExpenses: number;
     totalExpenses: number;
@@ -35,7 +36,7 @@ interface FinancialProfileProps {
 
 export const FinancialProfile = memo(function FinancialProfile({
     person1Name, person1Income, person2Name, person2Income,
-    expensesList, autoMonthlyRealEstateCosts, autoMonthlyLoanPayments,
+    expensesList, autoMonthlyRealEstateCosts, autoMonthlyLoanPayments, autoMonthlySubscriptions,
     totalAutoExpenses, manualExpenses, totalExpenses, grossIncome, netIncome,
     containerClassName,
     onPerson1NameChange, onPerson1IncomeChange, onPerson2NameChange, onPerson2IncomeChange,
@@ -168,7 +169,7 @@ export const FinancialProfile = memo(function FinancialProfile({
 
                     {totalAutoExpenses > 0 && (
                         <div className="mb-4 border-t border-slate-100 pt-3 dark:border-slate-800">
-                            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Spese Automatiche (da Immobili e Prestiti)</h4>
+                            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Spese Automatiche</h4>
                             <div className="space-y-2 text-sm">
                                 {autoMonthlyRealEstateCosts > 0 && (
                                     <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
@@ -186,6 +187,15 @@ export const FinancialProfile = memo(function FinancialProfile({
                                             Rate prestiti / mutui
                                         </span>
                                         <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">-{formatEuro(autoMonthlyLoanPayments)}/mese</span>
+                                    </div>
+                                )}
+                                {autoMonthlySubscriptions > 0 && (
+                                    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+                                        <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                                            <Repeat className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+                                            Abbonamenti ricorrenti
+                                        </span>
+                                        <span className="font-bold tabular-nums text-slate-700 dark:text-slate-200">-{formatEuro(autoMonthlySubscriptions)}/mese</span>
                                     </div>
                                 )}
                             </div>

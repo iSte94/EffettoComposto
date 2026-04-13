@@ -211,11 +211,12 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const [person2Name, setPerson2Name] = useState<string>("Persona 2");
     const [person2Income, setPerson2Income] = useState<number>(2000);
     const [expensesList, setExpensesList] = useState<MonthlyExpense[]>([]);
+    const [autoMonthlySubscriptions, setAutoMonthlySubscriptions] = useState<number>(0);
     const manualExpenses = expensesList.reduce((acc, expense) => acc + ((expense.amount || 0) / (expense.isAnnual ? 12 : 1)), 0);
     const autoMonthlyRealEstateCosts = realEstateCosts / 12;
     const autoMonthlyLoanPayments = calculatedExistingInstallment;
     const autoMonthlyRealEstateRent = realEstateRent / 12;
-    const totalAutoExpenses = autoMonthlyRealEstateCosts + autoMonthlyLoanPayments;
+    const totalAutoExpenses = autoMonthlyRealEstateCosts + autoMonthlyLoanPayments + autoMonthlySubscriptions;
     const totalExpenses = manualExpenses + totalAutoExpenses;
     const grossIncome = person1Income + person2Income;
     const netIncome = grossIncome + autoMonthlyRealEstateRent - totalExpenses;
@@ -450,6 +451,18 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                         setExpensesList(JSON.parse(prefData.preferences.expensesList));
                     } catch (error) {
                         console.error("Failed to parse expensesList", error);
+                    }
+                }
+                if (prefData.preferences.subscriptionsList) {
+                    try {
+                        const subs = JSON.parse(prefData.preferences.subscriptionsList);
+                        if (Array.isArray(subs)) {
+                            const monthly = subs.reduce((acc: number, s: { amount: number; frequency: string }) =>
+                                acc + (s.frequency === "annuale" ? s.amount / 12 : s.amount), 0);
+                            setAutoMonthlySubscriptions(monthly);
+                        }
+                    } catch (error) {
+                        console.error("Failed to parse subscriptionsList", error);
                     }
                 }
                 if (prefData.preferences.existingLoansList) {
@@ -805,6 +818,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     {manualExpenses > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Spese personali:</span><span>-{formatEuro(manualExpenses)}/m</span></div>}
                                     {realEstateCosts > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Costi immobili:</span><span>-{formatEuro(realEstateCosts / 12)}/m</span></div>}
                                     {calculatedExistingInstallment > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Rate prestiti:</span><span>-{formatEuro(calculatedExistingInstallment)}/m</span></div>}
+                                    {autoMonthlySubscriptions > 0 && <div className="flex items-center justify-between px-1 text-rose-500"><span>Abbonamenti:</span><span>-{formatEuro(autoMonthlySubscriptions)}/m</span></div>}
                                 </div>
                             </>}
                         </CardContent>
@@ -1041,6 +1055,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     expensesList={expensesList}
                                     autoMonthlyRealEstateCosts={autoMonthlyRealEstateCosts}
                                     autoMonthlyLoanPayments={autoMonthlyLoanPayments}
+                                    autoMonthlySubscriptions={autoMonthlySubscriptions}
                                     totalAutoExpenses={totalAutoExpenses}
                                     manualExpenses={manualExpenses}
                                     totalExpenses={totalExpenses}

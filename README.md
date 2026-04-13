@@ -83,6 +83,10 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 13 aprile 2026 (sync abbonamenti → patrimonio)
+
+- **Abbonamenti sincronizzati nel cashflow patrimonio** — gli abbonamenti inseriti nel Tracker Abbonamenti Ricorrenti vengono ora inclusi automaticamente tra le spese automatiche della sezione Patrimonio (Passivita & Cashflow). Il totale mensile degli abbonamenti si somma a costi immobiliari e rate prestiti, aggiornando in tempo reale il Risparmio Netto Mensile, il Cashflow Atteso e tutti gli indicatori derivati (Indice di Sopravvivenza, proiezione FIRE). Nessuna duplicazione manuale necessaria: basta aggiungere un abbonamento nel tracker e il profilo finanziario si aggiorna da solo al prossimo caricamento
+
 ### 13 aprile 2026
 
 - **Abbonamenti ricorrenti persistenti** — il Tracker Abbonamenti ora salva gli abbonamenti nel database (`subscriptionsList` nelle preferenze utente) e li ricarica al login, invece di perderli al refresh della pagina. Il campo e' incluso anche nell'export/import dati JSON, cosi' gli abbonamenti vengono trasferiti tra account e dispositivi
