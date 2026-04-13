@@ -22,6 +22,18 @@
 
 ---
 
+## 📸 Scopri l'App in Azione
+
+<div align="center">
+  <img src="public/screenshots/dashboard-patrimonio.jpg" alt="Dashboard Patrimonio" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
+  <br/>
+  <img src="public/screenshots/simulatore-mutuo.jpg" alt="Simulatore Mutuo Immobiliare" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
+  <br/>
+  <img src="public/screenshots/mutui-market.jpg" alt="Mutui Market Confronto" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
+</div>
+
+---
+
 ## Panoramica
 
 **Effetto Composto** e' una webapp completa per la gestione della finanza personale, pensata per chi vuole raggiungere l'indipendenza finanziaria (FIRE). Unisce in un unico strumento tutto quello che serve per simulare, pianificare e monitorare il proprio percorso verso la liberta' finanziaria.
