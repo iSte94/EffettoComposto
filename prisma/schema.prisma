@@ -80,8 +80,9 @@ model Preference {
   employerContributionValue Float   @default(1.5)    // % RAL o importo fisso annuo
 
   // Budget Tracker
-  budgetCategoriesList String @default("[]") // JSON: [{id,name,limit,color,icon,keywords:string[]}]
-  budgetSettings       String @default("{}") // JSON: {currentMonth?, viewMode: "month"|"avg"|"all"}
+  budgetCategoriesList  String @default("[]") // JSON: [{id,name,limit,color,icon,keywords:string[]}]
+  budgetSettings        String @default("{}") // JSON: {currentMonth?, viewMode: "month"|"avg"|"all"}
+  subscriptionsList     String @default("[]") // JSON: [{id,name,amount,frequency:"mensile"|"annuale"}]
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

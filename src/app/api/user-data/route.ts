@@ -31,12 +31,21 @@ export async function GET() {
             return rest;
         });
 
+        // Estrarre subscriptionsList come array per leggibilità nel JSON esportato
+        let subscriptions: unknown[] = [];
+        if (cleanPreferences?.subscriptionsList) {
+            try {
+                subscriptions = JSON.parse(cleanPreferences.subscriptionsList as string);
+            } catch { /* noop */ }
+        }
+
         const exportData = {
             version: 1,
             exportedAt: new Date().toISOString(),
             preferences: cleanPreferences,
             patrimonio: cleanAssets,
             obiettivi: cleanGoals,
+            abbonamenti: subscriptions,
         };
 
         return NextResponse.json(exportData);
@@ -61,6 +70,12 @@ const importSchema = z.object({
         createdAt: z.string().optional(),
         updatedAt: z.string().optional(),
     })).optional(),
+    abbonamenti: z.array(z.object({
+        id: z.string(),
+        name: z.string(),
+        amount: z.number(),
+        frequency: z.enum(["mensile", "annuale"]),
+    })).optional(),
 });
 
 // POST: Importa tutti i dati dell'utente (sovrascrive preferenze, aggiunge snapshot e obiettivi)
@@ -78,18 +93,33 @@ export async function POST(req: Request) {
         }
 
         const data = parsed.data;
-        const results = { preferences: false, patrimonio: 0, obiettivi: 0 };
+        const results = { preferences: false, patrimonio: 0, obiettivi: 0, abbonamenti: 0 };
 
         // 1. Import preferenze (upsert)
         if (data.preferences) {
             const { userId: _u, id, ...prefData } = data.preferences as Record<string, unknown>;
             void _u; void id;
+
+            // Se ci sono abbonamenti nel JSON e non sono già nelle preferenze, iniettali
+            if (data.abbonamenti && data.abbonamenti.length > 0 && !prefData.subscriptionsList) {
+                prefData.subscriptionsList = JSON.stringify(data.abbonamenti);
+            }
+
             await prisma.preference.upsert({
                 where: { userId },
                 update: prefData,
                 create: { ...prefData, userId },
             });
             results.preferences = true;
+            if (data.abbonamenti) results.abbonamenti = data.abbonamenti.length;
+        } else if (data.abbonamenti && data.abbonamenti.length > 0) {
+            // Solo abbonamenti senza preferenze
+            await prisma.preference.upsert({
+                where: { userId },
+                update: { subscriptionsList: JSON.stringify(data.abbonamenti) },
+                create: { userId, subscriptionsList: JSON.stringify(data.abbonamenti) },
+            });
+            results.abbonamenti = data.abbonamenti.length;
         }
 
         // 2. Import snapshot patrimonio
@@ -135,6 +165,7 @@ export async function POST(req: Request) {
             message: 'Dati importati con successo!',
             results,
         });
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
         console.error('Failed to import user data:', error);

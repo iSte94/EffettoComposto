@@ -55,4 +55,5 @@ export const preferencesSchema = z.object({
     // Budget
     budgetCategoriesList: z.string().optional(),
     budgetSettings: z.string().optional(),
+    subscriptionsList: z.string().optional(),
 });

@@ -83,6 +83,11 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 13 aprile 2026
+
+- **Abbonamenti ricorrenti persistenti** — il Tracker Abbonamenti ora salva gli abbonamenti nel database (`subscriptionsList` nelle preferenze utente) e li ricarica al login, invece di perderli al refresh della pagina. Il campo e' incluso anche nell'export/import dati JSON, cosi' gli abbonamenti vengono trasferiti tra account e dispositivi
+- **File demo `demo-marco-giulia.json`** — file JSON di esempio con dati completi di una coppia (profilo, spese, portafoglio ETF, Bitcoin, beni rifugio, fondo pensione, prestiti, parametri FIRE, simulatore mutuo, obiettivi di risparmio, categorie budget, abbonamenti e 7 snapshot storici). Pronto per essere importato con "Importa dati" dal menu ingranaggio
+
 ### 12 aprile 2026 (istruzioni import Directa)
 
 - **Guida "Come scaricare il file da Directa"** — il riquadro iniziale di Importa Movimenti Directa ora mostra i 5 passaggi per ottenere il CSV: accedi a Directa versione Libera, apri la sezione Movimenti, seleziona il periodo temporale dal calendario, clicca sull'icona del file Excel per scaricare il CSV, carica il file nell'app. Cosi' chi non conosce l'interfaccia Directa non deve cercare altrove

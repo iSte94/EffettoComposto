@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Repeat, CreditCard } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { useAuth } from "@/contexts/auth-context";
 
 interface Subscription {
     id: string;
@@ -27,19 +28,66 @@ const COMMON_SUBS: Omit<Subscription, "id">[] = [
 ];
 
 export function SubscriptionTracker() {
+    const { user } = useAuth();
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [showPresets, setShowPresets] = useState(false);
+    const [loaded, setLoaded] = useState(false);
+
+    // Load subscriptions from preferences on mount
+    useEffect(() => {
+        if (!user) { setLoaded(true); return; }
+        (async () => {
+            try {
+                const res = await fetch("/api/preferences");
+                const data = await res.json();
+                if (data.preferences?.subscriptionsList) {
+                    const parsed = JSON.parse(data.preferences.subscriptionsList);
+                    if (Array.isArray(parsed)) setSubscriptions(parsed);
+                }
+            } catch (e) {
+                console.error("Failed to load subscriptions", e);
+            } finally {
+                setLoaded(true);
+            }
+        })();
+    }, [user]);
+
+    // Save subscriptions to preferences (debounced)
+    const saveSubscriptions = useCallback(async (subs: Subscription[]) => {
+        if (!user) return;
+        try {
+            await fetch("/api/preferences", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ subscriptionsList: JSON.stringify(subs) }),
+            });
+        } catch (e) {
+            console.error("Failed to save subscriptions", e);
+        }
+    }, [user]);
 
     const addSub = (sub: Omit<Subscription, "id">) => {
-        setSubscriptions((prev) => [...prev, { ...sub, id: Date.now().toString() }]);
+        setSubscriptions((prev) => {
+            const updated = [...prev, { ...sub, id: Date.now().toString() }];
+            saveSubscriptions(updated);
+            return updated;
+        });
     };
 
     const removeSub = (id: string) => {
-        setSubscriptions((prev) => prev.filter((s) => s.id !== id));
+        setSubscriptions((prev) => {
+            const updated = prev.filter((s) => s.id !== id);
+            saveSubscriptions(updated);
+            return updated;
+        });
     };
 
     const updateSub = (id: string, updates: Partial<Subscription>) => {
-        setSubscriptions((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+        setSubscriptions((prev) => {
+            const updated = prev.map((s) => (s.id === id ? { ...s, ...updates } : s));
+            saveSubscriptions(updated);
+            return updated;
+        });
     };
 
     const totals = useMemo(() => {
@@ -49,6 +97,8 @@ export function SubscriptionTracker() {
         }
         return { monthly, annual: monthly * 12 };
     }, [subscriptions]);
+
+    if (!loaded) return null;
 
     return (
         <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">

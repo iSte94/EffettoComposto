@@ -119,7 +119,8 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
             if (res.ok) {
                 toast.success(
                     `Dati importati! Preferenze: ${result.results.preferences ? "sì" : "no"}, ` +
-                    `Snapshot: ${result.results.patrimonio}, Obiettivi: ${result.results.obiettivi}`
+                    `Snapshot: ${result.results.patrimonio}, Obiettivi: ${result.results.obiettivi}` +
+                    (result.results.abbonamenti ? `, Abbonamenti: ${result.results.abbonamenti}` : "")
                 );
                 // Ricarica la pagina per riflettere i nuovi dati
                 setTimeout(() => window.location.reload(), 1500);
