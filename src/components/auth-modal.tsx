@@ -157,7 +157,12 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
                             <Download className="size-4 mr-2" />
                             Esporta dati
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+                        <DropdownMenuItem
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                fileInputRef.current?.click();
+                            }}
+                        >
                             <Upload className="size-4 mr-2" />
                             Importa dati
                         </DropdownMenuItem>
