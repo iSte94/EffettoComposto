@@ -25,9 +25,15 @@
 ## 📸 Scopri l'App in Azione
 
 <div align="center">
+  <img src="public/screenshots/dashboard-situazione.jpg" alt="Dashboard Situazione Generale" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
+  <br/>
   <img src="public/screenshots/dashboard-patrimonio.jpg" alt="Dashboard Patrimonio" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
   <br/>
+  <img src="public/screenshots/simulatore-fire.jpg" alt="Simulatore FIRE Monte Carlo" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
+  <br/>
   <img src="public/screenshots/simulatore-mutuo.jpg" alt="Simulatore Mutuo Immobiliare" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
+  <br/>
+  <img src="public/screenshots/calcolo-stipendio-netto.jpg" alt="Calcolo Stipendio Netto" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
   <br/>
   <img src="public/screenshots/mutui-market.jpg" alt="Mutui Market Confronto" width="800" style="border-radius: 8px; margin-bottom: 20px;" />
 </div>
