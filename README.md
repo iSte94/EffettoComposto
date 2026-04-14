@@ -101,6 +101,10 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 14 aprile 2026 (riepilogo — tooltip breakdown patrimonio netto)
+
+- **Tooltip "cosa ha mosso il patrimonio"** — passando col mouse sopra la cifra del Patrimonio Netto nel tab Riepilogo appare un pannello a scomparsa che spiega in dettaglio da dove arriva la variazione rispetto allo snapshot precedente. Il breakdown mostra il delta per ciascuna categoria (Liquidita' & ETF, Fondo Emergenza, Bitcoin, Beni Rifugio, Fondo Pensione, Debiti), con la percentuale di contributo al movimento totale, ordinato per impatto assoluto e con riga "Totale" finale che combacia con il +/-€ mostrato sotto. I debiti sono invertiti (una riduzione debiti conta come contributo positivo), cosi' l'utente capisce subito se il mese e' andato bene grazie a mercato, risparmio o deleveraging
+
 ### 14 aprile 2026 (consulente acquisti v2.1 — fix su dati reali)
 
 - **Impatto patrimoniale su investibile** — il peso dell'acquisto ora e' misurato sul "patrimonio investibile" (asset totali − immobili − debiti) invece che sul patrimonio netto totale. Per chi ha casa di proprieta', un'auto da 30k non "vale" il 2% dei 1.4M totali: vale il 6% dei 500k realmente mobilizzabili, ed e' questa la cifra che conta

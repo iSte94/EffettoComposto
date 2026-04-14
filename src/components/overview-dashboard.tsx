@@ -11,6 +11,7 @@ import {
 import { formatEuro } from "@/lib/format";
 import { FinancialAlerts } from "@/components/financial-alerts";
 import { NetWorthProjection } from "@/components/patrimonio/net-worth-projection";
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 
 import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
@@ -89,6 +90,18 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         const netWorthChange = currentNetWorth - previousNetWorth;
         const netWorthChangePercent = previousNetWorth !== 0 ? (netWorthChange / Math.abs(previousNetWorth)) * 100 : 0;
 
+        // Breakdown del delta vs snapshot precedente, per categoria
+        const btcLatest = (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
+        const btcPrev = previous ? (previous.bitcoinAmount || 0) * (previous.bitcoinPrice || 0) : btcLatest;
+        const changeBreakdown = previous ? [
+            { label: "Liquidità & ETF", delta: ((latest.liquidStockValue || 0) + (latest.stocksSnapshotValue || 0)) - ((previous.liquidStockValue || 0) + (previous.stocksSnapshotValue || 0)), color: "bg-purple-500" },
+            { label: "Fondo Emergenza", delta: (latest.emergencyFund || 0) - (previous.emergencyFund || 0), color: "bg-emerald-500" },
+            { label: "Bitcoin", delta: btcLatest - btcPrev, color: "bg-amber-500" },
+            { label: "Beni Rifugio", delta: (latest.safeHavens || 0) - (previous.safeHavens || 0), color: "bg-slate-400" },
+            { label: "Fondo Pensione", delta: (latest.pensionFund || 0) - (previous.pensionFund || 0), color: "bg-teal-500" },
+            { label: "Debiti", delta: -((latest.debtsTotal || 0) - (previous.debtsTotal || 0)), color: "bg-rose-500" },
+        ].filter(item => Math.abs(item.delta) >= 0.5).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)) : [];
+
         const totalDebts = latest.debtsTotal || 0;
         const totalAssets = currentNetWorth + totalDebts;
         const debtToAssetRatio = totalAssets > 0 ? (totalDebts / totalAssets) * 100 : 0;
@@ -129,7 +142,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0;
 
         return {
-            currentNetWorth, netWorthChange, netWorthChangePercent,
+            currentNetWorth, netWorthChange, netWorthChangePercent, changeBreakdown, hasPrevious: !!previous,
             totalDebts, debtToAssetRatio,
             realEstateValue, liquidValue, btcValue, otherAssets,
             sparkData, allocation,
@@ -183,9 +196,56 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             {/* Hero */}
             <div className="text-center space-y-3">
                 <h2 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.28em]">Patrimonio Netto</h2>
-                <div className="text-4xl sm:text-5xl font-extrabold text-card-foreground tabular-nums leading-none">
-                    {formatEuro(metrics.currentNetWorth)}
-                </div>
+                <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className="text-4xl sm:text-5xl font-extrabold text-card-foreground tabular-nums leading-none cursor-help inline-block">
+                                {formatEuro(metrics.currentNetWorth)}
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs p-0 text-left">
+                            {metrics.hasPrevious && metrics.changeBreakdown.length > 0 ? (
+                                <div className="p-3 space-y-2">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        Cosa ha mosso il patrimonio
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        {metrics.changeBreakdown.map(item => {
+                                            const positive = item.delta >= 0;
+                                            const share = metrics.netWorthChange !== 0
+                                                ? (item.delta / metrics.netWorthChange) * 100
+                                                : 0;
+                                            return (
+                                                <div key={item.label} className="flex items-center justify-between gap-3 text-xs">
+                                                    <span className="flex items-center gap-1.5 text-card-foreground">
+                                                        <span className={`w-2 h-2 rounded-full ${item.color}`} />
+                                                        {item.label}
+                                                    </span>
+                                                    <span className={`tabular-nums font-bold ${positive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                        {positive ? '+' : ''}{formatEuro(item.delta)}
+                                                        {Math.abs(share) >= 1 && Math.abs(share) <= 150 && (
+                                                            <span className="text-muted-foreground font-normal ml-1">({share >= 0 ? '+' : ''}{share.toFixed(0)}%)</span>
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="pt-1.5 border-t border-border/60 flex items-center justify-between text-xs">
+                                        <span className="font-bold text-muted-foreground">Totale</span>
+                                        <span className={`tabular-nums font-extrabold ${isPositiveChange ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                            {isPositiveChange ? '+' : ''}{formatEuro(metrics.netWorthChange)}
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-3 text-xs text-muted-foreground">
+                                    Nessuna variazione dallo snapshot precedente.
+                                </div>
+                            )}
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
                 <div className={`text-sm font-bold ${isPositiveChange ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                     {isPositiveChange ? '+' : ''}{formatEuro(metrics.netWorthChange)}
                     <span className="text-muted-foreground font-normal">({metrics.netWorthChangePercent >= 0 ? '+' : ''}{metrics.netWorthChangePercent.toFixed(1)}% vs snapshot precedente)</span>
