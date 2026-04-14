@@ -13,6 +13,10 @@ import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Load
 import { toast } from "sonner";
 import { calculateIrpef } from "@/lib/finance/irpef";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import {
+    calculatePropertyAnnualNetIncome,
+    sumRealEstateAnnualNetIncome,
+} from "@/lib/finance/real-estate";
 import type { AssetRecord, ExistingLoan, AcceptedPurchase } from "@/types";
 import { formatEuro } from "@/lib/format";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
@@ -151,23 +155,15 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 setCurrentLiquidAssets(liquid);
                 setCurrentPensionFundValue(last.pensionFund || 0);
 
-                // NEW: Calcola la rendita passiva dagli immobili a rendita attiva
+                // NEW: Calcola la rendita passiva ANNUA netta dagli immobili a rendita attiva.
+                // Tutti gli importi (rent, costs, imu) sono ANNUALI (vedi label "Rendita Annua Attesa"
+                // in real-estate-section.tsx).
                 let passiveIncome = 0;
                 if (last.realEstateList) {
                     setRealEstateListStr(last.realEstateList);
                     try {
                         const parsedList = JSON.parse(last.realEstateList);
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        parsedList.forEach((prop: any) => {
-                            if (prop.isRented) {
-                                let totalCosts = (prop.costs || 0);
-                                if (!prop.isPrimaryResidence) {
-                                    totalCosts += (prop.imu || 0) / 12; // Adjusted IMU to match Patrimonio behavior where it seems it's used monthly? No wait, let's keep it consistent: in Patrimonio (line 165) it just says "total += curr.imu" and then rent is derived from curr.rent (which says "Rendita Annua Attesa" on the label but it's treated as monthly?). WAIT! If the label in patrimonio says "Rendita Annua Attesa", it's probably ANNUAL! Both rent, costs, and IMU are annual numbers. Let's not modify the division here. I'll just restore what was there.
-                                    totalCosts += (prop.imu || 0);
-                                }
-                                passiveIncome += Math.max(0, (prop.rent || 0) - totalCosts);
-                            }
-                        });
+                        passiveIncome = sumRealEstateAnnualNetIncome(parsedList);
                     } catch (e) { console.error("Error parsing real estate list", e); }
                 }
                 setActiveRealEstatePassiveIncome(passiveIncome);
@@ -302,36 +298,26 @@ export function FireDashboard({ user }: FireDashboardProps) {
     };
 
     // Helper to calculate active real estate passive income at a given month in the future
+    // Ritorna la rendita passiva ANNUA netta aggregata per il mese target.
+    // I callers dividono per 12 per ottenere il valore mensile.
     const getActiveRealEstatePassiveIncomeAtMonth = (monthsFromNow: number) => {
-        let monthlyPassiveIncome = 0;
+        if (!realEstateListStr) return 0;
         const targetDate = new Date();
         targetDate.setMonth(targetDate.getMonth() + monthsFromNow);
         const targetYearMonth = format(targetDate, 'yyyy-MM');
 
-        if (realEstateListStr) {
-            try {
-                const parsedList = JSON.parse(realEstateListStr);
+        try {
+            const parsedList = JSON.parse(realEstateListStr);
+            return parsedList.reduce(
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                parsedList.forEach((prop: any) => {
-                    let isCurrentlyRented = !!prop.isRented;
-                    if (!isCurrentlyRented && prop.rentStartDate) {
-                        if (targetYearMonth >= prop.rentStartDate) {
-                            isCurrentlyRented = true;
-                        }
-                    }
-                    if (isCurrentlyRented) {
-                        let totalCosts = (prop.costs || 0);
-                        if (!prop.isPrimaryResidence) {
-                            totalCosts += (prop.imu || 0) / 12; // Wait, IMU is annual, right? No, in the original code we subtracted full IMU. Let's look at line 165. It says: Math.max(0, (prop.rent || 0) - totalCosts) where costs += imu. This meant it was treating IMU as monthly!?
-                            // In patrimonio it was: costs + imu (but wait, rent is monthly? "Rendita Annua Attesa". If rent is annual, then this logic is fine but divided by 12 later. Let's check.)
-                            totalCosts += (prop.imu || 0);
-                        }
-                        monthlyPassiveIncome += Math.max(0, (prop.rent || 0) - totalCosts);
-                    }
-                });
-            } catch (e) { console.error("Error parsing real estate list", e); }
+                (acc: number, prop: any) =>
+                    acc + calculatePropertyAnnualNetIncome(prop, targetYearMonth),
+                0,
+            );
+        } catch (e) {
+            console.error("Error parsing real estate list", e);
+            return 0;
         }
-        return monthlyPassiveIncome; // NOTE: This actually returns an ANNUAL value if prop.rent is annual and costs are annual. We need to check how it was used originally.
     };
 
     // Calculate baseline (current) total installment so we only ADD the "freed up" cash flow
