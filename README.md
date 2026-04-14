@@ -101,6 +101,16 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 14 aprile 2026 (consulente acquisti v2)
+
+- **Consulente usa tutti i dati dell'utente** — fix della sorgente dati (l'API ritorna `history`, non `records`, quindi prima lo snapshot era vuoto) e caricamento completo delle preferenze: spese mensili reali da `expensesList` (gestisce `isAnnual`), risparmio reale (`reddito - spese - rate esistenti`) invece del 20% hardcoded, rata totale dei prestiti gia' in corso calcolata con `getInstallmentAmountForMonth`, DTI pre-acquisto e post-acquisto (con rate esistenti incluse), parametri FIRE personali (anno di nascita, eta' pensione, spese attese, SWR, rendimento, inflazione). Il costo opportunita' ora usa il rendimento reale dell'utente (nominale - inflazione) invece del 7% fisso
+- **Grafico Impatto FIRE** — nuova sezione che sovrappone due curve di proiezione del capitale (con e senza acquisto) fino al raggiungimento del Target FIRE, con badge prominente dello spostamento in mesi/anni ("+2a 4m" / "-3 mesi"), quattro mini-KPI (FIRE senza, FIRE con, Target, Risparmio usato) e ReferenceLine sull'eta' di raggiungimento FIRE per entrambi gli scenari
+- **Pannello "Come abbiamo calcolato"** — sette blocchi accordion espandibili (rata, TCO, DTI, liquidita', costo opportunita', target FIRE, impatto patrimoniale) che mostrano per ogni numero: formula matematica, sostituzione dei valori reali dell'utente, risultato. Cosi' il Consulente smette di essere una black-box e diventa didattico
+- **Confronto Scenari Cash / Finanziato / Non comprare** — BarChart comparativo a tre colonne con patrimonio finale, liquidita' dopo l'esborso, interessi pagati e anni al FIRE in ciascuna strategia. Badge "Migliore" sullo scenario vincente e gap in euro per quelli perdenti, cosi' la decisione diventa evidente
+- **Sensitivita' del finanziamento** — ComposedChart con toggle Anticipo%/Durata anni che mostra come cambiano TCO, interessi totali e ritardo FIRE al variare di quel parametro. ReferenceDot verde evidenzia la scelta attuale dell'utente, con riassunto testuale sotto al grafico
+- **Motore FIRE condiviso (`src/lib/finance/fire-projection.ts`)** — nuova funzione pura `projectFire(params)` deterministica con modificatori di scenario (esborso una tantum, rata ricorrente, costi ongoing) + helper `fireDelayMonths` e `formatDelay`. Riutilizzabile da Consulente e potenzialmente dal tab FIRE, evita la duplicazione dei calcoli
+- **Top bar Consulente ampliata** — da 4 a 6 KPI: Patrimonio Netto, Liquidita', Reddito, **Risparmio Reale**, **DTI Attuale** e Debiti/Eta', con sottotitolo descrittivo su ogni card
+
 ### 13 aprile 2026 (sync abbonamenti → patrimonio)
 
 - **Abbonamenti sincronizzati nel cashflow patrimonio** — gli abbonamenti inseriti nel Tracker Abbonamenti Ricorrenti vengono ora inclusi automaticamente tra le spese automatiche della sezione Patrimonio (Passivita & Cashflow). Il totale mensile degli abbonamenti si somma a costi immobiliari e rate prestiti, aggiornando in tempo reale il Risparmio Netto Mensile, il Cashflow Atteso e tutti gli indicatori derivati (Indice di Sopravvivenza, proiezione FIRE). Nessuna duplicazione manuale necessaria: basta aggiungere un abbonamento nel tracker e il profilo finanziario si aggiorna da solo al prossimo caricamento

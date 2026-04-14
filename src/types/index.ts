@@ -65,6 +65,19 @@ export interface FinancialSnapshot {
     emergencyFund: number;
     monthlyIncome: number;
     realEstateValue: number;
+    // Dati estesi per Consulente (calcolati dal resto dell'app)
+    monthlyExpenses: number;          // Somma expensesList (mensilizzata)
+    monthlySavings: number;           // netIncome - expenses - rate prestiti esistenti
+    existingLoansMonthlyPayment: number; // Totale rate prestiti esistenti
+    currentDTI: number;               // Rata esistente / reddito (0-1)
+    // FIRE context
+    birthYear: number | null;
+    currentAge: number | null;
+    retirementAge: number;
+    expectedMonthlyExpensesAtFire: number;
+    fireWithdrawalRate: number;       // %
+    fireExpectedReturn: number;       // %
+    expectedInflation: number;        // %
 }
 
 export type PurchaseCategory = "auto" | "immobile" | "arredamento" | "altro";

@@ -59,11 +59,13 @@ function generateWealthProjection(
     monthlyPayment: number,
     annualRecurring: number,
     years: number,
-    marketReturn: number = 0.07,
 ) {
     const data: { year: number; label: string; senzaAcquisto: number; conAcquisto: number }[] = [];
-    const monthlyReturn = Math.pow(1 + marketReturn, 1 / 12) - 1;
-    const monthlySaving = snapshot.monthlyIncome * 0.2;
+    // Usa il rendimento reale atteso dell'utente (nominale - inflazione)
+    const realReturn = Math.max(0, (snapshot.fireExpectedReturn - snapshot.expectedInflation) / 100);
+    const monthlyReturn = Math.pow(1 + realReturn, 1 / 12) - 1;
+    // Usa il risparmio reale calcolato (reddito - spese - rate), non il 20% hardcoded
+    const monthlySaving = snapshot.monthlySavings;
     const totalMonths = years * 12;
 
     let wealthWithout = snapshot.netWorth;
@@ -129,9 +131,10 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
         if (calculations.annualRecurringCosts > 0) {
             items.push({ name: `Costi Ricorrenti (${calculations.tcoYears}a)`, valore: calculations.annualRecurringCosts * calculations.tcoYears, color: "#f59e0b" });
         }
-        items.push({ name: "Costo Opportunita", valore: sim.totalPrice * Math.pow(1.07, calculations.tcoYears) - sim.totalPrice, color: "#8b5cf6" });
+        const realRet = Math.max(0, ((snapshot.fireExpectedReturn - snapshot.expectedInflation) / 100));
+        items.push({ name: "Costo Opportunita", valore: sim.totalPrice * Math.pow(1 + realRet, calculations.tcoYears) - sim.totalPrice, color: "#8b5cf6" });
         return items;
-    }, [sim, calculations]);
+    }, [sim, calculations, snapshot]);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const euroFormatter = (value: any) => [formatEuro(Number(value)), undefined];

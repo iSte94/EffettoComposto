@@ -9,10 +9,15 @@ import {
 } from "lucide-react";
 
 import { formatEuro } from "@/lib/format";
-import type { FinancialSnapshot, PurchaseSimulation, Advice, AcceptedPurchase, ExistingLoan } from "@/types";
+import type { FinancialSnapshot, PurchaseSimulation, Advice, AcceptedPurchase, ExistingLoan, MonthlyExpense } from "@/types";
 import { PurchaseForm } from "@/components/advisor/purchase-form";
 import { AdvicePanel } from "@/components/advisor/advice-panel";
 import { PurchaseImpactChart } from "@/components/advisor/purchase-impact-chart";
+import { FireImpactChart } from "@/components/advisor/fire-impact-chart";
+import { CalculationBreakdown } from "@/components/advisor/calculation-breakdown";
+import { ScenarioComparison } from "@/components/advisor/scenario-comparison";
+import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
+import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { toast } from "sonner";
 
 interface AdvisorDashboardProps {
@@ -43,6 +48,10 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
   const [snapshot, setSnapshot] = useState<FinancialSnapshot>({
     totalAssets: 0, totalDebts: 0, netWorth: 0, liquidAssets: 0,
     emergencyFund: 0, monthlyIncome: 0, realEstateValue: 0,
+    monthlyExpenses: 0, monthlySavings: 0, existingLoansMonthlyPayment: 0, currentDTI: 0,
+    birthYear: null, currentAge: null, retirementAge: 60,
+    expectedMonthlyExpensesAtFire: 2500,
+    fireWithdrawalRate: 3.25, fireExpectedReturn: 6, expectedInflation: 2,
   });
   const [sim, setSim] = useState<PurchaseSimulation>(defaultSimulation);
   const [showResults, setShowResults] = useState(false);
@@ -73,26 +82,64 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         let totalDebts = 0;
         let totalAssets = 0;
 
-        if (patrimonioData.records?.length > 0) {
-          const latest = patrimonioData.records[patrimonioData.records.length - 1];
+        const history = patrimonioData.history || patrimonioData.records || [];
+        if (history.length > 0) {
+          const latest = history[history.length - 1];
           liquidAssets = (latest.liquidStockValue || 0) + (latest.stocksSnapshotValue || 0) + (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
           emergencyFund = latest.emergencyFund || 0;
           realEstateValue = latest.realEstateValue || 0;
           totalDebts = latest.debtsTotal || 0;
           const safeHavens = latest.safeHavens || 0;
           const pensionFund = latest.pensionFund || 0;
-          totalAssets = liquidAssets + safeHavens + emergencyFund + pensionFund;
+          totalAssets = liquidAssets + safeHavens + emergencyFund + pensionFund + realEstateValue;
         }
 
-        const monthlyIncome = prefData.preferences?.netIncome || 0;
+        const p = prefData.preferences || {};
+        const monthlyIncome = Number(p.netIncome) || 0;
 
-        // Carica prestiti e acquisti accettati
-        if (prefData.preferences?.existingLoansList) {
-          try { setExistingLoans(JSON.parse(prefData.preferences.existingLoansList)); } catch { }
+        // Carica prestiti esistenti
+        let loans: ExistingLoan[] = [];
+        if (p.existingLoansList) {
+          try { loans = JSON.parse(p.existingLoansList); } catch { /* empty */ }
         }
-        if (prefData.preferences?.acceptedPurchases) {
-          try { setAcceptedPurchases(JSON.parse(prefData.preferences.acceptedPurchases)); } catch { }
+        setExistingLoans(loans);
+        if (p.acceptedPurchases) {
+          try { setAcceptedPurchases(JSON.parse(p.acceptedPurchases)); } catch { /* empty */ }
         }
+
+        // Spese mensili reali da expensesList (isAnnual => /12)
+        let monthlyExpenses = 0;
+        if (p.expensesList) {
+          try {
+            const list: MonthlyExpense[] = JSON.parse(p.expensesList);
+            monthlyExpenses = list.reduce((acc, e) => acc + ((Number(e.amount) || 0) / (e.isAnnual ? 12 : 1)), 0);
+          } catch { /* empty */ }
+        }
+
+        // Rata mensile totale prestiti esistenti (oggi, mese 0)
+        const now = new Date();
+        let existingLoansMonthlyPayment = 0;
+        loans.forEach(loan => {
+          if (!loan.startDate || !loan.endDate) return;
+          const start = new Date(loan.startDate + "-01");
+          const end = new Date(loan.endDate + "-01");
+          if (now < start || now >= end) return;
+          const totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+          const currentMonthsPassed = (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+          existingLoansMonthlyPayment += getInstallmentAmountForMonth(loan, currentMonthsPassed, totalMonths, currentMonthsPassed);
+        });
+
+        const monthlySavings = Math.max(0, monthlyIncome - monthlyExpenses - existingLoansMonthlyPayment);
+        const currentDTI = monthlyIncome > 0 ? existingLoansMonthlyPayment / monthlyIncome : 0;
+
+        // FIRE context
+        const birthYear: number | null = p.birthYear ?? null;
+        const currentAge = birthYear ? new Date().getFullYear() - birthYear : null;
+        const retirementAge = Number(p.retirementAge) || 60;
+        const expectedMonthlyExpensesAtFire = Number(p.expectedMonthlyExpenses) || Math.max(monthlyExpenses, 1500);
+        const fireWithdrawalRate = Number(p.fireWithdrawalRate) || 3.25;
+        const fireExpectedReturn = Number(p.fireExpectedReturn) || 6;
+        const expectedInflation = p.expectedInflation !== undefined ? Number(p.expectedInflation) : 2;
 
         setSnapshot({
           totalAssets,
@@ -102,6 +149,17 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
           emergencyFund,
           monthlyIncome,
           realEstateValue,
+          monthlyExpenses,
+          monthlySavings,
+          existingLoansMonthlyPayment,
+          currentDTI,
+          birthYear,
+          currentAge,
+          retirementAge,
+          expectedMonthlyExpensesAtFire,
+          fireWithdrawalRate,
+          fireExpectedReturn,
+          expectedInflation,
         });
       } catch (e) {
         console.error("Errore caricamento dati:", e);
@@ -257,9 +315,10 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       residualValue = sim.totalPrice * Math.pow(1.02, tcoYears);
     }
 
-    // Costo opportunita: se investissi la stessa somma al 7%
+    // Costo opportunita: se investissi la stessa somma al rendimento reale atteso dell'utente
+    const realReturnForOpportunity = Math.max(0, (snapshot.fireExpectedReturn - snapshot.expectedInflation) / 100);
     const cashOutlay = sim.isFinanced ? sim.downPayment : sim.totalPrice;
-    const opportunityCost = cashOutlay * Math.pow(1.07, tcoYears) - cashOutlay;
+    const opportunityCost = cashOutlay * Math.pow(1 + realReturnForOpportunity, tcoYears) - cashOutlay;
 
     // Costo netto reale (costo totale - valore residuo)
     const netRealCost = totalTCO - residualValue;
@@ -275,9 +334,11 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     const emergencyMonthsUsed = snapshot.monthlyIncome > 0
       ? cashOutlay / snapshot.monthlyIncome : 0;
 
-    // Rapporto rata/reddito post-acquisto
+    // DTI pre-acquisto (rate prestiti gia' in corso / reddito)
+    const dtiPre = snapshot.currentDTI * 100;
+    // Rapporto rata/reddito post-acquisto (include rate esistenti + nuova rata)
     const dtiPostPurchase = snapshot.monthlyIncome > 0
-      ? (monthlyPayment / snapshot.monthlyIncome) * 100 : 0;
+      ? ((snapshot.existingLoansMonthlyPayment + monthlyPayment) / snapshot.monthlyIncome) * 100 : 0;
 
     // Liquidita residua dopo l'esborso
     const liquidityAfter = snapshot.liquidAssets + snapshot.emergencyFund - cashOutlay;
@@ -293,9 +354,10 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     return {
       loanAmount, monthlyPayment, totalInterest, totalCostOfPurchase,
       annualRecurringCosts, totalTCO, residualValue, opportunityCost,
-      netRealCost, wealthImpact, emergencyMonthsUsed, dtiPostPurchase,
+      netRealCost, wealthImpact, emergencyMonthsUsed, dtiPostPurchase, dtiPre,
       liquidityAfter, emergencyMonthsLeft, tcoYears, cashOutlay,
       totalFinancialCommitment, annualRentIncome, netRentYield,
+      realReturnForOpportunity,
     };
   }, [sim, snapshot]);
 
@@ -360,13 +422,16 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       });
     }
 
-    // 3. DTI per finanziamenti
+    // 3. DTI per finanziamenti (include rate gia' in corso)
     if (sim.isFinanced) {
+      const dtiPreStr = snapshot.existingLoansMonthlyPayment > 0
+        ? ` (parti gia' da ${formatEuro(snapshot.existingLoansMonthlyPayment)}/mese di rate in corso = ${c.dtiPre.toFixed(1)}%)`
+        : "";
       if (c.dtiPostPurchase > 33) {
         list.push({
           type: "danger",
           title: "Rapporto Rata/Reddito Critico",
-          message: `La rata di ${formatEuro(c.monthlyPayment)}/mese porterebbe il tuo DTI al ${c.dtiPostPurchase.toFixed(1)}%, oltre la soglia del 33%. Le banche potrebbero rifiutare il finanziamento e, anche se approvato, rischieresti stress finanziario cronico.`,
+          message: `La rata di ${formatEuro(c.monthlyPayment)}/mese porterebbe il tuo DTI totale al ${c.dtiPostPurchase.toFixed(1)}%${dtiPreStr}, oltre la soglia del 33%. Le banche potrebbero rifiutare il finanziamento e, anche se approvato, rischieresti stress finanziario cronico.`,
           icon: <CreditCard className="w-5 h-5 text-red-500" />,
         });
       } else if (c.dtiPostPurchase > 20) {
@@ -470,12 +535,13 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       }
     }
 
-    // 5. Costo opportunita (sempre)
+    // 5. Costo opportunita (sempre) — usa il rendimento reale atteso dell'utente
     if (c.opportunityCost > 500) {
+      const realRetPct = (c.realReturnForOpportunity * 100).toFixed(1);
       list.push({
         type: "info",
         title: "Costo Opportunita dell'Investimento Alternativo",
-        message: `Se investissi i ${formatEuro(c.cashOutlay)} al 7% annuo per ${c.tcoYears} anni, genereresti circa ${formatEuro(c.opportunityCost)} di rendimento. Questo non significa "non comprare", ma ti aiuta a capire il vero costo della scelta in termini di crescita patrimoniale mancata.`,
+        message: `Se investissi i ${formatEuro(c.cashOutlay)} al ${realRetPct}% reale (${snapshot.fireExpectedReturn}% nominale - ${snapshot.expectedInflation}% inflazione) per ${c.tcoYears} anni, genereresti circa ${formatEuro(c.opportunityCost)} di rendimento in euro odierni. Non significa "non comprare", ma ti aiuta a capire il vero costo della scelta in termini di crescita patrimoniale mancata.`,
         icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
       });
     }
@@ -555,18 +621,21 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
 
       {/* Snapshot Patrimonio Sintetico */}
       {user && snapshot.netWorth > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
           {[
-            { label: "Patrimonio Netto", value: formatEuro(snapshot.netWorth), icon: <Wallet className="w-4 h-4" />, color: "text-slate-900 dark:text-slate-100" },
-            { label: "Liquidita Disponibile", value: formatEuro(snapshot.liquidAssets + snapshot.emergencyFund), icon: <PiggyBank className="w-4 h-4" />, color: "text-blue-600 dark:text-blue-400" },
-            { label: "Reddito Mensile", value: formatEuro(snapshot.monthlyIncome), icon: <TrendingUp className="w-4 h-4" />, color: "text-emerald-600 dark:text-emerald-400" },
-            { label: "Debiti Attuali", value: formatEuro(snapshot.totalDebts), icon: <CreditCard className="w-4 h-4" />, color: "text-red-500" },
+            { label: "Patrimonio Netto", value: formatEuro(snapshot.netWorth), sub: `assets ${formatEuro(snapshot.totalAssets)}`, icon: <Wallet className="w-4 h-4" />, color: "text-slate-900 dark:text-slate-100" },
+            { label: "Liquidita", value: formatEuro(snapshot.liquidAssets + snapshot.emergencyFund), sub: `${(snapshot.monthlyIncome > 0 ? (snapshot.liquidAssets + snapshot.emergencyFund) / snapshot.monthlyIncome : 0).toFixed(1)} mesi reddito`, icon: <PiggyBank className="w-4 h-4" />, color: "text-blue-600 dark:text-blue-400" },
+            { label: "Reddito Netto", value: formatEuro(snapshot.monthlyIncome), sub: `/mese`, icon: <TrendingUp className="w-4 h-4" />, color: "text-emerald-600 dark:text-emerald-400" },
+            { label: "Risparmio Reale", value: formatEuro(snapshot.monthlySavings), sub: `dopo spese e rate`, icon: <BadgePercent className="w-4 h-4" />, color: "text-indigo-600 dark:text-indigo-400" },
+            { label: "DTI Attuale", value: `${(snapshot.currentDTI * 100).toFixed(1)}%`, sub: `rate ${formatEuro(snapshot.existingLoansMonthlyPayment)}/m`, icon: <CreditCard className="w-4 h-4" />, color: snapshot.currentDTI > 0.33 ? "text-red-500" : snapshot.currentDTI > 0.2 ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400" },
+            { label: "Debiti Totali", value: formatEuro(snapshot.totalDebts), sub: snapshot.currentAge !== null ? `eta' ${snapshot.currentAge}a` : "eta' n/d", icon: <Scale className="w-4 h-4" />, color: "text-red-500" },
           ].map((item, i) => (
-            <div key={i} className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+            <div key={i} className="rounded-2xl border border-slate-200/80 bg-white/75 p-3 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
                 {item.icon} {item.label}
               </div>
-              <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
+              <div className={`text-lg font-bold ${item.color}`}>{item.value}</div>
+              <div className="mt-0.5 text-[10px] text-slate-400 dark:text-slate-500">{item.sub}</div>
             </div>
           ))}
         </div>
@@ -590,15 +659,21 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         </div>
       </div>
 
-      {/* Impatto Futuro — Grafici */}
+      {/* Grafici e analisi avanzate */}
       {showResults && user && (
-        <PurchaseImpactChart
-          sim={sim}
-          calculations={calculations}
-          snapshot={snapshot}
-          acceptedPurchases={acceptedPurchases}
-          onRemovePurchase={handleRemovePurchase}
-        />
+        <div className="space-y-6">
+          <FireImpactChart sim={sim} calculations={calculations} snapshot={snapshot} />
+          <ScenarioComparison sim={sim} snapshot={snapshot} calculations={calculations} />
+          <SensitivityChart sim={sim} snapshot={snapshot} calculations={calculations} />
+          <CalculationBreakdown sim={sim} snapshot={snapshot} calculations={calculations} />
+          <PurchaseImpactChart
+            sim={sim}
+            calculations={calculations}
+            snapshot={snapshot}
+            acceptedPurchases={acceptedPurchases}
+            onRemovePurchase={handleRemovePurchase}
+          />
+        </div>
       )}
     </div>
   );
