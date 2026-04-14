@@ -101,6 +101,16 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (FIRE — fix IMU + nuovi KPI storici nel Riepilogo)
+
+- **Fix double-count IMU nella rendita passiva FIRE** — nel tab FIRE, il calcolo della rendita passiva immobiliare sottraeva l'IMU due volte: una volta dentro `calculateNetRentalYield` (che restituisce gia' il rendimento netto di tutte le spese) e una seconda volta nel ciclo di somma in `fire-dashboard.tsx`. Conseguenza: gli utenti con immobili locati vedevano una rendita passiva sottostimata, e quindi un target FIRE piu' distante del reale. Bug corretto estraendo la logica in un nuovo modulo puro `src/lib/finance/real-estate.ts` con le funzioni `calculateNetRentalIncome` e `sumNetRentalIncome`, ora coperte da **118 righe di unit test** (`real-estate.test.ts`) che verificano casi con/senza affitto, IMU gia' scorporata e scenari con immobili multipli
+- **Refactor fire-dashboard.tsx** — il componente orchestratore scende da ~920 a ~885 righe delegando il calcolo della rendita passiva al nuovo modulo; meno logica inline nel componente UI, piu' testabilita'
+- **Nuovi KPI storici nel Riepilogo: CAGR e Max Drawdown** — due card aggiuntive in cima al tab Riepilogo che analizzano la serie storica degli snapshot patrimoniali:
+  - **CAGR annualizzato** (Compound Annual Growth Rate): tasso di crescita medio composto del patrimonio netto, calcolato sulla distanza temporale effettiva tra primo e ultimo snapshot. Si attiva quando c'e' almeno un anno di storia e mostra "N/A" con tooltip esplicativo negli altri casi
+  - **Max Drawdown**: massima perdita percentuale da un picco storico a un minimo successivo, indicatore chiave di volatilita' e resilienza del portafoglio nei momenti peggiori (utile per capire se si e' psicologicamente pronti a reggere un bear market)
+- **Modulo `src/lib/finance/history-stats.ts`** — nuove funzioni pure `calculateCAGR(snapshots)` e `calculateMaxDrawdown(snapshots)` coperte da 105 righe di unit test (`history-stats.test.ts`). Isolate dal componente UI per poter essere riutilizzate altrove (es. grafici storici, report export)
+- **Suite test** — da 88 a **111 test passati** (+23 nuovi test sui due moduli finance)
+
 ### 14 aprile 2026 (riepilogo — tooltip breakdown patrimonio netto)
 
 - **Tooltip "cosa ha mosso il patrimonio"** — passando col mouse sopra la cifra del Patrimonio Netto nel tab Riepilogo appare un pannello a scomparsa che spiega in dettaglio da dove arriva la variazione rispetto allo snapshot precedente. Il breakdown mostra il delta per ciascuna categoria (Liquidita' & ETF, Fondo Emergenza, Bitcoin, Beni Rifugio, Fondo Pensione, Debiti), con la percentuale di contributo al movimento totale, ordinato per impatto assoluto e con riga "Totale" finale che combacia con il +/-€ mostrato sotto. I debiti sono invertiti (una riduzione debiti conta come contributo positivo), cosi' l'utente capisce subito se il mese e' andato bene grazie a mercato, risparmio o deleveraging
