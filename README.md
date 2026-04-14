@@ -101,6 +101,18 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 14 aprile 2026 (consulente acquisti v2.1 — fix su dati reali)
+
+- **Impatto patrimoniale su investibile** — il peso dell'acquisto ora e' misurato sul "patrimonio investibile" (asset totali − immobili − debiti) invece che sul patrimonio netto totale. Per chi ha casa di proprieta', un'auto da 30k non "vale" il 2% dei 1.4M totali: vale il 6% dei 500k realmente mobilizzabili, ed e' questa la cifra che conta
+- **Coast FIRE supportato** — il grafico Impatto FIRE non mostra piu' "non calcolabile" quando il risparmio mensile e' 0: se hai capitale gia' accumulato, il motore proietta comunque la crescita dell'investito e l'erosione causata dall'acquisto, con banner "Modalita' Coast FIRE" esplicativo
+- **Verdetto numerico** — il verdetto finale ora cita i numeri concreti: "ti costa X totali in N anni, sposta il FIRE di circa M mesi, include Y di mancato rendimento". Niente piu' frasi generiche, solo impatto misurabile
+- **Mesi di copertura basati sulle spese** — l'emergency fund dopo l'acquisto e' calcolato su `liquidita' residua / (spese + rate)`, non piu' sul reddito. Cap semantico "oltre 24 mesi (abbondante)" invece di stringhe tipo "255.7 mesi"
+- **Pesatura su prestiti multipli** — se hai gia' 2+ finanziamenti in corso, scatta un avviso cumulativo dedicato e il verdetto viene spinto verso "cautela" perche' gli impegni si sommano e la resilienza agli imprevisti si riduce su piu' fronti
+- **Acquisti accettati in cima** — la lista dei finanziamenti gia' accettati nel Consulente e' stata spostata in cima alla pagina (prima del form di simulazione), con totali impegno TCO e rate mensili aggregate. Cosi' vedi l'impegno cumulato prima di aggiungerne un altro
+- **Ordine didattico delle sezioni** — "Come abbiamo calcolato" ora precede i grafici di impatto: prima capisci da dove vengono i numeri, poi vedi le conseguenze (Impatto FIRE → Confronto Scenari → Sensitivita' → ammortamento)
+- **Rimossa proiezione patrimoniale legacy** — il vecchio chart "Con vs Senza acquisto" di PurchaseImpactChart e' stato eliminato: mostrava "differenza -€0" quando il risparmio era 0 ed era ridondante con il grafico Impatto FIRE piu' robusto
+- **Default svalutazione auto 20%** — bumpato da 15% per riflettere meglio la svalutazione reale di auto nuove (specie EV: 20-25%/anno)
+
 ### 14 aprile 2026 (consulente acquisti v2)
 
 - **Consulente usa tutti i dati dell'utente** — fix della sorgente dati (l'API ritorna `history`, non `records`, quindi prima lo snapshot era vuoto) e caricamento completo delle preferenze: spese mensili reali da `expensesList` (gestisce `isAnnual`), risparmio reale (`reddito - spese - rate esistenti`) invece del 20% hardcoded, rata totale dei prestiti gia' in corso calcolata con `getInstallmentAmountForMonth`, DTI pre-acquisto e post-acquisto (con rate esistenti incluse), parametri FIRE personali (anno di nascita, eta' pensione, spese attese, SWR, rendimento, inflazione). Il costo opportunita' ora usa il rendimento reale dell'utente (nominale - inflazione) invece del 7% fisso

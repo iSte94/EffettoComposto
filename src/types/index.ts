@@ -65,11 +65,15 @@ export interface FinancialSnapshot {
     emergencyFund: number;
     monthlyIncome: number;
     realEstateValue: number;
+    // Patrimonio al netto degli immobili (quello realmente "investibile"/mobilizzabile)
+    investableAssets: number;         // totalAssets - realEstateValue
+    investableNetWorth: number;       // investableAssets - totalDebts
     // Dati estesi per Consulente (calcolati dal resto dell'app)
     monthlyExpenses: number;          // Somma expensesList (mensilizzata)
     monthlySavings: number;           // netIncome - expenses - rate prestiti esistenti
     existingLoansMonthlyPayment: number; // Totale rate prestiti esistenti
     currentDTI: number;               // Rata esistente / reddito (0-1)
+    existingLoansCount: number;       // Numero prestiti in corso (per pesatura verdetto)
     // FIRE context
     birthYear: number | null;
     currentAge: number | null;

@@ -26,8 +26,11 @@ export const FireImpactChart = memo(function FireImpactChart({
     sim, calculations, snapshot,
 }: FireImpactChartProps) {
 
-    const { baseline, withPurchase, delay, data, hasFireData } = useMemo(() => {
-        const hasFireData = snapshot.currentAge !== null && snapshot.monthlySavings > 0;
+    const { baseline, withPurchase, delay, data, hasFireData, isCoastMode } = useMemo(() => {
+        // Coast FIRE: basta avere eta' + (capitale > 0 OR risparmio > 0)
+        const startingCapital = snapshot.liquidAssets + snapshot.emergencyFund;
+        const hasFireData = snapshot.currentAge !== null && (snapshot.monthlySavings > 0 || startingCapital > 0);
+        const isCoastMode = snapshot.monthlySavings <= 0 && startingCapital > 0;
         if (!hasFireData) {
             return {
                 baseline: null,
@@ -35,6 +38,7 @@ export const FireImpactChart = memo(function FireImpactChart({
                 delay: 0,
                 data: [] as { year: number; age: number; senza: number; con: number; target: number }[],
                 hasFireData: false,
+                isCoastMode: false,
             };
         }
 
@@ -79,7 +83,7 @@ export const FireImpactChart = memo(function FireImpactChart({
             };
         });
 
-        return { baseline, withPurchase, delay, data, hasFireData: true };
+        return { baseline, withPurchase, delay, data, hasFireData: true, isCoastMode };
     }, [sim, calculations, snapshot]);
 
     if (!hasFireData || !baseline || !withPurchase) {
@@ -91,7 +95,7 @@ export const FireImpactChart = memo(function FireImpactChart({
                         <div>
                             <h3 className="text-sm font-bold text-amber-800 dark:text-amber-300">Impatto FIRE non calcolabile</h3>
                             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
-                                Per vedere l&apos;impatto sul tuo FIRE completa i parametri nel tab <strong>FIRE</strong> (anno di nascita, spese attese) e assicurati di avere un <strong>risparmio mensile positivo</strong> (reddito &gt; spese).
+                                Per vedere l&apos;impatto sul tuo FIRE completa i parametri nel tab <strong>FIRE</strong> (anno di nascita, spese attese) e assicurati di avere <strong>almeno capitale investibile o risparmio mensile &gt; 0</strong>.
                             </p>
                         </div>
                     </div>
@@ -221,6 +225,12 @@ export const FireImpactChart = memo(function FireImpactChart({
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
+
+                {isCoastMode && (
+                    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-[11px] text-blue-700 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+                        <strong>Modalita&apos; Coast FIRE:</strong> il tuo risparmio mensile attuale e&apos; 0, ma il capitale gia&apos; accumulato cresce comunque al rendimento reale. L&apos;acquisto brucia parte di questo capitale e ne ritarda la crescita.
+                    </div>
+                )}
 
                 <div className="mt-3 flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
                     <TrendingDown className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-500" />

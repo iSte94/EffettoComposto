@@ -17,7 +17,10 @@ import { FireImpactChart } from "@/components/advisor/fire-impact-chart";
 import { CalculationBreakdown } from "@/components/advisor/calculation-breakdown";
 import { ScenarioComparison } from "@/components/advisor/scenario-comparison";
 import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
+import { Button } from "@/components/ui/button";
+import { Trash2, Calendar } from "lucide-react";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { projectFire } from "@/lib/finance/fire-projection";
 import { toast } from "sonner";
 
 interface AdvisorDashboardProps {
@@ -35,12 +38,18 @@ const defaultSimulation: PurchaseSimulation = {
   annualInsurance: 800,
   annualMaintenance: 500,
   monthlyFuel: 150,
-  depreciationRate: 15,
+  depreciationRate: 20,
   monthlyRent: 0,
   condominiumFees: 100,
   imuTax: 200,
   usefulLifeYears: 10,
 };
+
+function formatMonthsCoverage(months: number): string {
+  if (!Number.isFinite(months) || months < 0) return "0.0 mesi";
+  if (months > 24) return "oltre 24 mesi (abbondante)";
+  return `${months.toFixed(1)} mesi`;
+}
 
 export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
   const [isMounted, setIsMounted] = useState(false);
@@ -48,7 +57,9 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
   const [snapshot, setSnapshot] = useState<FinancialSnapshot>({
     totalAssets: 0, totalDebts: 0, netWorth: 0, liquidAssets: 0,
     emergencyFund: 0, monthlyIncome: 0, realEstateValue: 0,
+    investableAssets: 0, investableNetWorth: 0,
     monthlyExpenses: 0, monthlySavings: 0, existingLoansMonthlyPayment: 0, currentDTI: 0,
+    existingLoansCount: 0,
     birthYear: null, currentAge: null, retirementAge: 60,
     expectedMonthlyExpensesAtFire: 2500,
     fireWithdrawalRate: 3.25, fireExpectedReturn: 6, expectedInflation: 2,
@@ -141,6 +152,9 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         const fireExpectedReturn = Number(p.fireExpectedReturn) || 6;
         const expectedInflation = p.expectedInflation !== undefined ? Number(p.expectedInflation) : 2;
 
+        const investableAssets = Math.max(0, totalAssets - realEstateValue);
+        const investableNetWorth = investableAssets - totalDebts;
+
         setSnapshot({
           totalAssets,
           totalDebts,
@@ -149,10 +163,13 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
           emergencyFund,
           monthlyIncome,
           realEstateValue,
+          investableAssets,
+          investableNetWorth,
           monthlyExpenses,
           monthlySavings,
           existingLoansMonthlyPayment,
           currentDTI,
+          existingLoansCount: loans.length,
           birthYear,
           currentAge,
           retirementAge,
@@ -324,15 +341,14 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     const netRealCost = totalTCO - residualValue;
 
     // Impatto sul patrimonio: considera il costo totale dell'impegno (anticipo + debito residuo + costi ricorrenti)
-    // Non solo l'anticipo, ma l'intera esposizione finanziaria
+    // IMPORTANTE: usiamo il patrimonio INVESTIBILE (escludendo immobili illiquidi)
     const totalFinancialCommitment = sim.isFinanced
       ? totalCostOfPurchase + annualRecurringCosts * tcoYears  // prezzo + interessi + costi ricorrenti
       : sim.totalPrice + annualRecurringCosts * tcoYears;
-    const wealthImpact = (totalFinancialCommitment / Math.max(snapshot.netWorth, 1)) * 100;
-
-    // Mesi di fondo emergenza consumati
-    const emergencyMonthsUsed = snapshot.monthlyIncome > 0
-      ? cashOutlay / snapshot.monthlyIncome : 0;
+    const investableDenominator = Math.max(snapshot.investableNetWorth, 1);
+    const wealthImpact = (totalFinancialCommitment / investableDenominator) * 100;
+    // Anche peso sul patrimonio totale (per riferimento)
+    const wealthImpactTotal = (totalFinancialCommitment / Math.max(snapshot.netWorth, 1)) * 100;
 
     // DTI pre-acquisto (rate prestiti gia' in corso / reddito)
     const dtiPre = snapshot.currentDTI * 100;
@@ -343,21 +359,51 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     // Liquidita residua dopo l'esborso
     const liquidityAfter = snapshot.liquidAssets + snapshot.emergencyFund - cashOutlay;
 
-    // Mesi di emergenza residui
-    const emergencyMonthsLeft = snapshot.monthlyIncome > 0
-      ? Math.max(0, liquidityAfter) / snapshot.monthlyIncome : 0;
+    // Mesi di emergenza residui — basati sulle SPESE mensili (reddito non e' uno scudo)
+    const baselineMonthly = Math.max(snapshot.monthlyExpenses + snapshot.existingLoansMonthlyPayment, 1);
+    const emergencyMonthsLeft = Math.max(0, liquidityAfter) / baselineMonthly;
+    const emergencyMonthsUsed = cashOutlay / baselineMonthly;
 
     // Per immobili: rendimento da affitto
     const annualRentIncome = sim.monthlyRent * 12;
     const netRentYield = sim.totalPrice > 0 ? ((annualRentIncome - annualRecurringCosts) / sim.totalPrice) * 100 : 0;
 
+    // Ritardo FIRE (mesi) — calcolato qui per alimentare il verdetto numerico
+    let fireDelayMonthsValue = 0;
+    const hasFireCtx = snapshot.currentAge !== null &&
+      (snapshot.monthlySavings > 0 || (snapshot.liquidAssets + snapshot.emergencyFund) > 0);
+    if (hasFireCtx) {
+      const baseParams = {
+        startingCapital: snapshot.liquidAssets + snapshot.emergencyFund,
+        monthlySavings: snapshot.monthlySavings,
+        monthlyExpensesAtFire: snapshot.expectedMonthlyExpensesAtFire,
+        expectedReturnPct: snapshot.fireExpectedReturn,
+        inflationPct: snapshot.expectedInflation,
+        withdrawalRatePct: snapshot.fireWithdrawalRate,
+        currentAge: snapshot.currentAge ?? 30,
+        retirementAge: snapshot.retirementAge,
+      };
+      const base = projectFire(baseParams);
+      const withBuy = projectFire({
+        ...baseParams,
+        oneTimeOutflow: cashOutlay,
+        recurringMonthlyCost: sim.isFinanced ? monthlyPayment : 0,
+        recurringMonths: sim.isFinanced ? sim.financingYears * 12 : 0,
+        ongoingMonthlyCost: annualRecurringCosts / 12,
+        ongoingMonths: tcoYears * 12,
+      });
+      if (base.monthsToFire >= 0 && withBuy.monthsToFire >= 0) {
+        fireDelayMonthsValue = withBuy.monthsToFire - base.monthsToFire;
+      }
+    }
+
     return {
       loanAmount, monthlyPayment, totalInterest, totalCostOfPurchase,
       annualRecurringCosts, totalTCO, residualValue, opportunityCost,
-      netRealCost, wealthImpact, emergencyMonthsUsed, dtiPostPurchase, dtiPre,
+      netRealCost, wealthImpact, wealthImpactTotal, emergencyMonthsUsed, dtiPostPurchase, dtiPre,
       liquidityAfter, emergencyMonthsLeft, tcoYears, cashOutlay,
       totalFinancialCommitment, annualRentIncome, netRentYield,
-      realReturnForOpportunity,
+      realReturnForOpportunity, fireDelayMonthsValue,
     };
   }, [sim, snapshot]);
 
@@ -393,32 +439,46 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       list.push({
         type: "success",
         title: "Fondo Emergenza Solido",
-        message: `Dopo l'acquisto manterresti ${c.emergencyMonthsLeft.toFixed(1)} mesi di copertura. Ottima posizione: puoi affrontare l'acquisto senza compromettere la tua rete di sicurezza finanziaria.`,
+        message: `Dopo l'acquisto manterresti ${formatMonthsCoverage(c.emergencyMonthsLeft)} di copertura. Ottima posizione: puoi affrontare l'acquisto senza compromettere la tua rete di sicurezza finanziaria.`,
         icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />,
       });
     }
 
-    // 2. Impatto patrimoniale (basato sull'impegno totale: prezzo + interessi + costi ricorrenti)
+    // 2. Impatto patrimoniale — misurato sul patrimonio INVESTIBILE (esclusi immobili)
+    const hasRealEstate = s.realEstateValue > 0;
+    const realEstateHint = hasRealEstate
+      ? ` (patrimonio totale ${formatEuro(s.netWorth)}, ma escludiamo ${formatEuro(s.realEstateValue)} di immobili illiquidi)`
+      : "";
     if (c.wealthImpact > 50) {
       list.push({
         type: "danger",
-        title: "Forte Impatto Patrimoniale",
-        message: `L'impegno finanziario complessivo di ${formatEuro(c.totalFinancialCommitment)} (prezzo + interessi + costi ricorrenti su ${c.tcoYears} anni) rappresenta il ${c.wealthImpact.toFixed(0)}% del tuo patrimonio netto di ${formatEuro(s.netWorth)}. E un'esposizione eccessiva: nessun singolo impegno dovrebbe superare il 30-40% del patrimonio.`,
+        title: "Forte Impatto sul Patrimonio Investibile",
+        message: `L'impegno complessivo di ${formatEuro(c.totalFinancialCommitment)} (prezzo + interessi + costi ricorrenti su ${c.tcoYears} anni) pesa per il ${c.wealthImpact.toFixed(0)}% sul tuo patrimonio investibile di ${formatEuro(s.investableNetWorth)}${realEstateHint}. E un'esposizione eccessiva: immobili gia' posseduti non sono un cuscinetto spendibile.`,
         icon: <Scale className="w-5 h-5 text-red-500" />,
       });
     } else if (c.wealthImpact > 25) {
       list.push({
         type: "warning",
-        title: "Impatto Patrimoniale Significativo",
-        message: `L'impegno totale di ${formatEuro(c.totalFinancialCommitment)} pesa per il ${c.wealthImpact.toFixed(0)}% sul tuo patrimonio netto di ${formatEuro(s.netWorth)}. E un impegno importante ma gestibile se hai un reddito stabile e la capacita di ricostituire il capitale.`,
+        title: "Impatto Significativo sul Patrimonio Investibile",
+        message: `L'impegno totale di ${formatEuro(c.totalFinancialCommitment)} pesa per il ${c.wealthImpact.toFixed(0)}% sul patrimonio investibile di ${formatEuro(s.investableNetWorth)}${realEstateHint}. E un impegno importante ma gestibile se hai reddito stabile e puoi ricostituire il capitale liquido.`,
         icon: <Scale className="w-5 h-5 text-amber-500" />,
       });
     } else {
       list.push({
         type: "success",
         title: "Impatto Patrimoniale Contenuto",
-        message: `L'impegno complessivo di ${formatEuro(c.totalFinancialCommitment)} rappresenta il ${c.wealthImpact.toFixed(0)}% del tuo patrimonio netto di ${formatEuro(s.netWorth)}. Assolutamente gestibile e proporzionato.`,
+        message: `L'impegno complessivo di ${formatEuro(c.totalFinancialCommitment)} e' il ${c.wealthImpact.toFixed(0)}% del patrimonio investibile di ${formatEuro(s.investableNetWorth)}${realEstateHint}. Assolutamente proporzionato alla tua capacita mobilizzabile.`,
         icon: <Scale className="w-5 h-5 text-emerald-500" />,
+      });
+    }
+
+    // 2b. Esposizione cumulativa (se hai gia' piu' prestiti in corso)
+    if (s.existingLoansCount >= 2) {
+      list.push({
+        type: "warning",
+        title: `Hai gia' ${s.existingLoansCount} prestiti in corso`,
+        message: `Le rate attuali sono ${formatEuro(s.existingLoansMonthlyPayment)}/mese (DTI ${(s.currentDTI * 100).toFixed(1)}%). Un ulteriore impegno si somma a quello gia' esistente: valuta se la capacita di assorbire imprevisti regge su piu' fronti contemporaneamente.`,
+        icon: <CreditCard className="w-5 h-5 text-amber-500" />,
       });
     }
 
@@ -546,29 +606,38 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       });
     }
 
-    // 6. Verdetto finale
+    // 6. Verdetto finale con NUMERI (costo totale, delay FIRE, opportunita)
     const dangers = list.filter(a => a.type === "danger").length;
     const warnings = list.filter(a => a.type === "warning").length;
+    const multiLoanPenalty = s.existingLoansCount >= 2 ? 1 : 0;
+    const effectiveWarnings = warnings + multiLoanPenalty;
+
+    // Costruzione frase numerica condivisa
+    const fireDelay = c.fireDelayMonthsValue;
+    const delayPhrase = fireDelay > 1
+      ? ` e sposta il tuo FIRE di circa ${Math.round(fireDelay)} mes${Math.round(fireDelay) === 1 ? "e" : "i"}`
+      : "";
+    const costPhrase = `ti costa ${formatEuro(c.totalFinancialCommitment)} totali in ${c.tcoYears} anni${c.opportunityCost > 500 ? ` (inclusi ${formatEuro(c.opportunityCost)} di mancato rendimento)` : ""}`;
 
     if (dangers > 0) {
       list.push({
         type: "danger",
         title: "Verdetto: Acquisto Sconsigliato",
-        message: `Ci sono ${dangers} criticita gravi. Prima di procedere, affronta i problemi evidenziati sopra. Potresti considerare: un modello piu economico, un anticipo maggiore, posticipare l'acquisto per accumulare piu liquidita, o rivedere completamente la necessita dell'acquisto.`,
+        message: `${dangers} criticita gravi. Questo acquisto ${costPhrase}${delayPhrase}. Prima di procedere: modello piu economico, anticipo maggiore, o posticipare per accumulare liquidita.`,
         icon: <Target className="w-5 h-5 text-red-500" />,
       });
-    } else if (warnings >= 2) {
+    } else if (effectiveWarnings >= 2) {
       list.push({
         type: "warning",
         title: "Verdetto: Procedere con Cautela",
-        message: `L'acquisto e fattibile ma presenta ${warnings} punti di attenzione. Puoi procedere se hai un piano chiaro per mitigare i rischi evidenziati. Valuta se puoi migliorare le condizioni (anticipo maggiore, tasso migliore, modello piu economico).`,
+        message: `${warnings} punti di attenzione${multiLoanPenalty ? ` + ${s.existingLoansCount} prestiti gia' in corso` : ""}. Costo reale: ${costPhrase}${delayPhrase}. Procedi solo con un piano chiaro per mitigare i rischi.`,
         icon: <Target className="w-5 h-5 text-amber-500" />,
       });
     } else {
       list.push({
         type: "success",
         title: "Verdetto: Acquisto Sostenibile",
-        message: `La tua situazione finanziaria supporta bene questo acquisto. I parametri chiave (liquidita, DTI, impatto patrimoniale) sono tutti in zona di comfort. Puoi procedere con serenita.`,
+        message: `Parametri in zona di comfort. Tieni presente che ${costPhrase}${delayPhrase ? `: ${delayPhrase.replace(" e ", "")}` : ""}. Puoi procedere con serenita.`,
         icon: <Target className="w-5 h-5 text-emerald-500" />,
       });
     }
@@ -641,6 +710,72 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         </div>
       )}
 
+      {/* Acquisti gia' accettati (in cima, per vedere impegno cumulato prima di simularne un altro) */}
+      {user && acceptedPurchases.length > 0 && (() => {
+        const totalCommitment = acceptedPurchases.reduce((acc, p) => acc + (p.totalTCO || p.totalPrice), 0);
+        const totalMonthlyPayments = acceptedPurchases
+          .filter(p => p.isFinanced)
+          .reduce((acc, p) => acc + p.monthlyPayment, 0);
+        return (
+          <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/60 p-4 backdrop-blur-xl dark:border-indigo-900/60 dark:bg-indigo-950/30 sm:p-5">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  Acquisti Gia&apos; Accettati ({acceptedPurchases.length})
+                </h3>
+              </div>
+              <div className="flex flex-wrap gap-3 text-[11px]">
+                <span className="rounded-full bg-white/70 px-3 py-1 font-bold text-indigo-700 dark:bg-slate-900/70 dark:text-indigo-300">
+                  Impegno TCO: {formatEuro(totalCommitment)}
+                </span>
+                {totalMonthlyPayments > 0 && (
+                  <span className="rounded-full bg-white/70 px-3 py-1 font-bold text-amber-700 dark:bg-slate-900/70 dark:text-amber-300">
+                    Rate totali: {formatEuro(totalMonthlyPayments)}/mese
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="space-y-2">
+              {acceptedPurchases.map(p => (
+                <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/60 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{p.itemName}</span>
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+                        {p.category}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {new Date(p.acceptedAt).toLocaleDateString("it-IT")}
+                      </span>
+                      <span>Prezzo: {formatEuro(p.totalPrice)}</span>
+                      {p.isFinanced && (
+                        <>
+                          <span>Rata: {formatEuro(p.monthlyPayment)}/m</span>
+                          <span className="text-red-500">Interessi: {formatEuro(p.totalInterest)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemovePurchase(p.id)}
+                    className="h-9 w-9 shrink-0 rounded-full text-slate-400 hover:text-red-500"
+                    aria-label="Rimuovi acquisto"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <PurchaseForm sim={sim} onUpdateSim={updateSim} onAnalyze={() => setShowResults(true)} />
         <div className="lg:col-span-7">
@@ -659,19 +794,17 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         </div>
       </div>
 
-      {/* Grafici e analisi avanzate */}
+      {/* Grafici e analisi avanzate — ORDINE DIDATTICO: prima i numeri, poi l'impatto, poi i confronti */}
       {showResults && user && (
         <div className="space-y-6">
+          <CalculationBreakdown sim={sim} snapshot={snapshot} calculations={calculations} />
           <FireImpactChart sim={sim} calculations={calculations} snapshot={snapshot} />
           <ScenarioComparison sim={sim} snapshot={snapshot} calculations={calculations} />
           <SensitivityChart sim={sim} snapshot={snapshot} calculations={calculations} />
-          <CalculationBreakdown sim={sim} snapshot={snapshot} calculations={calculations} />
           <PurchaseImpactChart
             sim={sim}
             calculations={calculations}
             snapshot={snapshot}
-            acceptedPurchases={acceptedPurchases}
-            onRemovePurchase={handleRemovePurchase}
           />
         </div>
       )}

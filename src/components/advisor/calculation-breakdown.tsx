@@ -25,6 +25,7 @@ interface CalculationBreakdownProps {
         cashOutlay: number;
         liquidityAfter: number;
         wealthImpact: number;
+        wealthImpactTotal: number;
         totalFinancialCommitment: number;
         realReturnForOpportunity: number;
     };
@@ -260,10 +261,10 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
         });
     }
 
-    // 7. Impatto patrimoniale
+    // 7. Impatto patrimoniale — misurato sul patrimonio INVESTIBILE (esclusi immobili)
     blocks.push({
-        title: "Impatto patrimoniale",
-        description: "Quanto pesa l'impegno totale sul tuo patrimonio netto",
+        title: "Impatto patrimoniale (investibile)",
+        description: "Quanto pesa l'impegno sul patrimonio davvero mobilizzabile (esclusi immobili)",
         steps: [
             {
                 label: "Impegno finanziario totale",
@@ -274,10 +275,22 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
                 result: formatEuro(c.totalFinancialCommitment),
             },
             {
-                label: "Peso sul patrimonio netto",
+                label: "Patrimonio investibile (denominatore)",
+                formula: "asset totali − immobili − debiti",
+                substituted: `${formatEuro(snapshot.totalAssets)} − ${formatEuro(snapshot.realEstateValue)} − ${formatEuro(snapshot.totalDebts)}`,
+                result: formatEuro(snapshot.investableNetWorth),
+            },
+            {
+                label: "Peso sul patrimonio investibile",
+                formula: "impegno / investibile × 100",
+                substituted: `${formatEuro(c.totalFinancialCommitment)} / ${formatEuro(snapshot.investableNetWorth)}`,
+                result: `${c.wealthImpact.toFixed(1)}%`,
+            },
+            {
+                label: "Per riferimento: peso sul patrimonio totale",
                 formula: "impegno / patrimonio netto × 100",
                 substituted: `${formatEuro(c.totalFinancialCommitment)} / ${formatEuro(snapshot.netWorth)}`,
-                result: `${c.wealthImpact.toFixed(1)}%`,
+                result: `${c.wealthImpactTotal.toFixed(1)}%`,
             },
         ],
     });
