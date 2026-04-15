@@ -12,6 +12,7 @@ services:
       DATABASE_URL: "file:/app/data/prod.db"
       JWT_SECRET: "${JWT_SECRET}"
       CRON_SECRET: "${CRON_SECRET}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY}"
       TZ: "Europe/Rome"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
