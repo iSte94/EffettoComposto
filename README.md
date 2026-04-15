@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (fix critico FIRE — liquidazione fondo pensione)
+
+- **Bug fix matematico — fondo pensione mai liquidato** — risolto un bug finanziariamente critico nel simulatore FIRE (deterministico, Monte Carlo e stress test "Lost Decade"). La logica originale usava una strict equality `yAge === pensionFundAccessAge` per decidere quando liquidare il fondo pensione complementare: se l'utente aveva gia' superato l'eta' di accesso (es. 65 anni con accesso a 62) OPPURE inseriva un'eta' non intera, il trigger non scattava MAI e il capitale del fondo pensione cresceva all'infinito senza mai essere convertito in rendita/capitale netto. Di conseguenza, la proiezione FIRE ignorava completamente il patrimonio del FP nelle spese di ritiro, sottostimando il successo del piano — in particolare per utenti gia' prossimi al pensionamento
+- **Nuovo modulo `src/lib/finance/pension-fund.ts`** — estratta la logica di liquidazione in due helper puri e testabili: `liquidatePensionFund()` (applica tassazione in uscita, calcola rendita mensile e quota lump-sum per modalita' `annuity` o `hybrid`, clamp tax rate a [0,100], gestione edge-case `lifeExpectancy <= accessAge` evitando divisione per zero) e `shouldLiquidatePensionFund()` (trigger idempotente con flag `hasAccessed` + confronto `>=`, robusto a eta' frazionarie e a currentAge > accessAge)
+- **Suite di test regressione** — 13 nuovi unit test in `pension-fund.test.ts` che coprono: modalita' annuity/hybrid, edge-case capitale zero/negativo/NaN, clamping aliquote fuori scala, protezione da divisione per zero, e i due scenari del bug originale (currentAge > accessAge e eta' frazionarie)
+
 ### 14 aprile 2026 (riepilogo — tooltip breakdown patrimonio netto)
 
 - **Tooltip "cosa ha mosso il patrimonio"** — passando col mouse sopra la cifra del Patrimonio Netto nel tab Riepilogo appare un pannello a scomparsa che spiega in dettaglio da dove arriva la variazione rispetto allo snapshot precedente. Il breakdown mostra il delta per ciascuna categoria (Liquidita' & ETF, Fondo Emergenza, Bitcoin, Beni Rifugio, Fondo Pensione, Debiti), con la percentuale di contributo al movimento totale, ordinato per impatto assoluto e con riga "Totale" finale che combacia con il +/-€ mostrato sotto. I debiti sono invertiti (una riduzione debiti conta come contributo positivo), cosi' l'utente capisce subito se il mese e' andato bene grazie a mercato, risparmio o deleveraging

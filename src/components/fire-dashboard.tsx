@@ -13,6 +13,7 @@ import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Load
 import { toast } from "sonner";
 import { calculateIrpef } from "@/lib/finance/irpef";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { liquidatePensionFund, shouldLiquidatePensionFund } from "@/lib/finance/pension-fund";
 import type { AssetRecord, ExistingLoan, AcceptedPurchase } from "@/types";
 import { formatEuro } from "@/lib/format";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
@@ -371,6 +372,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     let tempCap = startingCapital;
     let pensionCap = currentPensionFundValue; // Separate pot for pension fund
     let pensionAnnuity = 0; // Monthly annuity from pension fund (activated at access age)
+    let pensionFundAccessed = false; // Idempotent flag: liquidation must happen at most once
     let yearsToFire = 0;
     const maxYearsSim = 100;
     const chartData = [];
@@ -425,19 +427,26 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 pensionCap += totalAnnualPensionContribution / 12;
             }
 
-            // At pension fund access age: liquidate based on exit mode
-            if (yAge === pensionFundAccessAge && m % 12 === 0 && pensionCap > 0) {
-                const pensionCapNet = pensionCap * (1 - pensionFundExitTaxRate / 100);
-                const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
-                if (pensionExitMode === "hybrid") {
-                    // 50% capitale + 50% rendita
-                    tempCap += pensionCapNet * 0.5;
-                    pensionAnnuity = (pensionCapNet * 0.5) / annuityMonths;
-                } else {
-                    // 100% rendita mensile
-                    pensionAnnuity = pensionCapNet / annuityMonths;
-                }
+            // At pension fund access age: liquidate based on exit mode.
+            // BUG FIX: precedentemente si usava `yAge === pensionFundAccessAge`,
+            // che falliva (mancata liquidazione per sempre) se l'utente aveva
+            // gia' superato l'eta' di accesso o per eta' non intere.
+            if (
+                m % 12 === 0 &&
+                pensionCap > 0 &&
+                shouldLiquidatePensionFund(yAge, pensionFundAccessAge, pensionFundAccessed)
+            ) {
+                const liq = liquidatePensionFund({
+                    pensionCap,
+                    exitTaxRate: pensionFundExitTaxRate,
+                    exitMode: pensionExitMode,
+                    accessAge: pensionFundAccessAge,
+                    lifeExpectancy,
+                });
+                tempCap += liq.cashLump;
+                pensionAnnuity = liq.monthlyAnnuity;
                 pensionCap = 0; // Fully liquidated
+                pensionFundAccessed = true;
             }
         }
 
@@ -554,6 +563,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     let stressCap = startingCapital;
     let stressPensionCap = currentPensionFundValue;
     let stressPensionAnnuity = 0;
+    let stressPensionAccessed = false;
     const stressData = [];
     let stressSurvived = true;
 
@@ -600,16 +610,21 @@ export function FireDashboard({ user }: FireDashboardProps) {
             if (!isRetired && totalAnnualPensionContribution > 0) {
                 stressPensionCap += totalAnnualPensionContribution;
             }
-            if (yAge === pensionFundAccessAge && stressPensionCap > 0) {
-                const net = stressPensionCap * (1 - pensionFundExitTaxRate / 100);
-                const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
-                if (pensionExitMode === "hybrid") {
-                    stressCap += net * 0.5;
-                    stressPensionAnnuity = (net * 0.5) / annuityMonths;
-                } else {
-                    stressPensionAnnuity = net / annuityMonths;
-                }
+            if (
+                stressPensionCap > 0 &&
+                shouldLiquidatePensionFund(yAge, pensionFundAccessAge, stressPensionAccessed)
+            ) {
+                const liq = liquidatePensionFund({
+                    pensionCap: stressPensionCap,
+                    exitTaxRate: pensionFundExitTaxRate,
+                    exitMode: pensionExitMode,
+                    accessAge: pensionFundAccessAge,
+                    lifeExpectancy,
+                });
+                stressCap += liq.cashLump;
+                stressPensionAnnuity = liq.monthlyAnnuity;
                 stressPensionCap = 0;
+                stressPensionAccessed = true;
             }
         }
 
