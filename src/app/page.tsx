@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, Wallet, Wrench } from "lucide-react";
+import { BarChart3, Bot, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, Wallet, Wrench } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
 import { BrandLogo } from "@/components/brand-logo";
 import { HeaderKpisBar } from "@/components/header-kpis";
@@ -17,6 +17,7 @@ const ProgressioneDashboard = lazy(() => import("@/components/progressione-dashb
 const RealEstateAnalysis = lazy(() => import("@/components/real-estate-analysis").then((m) => ({ default: m.RealEstateAnalysis })));
 const CalculatorsDashboard = lazy(() => import("@/components/calculators-dashboard").then((m) => ({ default: m.CalculatorsDashboard })));
 const BudgetingDashboard = lazy(() => import("@/components/budgeting-dashboard").then((m) => ({ default: m.BudgetingDashboard })));
+const AiDashboard = lazy(() => import("@/components/ai-dashboard").then((m) => ({ default: m.AiDashboard })));
 
 function TabFallback() {
   return (
@@ -65,7 +66,7 @@ export default function CalculatorPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         <div className="flex justify-center">
-          <TabsList className="grid w-full max-w-6xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-4 md:grid-cols-8">
+          <TabsList className="grid w-full max-w-7xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-3 md:grid-cols-9">
             <TabsTrigger value="overview" className={triggerClass}>
               <BarChart3 className="size-4 text-teal-500" />
               <span>Riepilogo</span>
@@ -97,6 +98,10 @@ export default function CalculatorPage() {
             <TabsTrigger value="calculators" className={triggerClass}>
               <Wrench className="size-4 text-teal-500" />
               <span>Strumenti</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai" className={triggerClass}>
+              <Bot className="size-4 text-purple-500" />
+              <span>AI</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -132,6 +137,10 @@ export default function CalculatorPage() {
 
           <TabsContent value="calculators">
             <CalculatorsDashboard />
+          </TabsContent>
+
+          <TabsContent value="ai">
+            <AiDashboard user={user} />
           </TabsContent>
         </Suspense>
       </Tabs>

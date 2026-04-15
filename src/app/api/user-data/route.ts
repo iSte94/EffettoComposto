@@ -8,10 +8,11 @@ export async function GET() {
     try {
         const userId = await getAuthenticatedUserId();
 
-        const [preferences, assets, goals] = await Promise.all([
+        const [preferences, assets, goals, budgetTransactions] = await Promise.all([
             prisma.preference.findUnique({ where: { userId } }),
             prisma.assetRecord.findMany({ where: { userId }, orderBy: { date: 'asc' } }),
             prisma.savingsGoal.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+            prisma.budgetTransaction.findMany({ where: { userId }, orderBy: { date: 'asc' } }),
         ]);
 
         // Rimuoviamo i campi interni (userId, id) che non servono per l'import
@@ -31,6 +32,11 @@ export async function GET() {
             return rest;
         });
 
+        const cleanBudgetTransactions = budgetTransactions.map(({ id, userId: _u, ...rest }) => {
+            void id; void _u;
+            return rest;
+        });
+
         // Estrarre subscriptionsList come array per leggibilità nel JSON esportato
         let subscriptions: unknown[] = [];
         if (cleanPreferences?.subscriptionsList) {
@@ -46,6 +52,7 @@ export async function GET() {
             patrimonio: cleanAssets,
             obiettivi: cleanGoals,
             abbonamenti: subscriptions,
+            budgetTransactions: cleanBudgetTransactions,
         };
 
         return NextResponse.json(exportData);
@@ -76,6 +83,15 @@ const importSchema = z.object({
         amount: z.number(),
         frequency: z.enum(["mensile", "annuale"]),
     })).optional(),
+    budgetTransactions: z.array(z.object({
+        date: z.string(),
+        description: z.string(),
+        amount: z.number(),
+        category: z.string(),
+        categoryOverride: z.boolean().default(false),
+        hash: z.string(),
+        importedAt: z.string().optional(),
+    })).optional(),
 });
 
 // POST: Importa tutti i dati dell'utente (sovrascrive preferenze, aggiunge snapshot e obiettivi)
@@ -93,7 +109,7 @@ export async function POST(req: Request) {
         }
 
         const data = parsed.data;
-        const results = { preferences: false, patrimonio: 0, obiettivi: 0, abbonamenti: 0 };
+        const results = { preferences: false, patrimonio: 0, obiettivi: 0, abbonamenti: 0, budgetTransactions: 0 };
 
         // 1. Import preferenze (upsert)
         if (data.preferences) {
@@ -159,6 +175,25 @@ export async function POST(req: Request) {
                 });
             }
             results.obiettivi = data.obiettivi.length;
+        }
+
+        // 4. Import budget transactions
+        if (data.budgetTransactions && data.budgetTransactions.length > 0) {
+            await prisma.budgetTransaction.deleteMany({ where: { userId } });
+
+            await prisma.budgetTransaction.createMany({
+                data: data.budgetTransactions.map((tx) => ({
+                    date: tx.date,
+                    description: tx.description,
+                    amount: tx.amount,
+                    category: tx.category,
+                    categoryOverride: tx.categoryOverride,
+                    hash: tx.hash,
+                    importedAt: tx.importedAt ? new Date(tx.importedAt) : new Date(),
+                    userId,
+                })),
+            });
+            results.budgetTransactions = data.budgetTransactions.length;
         }
 
         return NextResponse.json({
