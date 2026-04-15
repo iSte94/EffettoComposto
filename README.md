@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (obiettivi — contributo mensile richiesto e pacing badge)
+
+- **Contributo mensile necessario** — ogni obiettivo di risparmio con scadenza ora mostra quanto devi mettere da parte ogni mese per arrivare al traguardo in tempo. Il calcolo e' semplice ma trasparente: `(obiettivo − gia' risparmiato) / mesi rimanenti`, cosi' invece di vedere solo "8 mesi rimanenti" capisci subito che servono ad esempio "1.000 €/mese per 8 mesi"
+- **Badge di stato In linea / Da accelerare / In ritardo / Scaduto** — confrontando il ritmo storico di accumulo (calcolato dal momento di creazione dell'obiettivo) con quello richiesto per rispettare la scadenza, la card mostra un badge colorato con icona: verde "In linea" se stai mantenendo il passo, ambra "Da accelerare" se sei oltre il 60% del target ma sotto il necessario, rosso "In ritardo" se sei sotto quella soglia, e "Scaduto" se la deadline e' passata senza raggiungere l'obiettivo. Tooltip esplicativo on-hover su ogni badge
+- **Ritmo attuale visibile** — sotto al contributo richiesto viene mostrato anche il ritmo effettivo di risparmio ("Ritmo attuale: X €/mese"), cosi' l'utente ha sia il target sia la realta' sott'occhio e capisce esattamente di quanto deve aumentare lo sforzo. Niente piu' obiettivi "impostati e dimenticati": il feedback sul pacing e' immediato e azionabile
+
 ### 15 aprile 2026 (FIRE — fix IMU + nuovi KPI storici nel Riepilogo)
 
 - **Fix double-count IMU nella rendita passiva FIRE** — nel tab FIRE, il calcolo della rendita passiva immobiliare sottraeva l'IMU due volte: una volta dentro `calculateNetRentalYield` (che restituisce gia' il rendimento netto di tutte le spese) e una seconda volta nel ciclo di somma in `fire-dashboard.tsx`. Conseguenza: gli utenti con immobili locati vedevano una rendita passiva sottostimata, e quindi un target FIRE piu' distante del reale. Bug corretto estraendo la logica in un nuovo modulo puro `src/lib/finance/real-estate.ts` con le funzioni `calculateNetRentalIncome` e `sumNetRentalIncome`, ora coperte da **118 righe di unit test** (`real-estate.test.ts`) che verificano casi con/senza affitto, IMU gia' scorporata e scenari con immobili multipli
