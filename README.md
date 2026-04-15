@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (obiettivi — riepilogo con totali aggregati e ordinamento per urgenza)
+
+- **Riepilogo obiettivi piu' ricco** — la card "Progresso Totale" del tab Obiettivi di Risparmio ora mostra tre nuovi KPI aggregati in un terzetto di mini-card: "Da risparmiare" (quanto manca complessivamente al raggiungimento di tutti gli obiettivi), "Ritmo richiesto" (somma dei contributi mensili necessari per rispettare tutte le scadenze attive) e "Completati" (contatore X/Y di obiettivi gia' raggiunti). Prima l'utente aveva solo la somma corrente/target e la percentuale: ora ha anche la risposta immediata alla domanda piu' pratica — "quanto devo mettere da parte ogni mese in totale per stare in carreggiata?"
+- **Ordinamento intelligente delle card obiettivo** — le card sono ora ordinate per urgenza invece che per data di creazione: prima quelli scaduti, poi in ritardo, poi da accelerare, poi in linea, poi gli obiettivi senza scadenza e infine i completati. A parita' di stato il tie-breaker e' la scadenza piu' vicina, cosi' l'obiettivo piu' critico e' sempre in cima senza bisogno di scrollare. Migliora significativamente l'usabilita' per chi gestisce molti obiettivi in parallelo
+- **Refactor interno con `useMemo`** — l'estrazione di totali, conteggi, pacing e lista ordinata e' stata unificata in un singolo `useMemo` su `goals`, eliminando doppi calcoli di `getDeadlinePacing` (prima invocata sia in map che in derived) e nuova funzione `getGoalSortPriority` pura per assegnare la priorita' di ordinamento in base allo stato del pacing
+
 ### 15 aprile 2026 (FIRE — fix rendimento reale con equazione di Fisher esatta)
 
 - **Bug finanziario critico risolto nel calcolo del rendimento reale** — il motore FIRE (`fire-projection.ts`), il tab FIRE (`fire-dashboard.tsx`) e il consulente acquisti (`advisor-dashboard.tsx`) calcolavano il rendimento reale con la formula approssimata `realReturn = (nominal − inflation) / 100`. Per tassi tipici di un piano FIRE (7% nominale, 3% inflazione) questa scorciatoia dava 4.000% mentre l'equazione di Fisher esatta da' 3.883% — un errore relativo del ~3% che si compone nel tempo: su 30 anni portava a sovrastimare il capitale finale di circa il +3-4% e ad anticipare artificialmente il momento FIRE di quasi un anno. Peggio ancora, il calcolatore inflazione (`inflation-calculator.tsx`) usava gia' la formula corretta, quindi la stessa app mostrava **rendimenti reali diversi a seconda del tab** visitato
