@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (fix critico FIRE — liquidazione fondo pensione)
+
+- **Bug fix matematico — fondo pensione mai liquidato** — risolto un bug finanziariamente critico nel simulatore FIRE (deterministico, Monte Carlo e stress test "Lost Decade"). La logica originale usava una strict equality `yAge === pensionFundAccessAge` per decidere quando liquidare il fondo pensione complementare: se l'utente aveva gia' superato l'eta' di accesso (es. 65 anni con accesso a 62) OPPURE inseriva un'eta' non intera, il trigger non scattava MAI e il capitale del fondo pensione cresceva all'infinito senza mai essere convertito in rendita/capitale netto. Di conseguenza, la proiezione FIRE ignorava completamente il patrimonio del FP nelle spese di ritiro, sottostimando il successo del piano — in particolare per utenti gia' prossimi al pensionamento
+- **Nuovo modulo `src/lib/finance/pension-fund.ts`** — estratta la logica di liquidazione in due helper puri e testabili: `liquidatePensionFund()` (applica tassazione in uscita, calcola rendita mensile e quota lump-sum per modalita' `annuity` o `hybrid`, clamp tax rate a [0,100], gestione edge-case `lifeExpectancy <= accessAge` evitando divisione per zero) e `shouldLiquidatePensionFund()` (trigger idempotente con flag `hasAccessed` + confronto `>=`, robusto a eta' frazionarie e a currentAge > accessAge)
+- **Suite di test regressione** — 12 nuovi unit test in `pension-fund.test.ts` che coprono: modalita' annuity/hybrid, edge-case capitale zero/negativo/NaN, clamping aliquote fuori scala, protezione da divisione per zero, e i due scenari del bug originale (currentAge > accessAge e eta' frazionarie)
+
 ### 15 aprile 2026 (obiettivi — riepilogo con totali aggregati e ordinamento per urgenza)
 
 - **Riepilogo obiettivi piu' ricco** — la card "Progresso Totale" del tab Obiettivi di Risparmio ora mostra tre nuovi KPI aggregati in un terzetto di mini-card: "Da risparmiare" (quanto manca complessivamente al raggiungimento di tutti gli obiettivi), "Ritmo richiesto" (somma dei contributi mensili necessari per rispettare tutte le scadenze attive) e "Completati" (contatore X/Y di obiettivi gia' raggiunti). Prima l'utente aveva solo la somma corrente/target e la percentuale: ora ha anche la risposta immediata alla domanda piu' pratica — "quanto devo mettere da parte ogni mese in totale per stare in carreggiata?"
