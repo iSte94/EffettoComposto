@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
     Target, Plus, Trash2, Pencil, Check, X,
     Home, PiggyBank, TrendingUp, Plane, Sparkles, CircleDot,
-    Zap, AlertTriangle, Clock,
+    Zap, AlertTriangle, Clock, CalendarClock,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { format, differenceInMonths, parseISO } from "date-fns";
@@ -143,6 +143,22 @@ function getDeadlinePacing(goal: SavingsGoal): DeadlinePacing | null {
     return { requiredMonthly, monthsLeft, historicalMonthly, status };
 }
 
+// Priorità di ordinamento: più bassa = mostrata per prima.
+// Obiettivi in ritardo/scaduti per primi, poi stretch, poi on-track,
+// poi goal senza scadenza, infine quelli completati.
+function getGoalSortPriority(goal: SavingsGoal, pacing: DeadlinePacing | null): number {
+    const isComplete = goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount;
+    if (isComplete) return 100;
+    if (!pacing) return 50;
+    switch (pacing.status) {
+        case "expired": return 0;
+        case "behind": return 10;
+        case "stretch": return 20;
+        case "on-track": return 30;
+        default: return 50;
+    }
+}
+
 const PACING_BADGE: Record<PacingStatus, { label: string; className: string; icon: React.ReactNode }> = {
     "on-track": {
         label: "In linea",
@@ -266,6 +282,53 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
         }
     };
 
+    const {
+        totalTarget,
+        totalCurrent,
+        overallProgress,
+        totalRemaining,
+        totalRequiredMonthly,
+        completedCount,
+        sortedGoals,
+    } = useMemo(() => {
+        const targetSum = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
+        const currentSum = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
+        const progress = targetSum > 0 ? (currentSum / targetSum) * 100 : 0;
+        const remaining = Math.max(0, targetSum - currentSum);
+
+        let monthlySum = 0;
+        let completed = 0;
+
+        const decorated = goals.map((goal) => {
+            const pacing = getDeadlinePacing(goal);
+            if (pacing && pacing.status !== "expired" && pacing.monthsLeft > 0) {
+                monthlySum += pacing.requiredMonthly;
+            }
+            if (goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount) {
+                completed += 1;
+            }
+            return { goal, pacing, priority: getGoalSortPriority(goal, pacing) };
+        });
+
+        decorated.sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            // Tie-breaker: scadenza più vicina prima, poi quelli senza scadenza
+            const aDeadline = a.goal.deadline ? parseISO(a.goal.deadline + "-01").getTime() : Number.POSITIVE_INFINITY;
+            const bDeadline = b.goal.deadline ? parseISO(b.goal.deadline + "-01").getTime() : Number.POSITIVE_INFINITY;
+            return aDeadline - bDeadline;
+        });
+
+        return {
+            totalTarget: targetSum,
+            totalCurrent: currentSum,
+            overallProgress: progress,
+            totalRemaining: remaining,
+            totalRequiredMonthly: monthlySum,
+            completedCount: completed,
+            sortedGoals: decorated,
+        };
+    }, [goals]);
+
     if (!user) {
         return (
             <div className="flex flex-col items-center justify-center space-y-4 px-4 py-16 text-center">
@@ -277,10 +340,6 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
             </div>
         );
     }
-
-    const totalTarget = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
-    const totalCurrent = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
-    const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
 
     return (
         <div className="space-y-6">
@@ -323,6 +382,33 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                             className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700"
                             style={{ width: `${Math.min(overallProgress, 100)}%` }}
                         />
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5">
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <Target className="h-3 w-3" /> Da risparmiare
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">{formatEuro(totalRemaining)}</p>
+                        </div>
+                        <div
+                            className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5"
+                            title="Somma delle rate mensili necessarie per gli obiettivi con scadenza attiva"
+                        >
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <CalendarClock className="h-3 w-3" /> Ritmo richiesto
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">
+                                {totalRequiredMonthly > 0 ? `${formatEuro(totalRequiredMonthly)}/mese` : "—"}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5">
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <Check className="h-3 w-3" /> Completati
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">
+                                {completedCount} <span className="text-xs font-normal text-muted-foreground">/ {goals.length}</span>
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}
@@ -389,13 +475,12 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    {goals.map((goal) => {
+                    {sortedGoals.map(({ goal, pacing }) => {
                         const category = getCategoryInfo(goal.category);
                         const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
                         const isComplete = progress >= 100;
                         const estimated = getEstimatedDate(goal.currentAmount, goal.targetAmount, goal.createdAt);
                         const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
-                        const pacing = getDeadlinePacing(goal);
                         const pacingBadge = pacing ? PACING_BADGE[pacing.status] : null;
 
                         return (
