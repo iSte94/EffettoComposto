@@ -2,11 +2,15 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
 import { z } from 'zod/v4';
+import { buildDerived } from '@/lib/ai/derived';
 
 // GET: Esporta tutti i dati dell'utente (preferenze, snapshot patrimonio, obiettivi)
-export async function GET() {
+// Query string `?ai=1` arricchisce la risposta con il blocco `derived` (aggregati per AI).
+export async function GET(req: Request) {
     try {
         const userId = await getAuthenticatedUserId();
+        const { searchParams } = new URL(req.url);
+        const includeDerived = searchParams.get('ai') === '1';
 
         const [preferences, assets, goals, budgetTransactions] = await Promise.all([
             prisma.preference.findUnique({ where: { userId } }),
@@ -45,7 +49,7 @@ export async function GET() {
             } catch { /* noop */ }
         }
 
-        const exportData = {
+        const exportData: Record<string, unknown> = {
             version: 1,
             exportedAt: new Date().toISOString(),
             preferences: cleanPreferences,
@@ -54,6 +58,15 @@ export async function GET() {
             abbonamenti: subscriptions,
             budgetTransactions: cleanBudgetTransactions,
         };
+
+        if (includeDerived) {
+            exportData.derived = buildDerived({
+                preferences: cleanPreferences as Parameters<typeof buildDerived>[0]["preferences"],
+                snapshots: cleanAssets as Parameters<typeof buildDerived>[0]["snapshots"],
+                goals: cleanGoals as Parameters<typeof buildDerived>[0]["goals"],
+                transactions: cleanBudgetTransactions as Parameters<typeof buildDerived>[0]["transactions"],
+            });
+        }
 
         return NextResponse.json(exportData);
     } catch (error) {
@@ -200,7 +213,6 @@ export async function POST(req: Request) {
             message: 'Dati importati con successo!',
             results,
         });
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
         console.error('Failed to import user data:', error);

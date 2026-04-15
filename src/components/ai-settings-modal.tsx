@@ -20,7 +20,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useAiSettings } from "@/hooks/useAiSettings";
+import { useAuth } from "@/contexts/auth-context";
 import { listModels, type AiModel, type AiProvider } from "@/lib/ai/providers";
 
 interface Props {
@@ -31,6 +33,7 @@ interface Props {
 
 export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }: Props) {
     const { settings, save, clear, loaded } = useAiSettings();
+    const { user } = useAuth();
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen ?? internalOpen;
     const setOpen = onOpenChange ?? setInternalOpen;
@@ -38,16 +41,19 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
     const [provider, setProvider] = useState<AiProvider>("gemini");
     const [apiKey, setApiKey] = useState("");
     const [model, setModel] = useState("");
+    const [rememberOnAccount, setRememberOnAccount] = useState(false);
     const [models, setModels] = useState<AiModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         if (loaded && open) {
             setProvider(settings.provider);
             setApiKey(settings.apiKey);
             setModel(settings.model);
+            setRememberOnAccount(settings.rememberOnAccount && !!user);
         }
-    }, [loaded, open, settings]);
+    }, [loaded, open, settings, user]);
 
     const fetchModels = async () => {
         if (!apiKey) {
@@ -66,20 +72,36 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!apiKey) return toast.error("Inserisci una API key");
         if (!model) return toast.error("Seleziona o digita un modello");
-        save({ provider, apiKey, model });
-        toast.success("Impostazioni AI salvate");
-        setOpen(false);
+        setSaving(true);
+        try {
+            await save({ provider, apiKey, model, rememberOnAccount: rememberOnAccount && !!user });
+            toast.success(
+                rememberOnAccount && user
+                    ? "Impostazioni AI salvate sul tuo account"
+                    : "Impostazioni AI salvate in locale",
+            );
+            setOpen(false);
+        } catch (e) {
+            toast.error(`Errore: ${(e as Error).message.slice(0, 200)}`);
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleClear = () => {
-        clear();
-        setApiKey("");
-        setModel("");
-        setModels([]);
-        toast.success("Impostazioni AI rimosse");
+    const handleClear = async () => {
+        try {
+            await clear();
+            setApiKey("");
+            setModel("");
+            setModels([]);
+            setRememberOnAccount(false);
+            toast.success("Impostazioni AI rimosse");
+        } catch {
+            toast.error("Errore nella rimozione");
+        }
     };
 
     return (
@@ -90,9 +112,26 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                     <DialogTitle className="flex items-center gap-2 text-xl font-bold">
                         <Bot className="size-5 text-purple-500" /> Impostazioni AI
                     </DialogTitle>
-                    <DialogDescription className="text-muted-foreground">
-                        La chiave API è salvata solo nel tuo browser (localStorage). Le richieste al
-                        modello vengono inviate direttamente al provider senza passare dai nostri server.
+                    <DialogDescription className="space-y-2 text-muted-foreground">
+                        <span className="block">
+                            La chiave è memorizzata nel browser. Puoi opzionalmente salvarla anche sul
+                            tuo account, cifrata con <strong>AES-256-GCM</strong> sul server, per
+                            ritrovarla da altri dispositivi. Le richieste al modello partono sempre
+                            direttamente dal browser al provider — non passano dai nostri server.
+                        </span>
+                        <span className="block text-xs">
+                            Il codice è{" "}
+                            <a
+                                href="https://github.com/iSte94/EffettoComposto"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline hover:text-foreground"
+                            >
+                                open source
+                            </a>
+                            : puoi verificare che la chiave non venga mai loggata né usata per altro. Il
+                            server la decifra solo per restituirtela quando accedi.
+                        </span>
                     </DialogDescription>
                 </DialogHeader>
 
@@ -181,6 +220,25 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                         </p>
                     </div>
 
+                    <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/50 bg-muted/30 p-3">
+                        <div className="space-y-1">
+                            <Label htmlFor="ai-remember" className="text-sm font-medium">
+                                Ricorda su questo account
+                            </Label>
+                            <p className="text-xs text-muted-foreground">
+                                {user
+                                    ? "Salva la chiave anche sul server (cifrata AES-256-GCM) per recuperarla da altri dispositivi."
+                                    : "Disponibile solo dopo aver effettuato l'accesso."}
+                            </p>
+                        </div>
+                        <Switch
+                            id="ai-remember"
+                            checked={rememberOnAccount}
+                            onCheckedChange={setRememberOnAccount}
+                            disabled={!user}
+                        />
+                    </div>
+
                     <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-between">
                         <Button
                             type="button"
@@ -194,7 +252,9 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                             <Button variant="ghost" onClick={() => setOpen(false)}>
                                 Annulla
                             </Button>
-                            <Button onClick={handleSave}>Salva</Button>
+                            <Button onClick={handleSave} disabled={saving}>
+                                {saving ? "Salvataggio..." : "Salva"}
+                            </Button>
                         </div>
                     </div>
                 </div>

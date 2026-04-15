@@ -451,7 +451,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
         if (tempCap < 0) tempCap = 0;
     }
     // Store the pension annuity for display
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     const calculatedPensionAnnuity = pensionAnnuity;
     const displayYears = yearsToFire > 0 ? Math.min(Math.ceil(yearsToFire) + 5, 50) : 50;
     const displayChartData = chartData.slice(0, displayYears + 1);

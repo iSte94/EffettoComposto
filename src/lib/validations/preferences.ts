@@ -56,4 +56,6 @@ export const preferencesSchema = z.object({
     budgetCategoriesList: z.string().optional(),
     budgetSettings: z.string().optional(),
     subscriptionsList: z.string().optional(),
+    // AI
+    aiUserProfile: z.string().max(8000).optional(),
 });

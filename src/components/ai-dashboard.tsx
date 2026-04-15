@@ -1,52 +1,115 @@
 "use client";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Bot, Loader2, RefreshCw, Send, Settings, Sparkles, Trash2, User } from "lucide-react";
+import { Bot, ChevronDown, ChevronRight, Loader2, RefreshCw, Send, Settings, Sparkles, Trash2, User, UserCircle2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AiSettingsModal } from "@/components/ai-settings-modal";
+import { AiUserProfileModal } from "@/components/ai-user-profile-modal";
 import { useAiSettings } from "@/hooks/useAiSettings";
-import { chat, type AiChatMessage } from "@/lib/ai/providers";
+import { useAiUserProfile } from "@/hooks/useAiUserProfile";
+import { chat, type AiToolTraceEntry } from "@/lib/ai/providers";
+import { AI_TOOLS } from "@/lib/ai/tools";
 import {
+    appendTurn,
     clearSessionMessages,
     getSessionState,
-    setSessionMessages,
+    setSessionTurns,
     setSessionUserData,
     subscribeSessionState,
+    turnsToMessages,
+    type ChatTurn,
 } from "@/lib/ai/session-memory";
 
 interface Props {
     user: { username: string } | null;
 }
 
-const SYSTEM_PROMPT_PREAMBLE = `Sei un consulente finanziario personale esperto, integrato nella piattaforma "Effetto Composto" — un cruscotto in italiano per pianificare l'indipendenza finanziaria (FIRE), gestire patrimonio, mutui, investimenti e budget.
+const SYSTEM_PROMPT_BASE = `Sei un consulente finanziario personale esperto, integrato nella piattaforma "Effetto Composto" — un cruscotto in italiano per pianificare l'indipendenza finanziaria (FIRE), gestire patrimonio, mutui, investimenti e budget.
 
 REGOLE:
 - Rispondi SEMPRE in italiano, con tono chiaro, diretto e pragmatico.
-- Basa ogni consiglio sui dati reali dell'utente forniti qui sotto (JSON esportato dalla piattaforma).
-- Se mancano dati utili alla risposta, dillo esplicitamente e indica all'utente quale sezione della piattaforma compilare (Patrimonio, FIRE, Budget, Obiettivi, ecc.).
-- Non inventare cifre o assunzioni non supportate dai dati.
+- Hai accesso a strumenti (function calling): USALI quando servono calcoli precisi (Monte Carlo FIRE, ammortamento mutuo, IRPEF/netto, prezzi live azioni/BTC, offerte mutui market, delta patrimonio tra due date). Non stimare a parole ciò che puoi calcolare con un tool.
+- Basa ogni consiglio sui dati reali dell'utente forniti qui sotto (JSON esportato dalla piattaforma) e sui risultati dei tool che chiami.
+- Il blocco "derived" contiene aggregati pronti (timeline patrimonio, deltas MoM/YoY/YTD, asset allocation, FIRE quick-check, saving rate). Usalo invece di scorrere a mano la lista snapshot.
+- Tieni conto del PROFILO UTENTE (eta', lavoro, situazione, obiettivi, tolleranza al rischio) per personalizzare ogni consiglio.
+- Se mancano dati utili alla risposta, dillo esplicitamente e indica all'utente quale sezione della piattaforma compilare (Patrimonio, FIRE, Budget, Obiettivi, "Parlami di te" per il profilo personale).
+- Non inventare cifre o assunzioni non supportate dai dati o dai tool.
 - Formatta con paragrafi brevi ed elenchi quando utile.
 - Le risposte sono indicazioni informative, non consulenza fiscale/legale vincolante.
-
---- DATI UTENTE (snapshot JSON esportato dalla piattaforma) ---
 `;
+
+function buildSystemPrompt(userProfile: string, dataJson: string): string {
+    const profileBlock = userProfile.trim()
+        ? `\n--- PROFILO UTENTE (testo libero scritto dall'utente in "Parlami di te") ---\n${userProfile.trim()}\n`
+        : `\n--- PROFILO UTENTE ---\n(L'utente non ha ancora compilato la sezione "Parlami di te". Se serve contesto su eta'/lavoro/obiettivi, suggerisci di compilarla.)\n`;
+    return `${SYSTEM_PROMPT_BASE}${profileBlock}\n--- DATI UTENTE (snapshot JSON esportato dalla piattaforma) ---\n${dataJson}`;
+}
 
 const EXAMPLE_PROMPTS = [
     "Analizza il mio FIRE number: sono sulla buona strada?",
-    "Come dovrei ribilanciare il mio portafoglio?",
-    "Qual è il mio tasso di risparmio e come posso migliorarlo?",
-    "Riesco a permettermi il mutuo che sto simulando?",
+    "Quanto è cresciuto il mio patrimonio nell'ultimo anno?",
+    "Simula un Monte Carlo FIRE per i prossimi 20 anni",
+    "Confronta le migliori offerte mutuo a tasso fisso 30 anni",
 ];
+
+function ToolTrace({ entries }: { entries: AiToolTraceEntry[] }) {
+    const [open, setOpen] = useState(false);
+    if (entries.length === 0) return null;
+    return (
+        <div className="mt-2 rounded-xl border border-purple-500/20 bg-purple-500/5 text-xs">
+            <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 font-medium text-purple-700 dark:text-purple-300"
+            >
+                {open ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+                <Wrench className="size-3" />
+                {entries.length} {entries.length === 1 ? "strumento usato" : "strumenti usati"}
+            </button>
+            {open && (
+                <div className="space-y-2 border-t border-purple-500/20 px-3 py-2">
+                    {entries.map((e, i) => (
+                        <div key={i} className="space-y-1">
+                            <div className="flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                                <code className="rounded bg-purple-500/10 px-1 py-0.5 font-mono">
+                                    {e.name}
+                                </code>
+                                <span className="text-muted-foreground">{e.durationMs}ms</span>
+                            </div>
+                            {Object.keys(e.args).length > 0 && (
+                                <details className="pl-4">
+                                    <summary className="cursor-pointer text-muted-foreground">args</summary>
+                                    <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[10px] text-muted-foreground">
+                                        {JSON.stringify(e.args, null, 2)}
+                                    </pre>
+                                </details>
+                            )}
+                            <details className="pl-4">
+                                <summary className="cursor-pointer text-muted-foreground">risultato</summary>
+                                <pre className="overflow-x-auto whitespace-pre-wrap break-all text-[10px] text-muted-foreground">
+                                    {JSON.stringify(e.result, null, 2).slice(0, 2000)}
+                                </pre>
+                            </details>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export function AiDashboard({ user }: Props) {
     const { settings, loaded } = useAiSettings();
+    const { profile: userProfile } = useAiUserProfile();
     const session = useSyncExternalStore(subscribeSessionState, getSessionState, getSessionState);
-    const { messages, userDataJson, dataBytes } = session;
+    const { turns, userDataJson, dataBytes } = session;
     const [input, setInput] = useState("");
     const [sending, setSending] = useState(false);
     const [dataLoading, setDataLoading] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
+    const [pendingTools, setPendingTools] = useState<AiToolTraceEntry[]>([]);
     const endRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -54,7 +117,7 @@ export function AiDashboard({ user }: Props) {
         if (!user) return null;
         setDataLoading(true);
         try {
-            const res = await fetch("/api/user-data");
+            const res = await fetch("/api/user-data?ai=1");
             if (!res.ok) throw new Error("Impossibile caricare i dati");
             const data = await res.json();
             const json = JSON.stringify(data);
@@ -76,7 +139,7 @@ export function AiDashboard({ user }: Props) {
 
     useEffect(() => {
         endRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, sending]);
+    }, [turns, sending, pendingTools]);
 
     const isConfigured = loaded && !!settings.apiKey && !!settings.model;
 
@@ -99,24 +162,34 @@ export function AiDashboard({ user }: Props) {
             if (!contextJson) return;
         }
 
-        const next: AiChatMessage[] = [...messages, { role: "user", content: prompt }];
-        setSessionMessages(next);
+        const userTurn: ChatTurn = { message: { role: "user", content: prompt } };
+        const nextTurns = [...turns, userTurn];
+        setSessionTurns(nextTurns);
         setInput("");
         setSending(true);
+        setPendingTools([]);
 
         try {
             const reply = await chat({
                 provider: settings.provider,
                 apiKey: settings.apiKey,
                 model: settings.model,
-                systemPrompt: SYSTEM_PROMPT_PREAMBLE + contextJson,
-                messages: next,
+                systemPrompt: buildSystemPrompt(userProfile, contextJson),
+                messages: turnsToMessages(nextTurns),
+                tools: AI_TOOLS,
+                onToolCall: (entry) => {
+                    setPendingTools((prev) => [...prev, entry]);
+                },
             });
-            setSessionMessages([...next, { role: "assistant", content: reply }]);
+            appendTurn({
+                message: { role: "assistant", content: reply.text || "(nessuna risposta)" },
+                tools: reply.toolTrace.length > 0 ? reply.toolTrace : undefined,
+            });
         } catch (e) {
             toast.error(`Errore AI: ${(e as Error).message.slice(0, 200)}`);
         } finally {
             setSending(false);
+            setPendingTools([]);
             textareaRef.current?.focus();
         }
     };
@@ -159,11 +232,28 @@ export function AiDashboard({ user }: Props) {
                         </CardTitle>
                         <CardDescription>
                             Chiedi consigli personalizzati basati sui dati della tua piattaforma. Ogni
-                            messaggio include automaticamente uno snapshot aggiornato dei tuoi dati come
-                            contesto per il modello.
+                            messaggio include automaticamente il tuo profilo personale (&quot;Parlami di
+                            te&quot;), uno snapshot aggiornato dei dati (con aggregati derivati: timeline
+                            patrimonio, deltas, asset allocation, FIRE check, saving rate) e l&apos;AI
+                            può chiamare strumenti per calcoli precisi (Monte Carlo, ammortamento,
+                            prezzi live, offerte mutui).
                         </CardDescription>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
+                        <AiUserProfileModal
+                            open={profileOpen}
+                            onOpenChange={setProfileOpen}
+                            trigger={
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    title="Scrivi cosa l'AI deve sapere di te (eta', lavoro, obiettivi). Allegato a ogni messaggio."
+                                >
+                                    <UserCircle2 className="size-4 mr-1" />
+                                    Parlami di te
+                                </Button>
+                            }
+                        />
                         <Button
                             variant="outline"
                             size="sm"
@@ -184,7 +274,7 @@ export function AiDashboard({ user }: Props) {
                                 </Button>
                             }
                         />
-                        {messages.length > 0 && (
+                        {turns.length > 0 && (
                             <Button variant="ghost" size="sm" onClick={clearChat}>
                                 <Trash2 className="size-4 mr-1" />
                                 Pulisci
@@ -203,12 +293,37 @@ export function AiDashboard({ user }: Props) {
                         <span className="opacity-60">•</span>
                         <span>
                             <strong>Contesto:</strong>{" "}
-                            {userDataJson ? `${(dataBytes / 1024).toFixed(1)} KB di dati` : "vuoto"}
+                            {userDataJson ? `${(dataBytes / 1024).toFixed(1)} KB` : "vuoto"}
+                        </span>
+                        <span className="opacity-60">•</span>
+                        <span>
+                            <strong>Tools:</strong> {AI_TOOLS.length} disponibili
+                        </span>
+                        <span className="opacity-60">•</span>
+                        <span>
+                            <strong>Profilo:</strong>{" "}
+                            {userProfile.trim() ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setProfileOpen(true)}
+                                    className="underline hover:text-foreground"
+                                >
+                                    compilato ({userProfile.length} car.)
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => setProfileOpen(true)}
+                                    className="underline hover:text-foreground"
+                                >
+                                    vuoto — clicca per compilare
+                                </button>
+                            )}
                         </span>
                     </div>
 
                     <div className="min-h-[28rem] space-y-3 rounded-2xl border border-border/60 bg-background/60 p-3">
-                        {messages.length === 0 && !sending && (
+                        {turns.length === 0 && !sending && (
                             <div className="flex flex-col items-center gap-3 py-10 text-center">
                                 <Sparkles className="size-10 text-purple-400" />
                                 <p className="text-sm text-muted-foreground">
@@ -229,26 +344,29 @@ export function AiDashboard({ user }: Props) {
                             </div>
                         )}
 
-                        {messages.map((m, i) => (
+                        {turns.map((t, i) => (
                             <div
                                 key={i}
-                                className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                                className={`flex gap-2 ${t.message.role === "user" ? "justify-end" : "justify-start"}`}
                             >
-                                {m.role === "assistant" && (
+                                {t.message.role === "assistant" && (
                                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-purple-500/10">
                                         <Bot className="size-4 text-purple-500" />
                                     </div>
                                 )}
-                                <div
-                                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm leading-relaxed ${
-                                        m.role === "user"
-                                            ? "bg-blue-600 text-white"
-                                            : "bg-muted text-foreground"
-                                    }`}
-                                >
-                                    {m.content}
+                                <div className={`max-w-[85%] ${t.message.role === "user" ? "" : "w-full"}`}>
+                                    <div
+                                        className={`whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm leading-relaxed ${
+                                            t.message.role === "user"
+                                                ? "bg-blue-600 text-white"
+                                                : "bg-muted text-foreground"
+                                        }`}
+                                    >
+                                        {t.message.content}
+                                    </div>
+                                    {t.tools && t.tools.length > 0 && <ToolTrace entries={t.tools} />}
                                 </div>
-                                {m.role === "user" && (
+                                {t.message.role === "user" && (
                                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10">
                                         <User className="size-4 text-blue-500" />
                                     </div>
@@ -261,9 +379,25 @@ export function AiDashboard({ user }: Props) {
                                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-purple-500/10">
                                     <Bot className="size-4 text-purple-500" />
                                 </div>
-                                <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-sm text-muted-foreground">
-                                    <Loader2 className="size-4 animate-spin" />
-                                    Sto pensando...
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-sm text-muted-foreground">
+                                        <Loader2 className="size-4 animate-spin" />
+                                        {pendingTools.length > 0
+                                            ? `Eseguo strumenti (${pendingTools.length})...`
+                                            : "Sto pensando..."}
+                                    </div>
+                                    {pendingTools.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                            {pendingTools.map((t, i) => (
+                                                <span
+                                                    key={i}
+                                                    className="rounded-full bg-purple-500/10 px-2 py-0.5 text-[10px] font-mono text-purple-700 dark:text-purple-300"
+                                                >
+                                                    {t.name}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

@@ -84,6 +84,15 @@ model Preference {
   budgetSettings        String @default("{}") // JSON: {currentMonth?, viewMode: "month"|"avg"|"all"}
   subscriptionsList     String @default("[]") // JSON: [{id,name,amount,frequency:"mensile"|"annuale"}]
 
+  // AI Settings (chiave cifrata lato server solo se rememberKeys = true)
+  aiRememberKeys Boolean @default(false)
+  aiProvider     String? // "gemini" | "openrouter"
+  aiModel        String?
+  aiApiKeyEnc    String? // AES-256-GCM(base64) della API key
+
+  // AI: testo libero "Parlami di te" iniettato in ogni system prompt
+  aiUserProfile  String  @default("")
+
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

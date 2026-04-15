@@ -57,7 +57,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
 
     useEffect(() => {
-        if (!user) { setLoading(false); return; }
+        if (!user) return;
 
         Promise.all([
             fetch('/api/patrimonio').then(r => r.json()),
