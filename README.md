@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (obiettivi — contributo mensile richiesto e pacing badge)
+
+- **Contributo mensile necessario** — ogni obiettivo di risparmio con scadenza ora mostra quanto devi mettere da parte ogni mese per arrivare al traguardo in tempo. Il calcolo e' semplice ma trasparente: `(obiettivo − gia' risparmiato) / mesi rimanenti`, cosi' invece di vedere solo "8 mesi rimanenti" capisci subito che servono ad esempio "1.000 €/mese per 8 mesi"
+- **Badge di stato In linea / Da accelerare / In ritardo / Scaduto** — confrontando il ritmo storico di accumulo (calcolato dal momento di creazione dell'obiettivo) con quello richiesto per rispettare la scadenza, la card mostra un badge colorato con icona: verde "In linea" se stai mantenendo il passo, ambra "Da accelerare" se sei oltre il 60% del target ma sotto il necessario, rosso "In ritardo" se sei sotto quella soglia, e "Scaduto" se la deadline e' passata senza raggiungere l'obiettivo. Tooltip esplicativo on-hover su ogni badge
+- **Ritmo attuale visibile** — sotto al contributo richiesto viene mostrato anche il ritmo effettivo di risparmio ("Ritmo attuale: X €/mese"), cosi' l'utente ha sia il target sia la realta' sott'occhio e capisce esattamente di quanto deve aumentare lo sforzo. Niente piu' obiettivi "impostati e dimenticati": il feedback sul pacing e' immediato e azionabile
+
 ### 14 aprile 2026 (riepilogo — tooltip breakdown patrimonio netto)
 
 - **Tooltip "cosa ha mosso il patrimonio"** — passando col mouse sopra la cifra del Patrimonio Netto nel tab Riepilogo appare un pannello a scomparsa che spiega in dettaglio da dove arriva la variazione rispetto allo snapshot precedente. Il breakdown mostra il delta per ciascuna categoria (Liquidita' & ETF, Fondo Emergenza, Bitcoin, Beni Rifugio, Fondo Pensione, Debiti), con la percentuale di contributo al movimento totale, ordinato per impatto assoluto e con riga "Totale" finale che combacia con il +/-€ mostrato sotto. I debiti sono invertiti (una riduzione debiti conta come contributo positivo), cosi' l'utente capisce subito se il mese e' andato bene grazie a mercato, risparmio o deleveraging

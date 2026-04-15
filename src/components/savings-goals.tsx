@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
     Target, Plus, Trash2, Pencil, Check, X,
     Home, PiggyBank, TrendingUp, Plane, Sparkles, CircleDot,
+    Zap, AlertTriangle, Clock,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { format, differenceInMonths, parseISO } from "date-fns";
@@ -105,6 +106,65 @@ function getEstimatedDate(current: number, target: number, createdAt: string): s
     estimated.setMonth(estimated.getMonth() + monthsToGo);
     return format(estimated, "MMM yyyy", { locale: it });
 }
+
+type PacingStatus = "on-track" | "stretch" | "behind" | "expired";
+
+interface DeadlinePacing {
+    requiredMonthly: number;
+    monthsLeft: number;
+    historicalMonthly: number;
+    status: PacingStatus;
+}
+
+function getDeadlinePacing(goal: SavingsGoal): DeadlinePacing | null {
+    if (!goal.deadline) return null;
+    if (goal.currentAmount >= goal.targetAmount) return null;
+
+    const deadlineDate = parseISO(goal.deadline + "-01");
+    const now = new Date();
+    const monthsLeft = differenceInMonths(deadlineDate, now);
+    const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
+
+    if (monthsLeft < 0) {
+        return { requiredMonthly: remaining, monthsLeft, historicalMonthly: 0, status: "expired" };
+    }
+
+    const effectiveMonths = Math.max(1, monthsLeft);
+    const requiredMonthly = remaining / effectiveMonths;
+
+    const created = new Date(goal.createdAt);
+    const monthsElapsed = Math.max(1, differenceInMonths(now, created));
+    const historicalMonthly = goal.currentAmount / monthsElapsed;
+
+    let status: PacingStatus = "behind";
+    if (historicalMonthly >= requiredMonthly) status = "on-track";
+    else if (historicalMonthly >= requiredMonthly * 0.6) status = "stretch";
+
+    return { requiredMonthly, monthsLeft, historicalMonthly, status };
+}
+
+const PACING_BADGE: Record<PacingStatus, { label: string; className: string; icon: React.ReactNode }> = {
+    "on-track": {
+        label: "In linea",
+        className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60",
+        icon: <Check className="h-3 w-3" />,
+    },
+    stretch: {
+        label: "Da accelerare",
+        className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60",
+        icon: <Zap className="h-3 w-3" />,
+    },
+    behind: {
+        label: "In ritardo",
+        className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60",
+        icon: <AlertTriangle className="h-3 w-3" />,
+    },
+    expired: {
+        label: "Scaduto",
+        className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60",
+        icon: <Clock className="h-3 w-3" />,
+    },
+};
 
 interface SavingsGoalsProps {
     user: { username: string } | null;
@@ -335,17 +395,8 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                         const isComplete = progress >= 100;
                         const estimated = getEstimatedDate(goal.currentAmount, goal.targetAmount, goal.createdAt);
                         const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
-
-                        let deadlineInfo: string | null = null;
-                        if (goal.deadline) {
-                            const deadlineDate = parseISO(goal.deadline + "-01");
-                            const monthsLeft = differenceInMonths(deadlineDate, new Date());
-                            deadlineInfo = monthsLeft > 0
-                                ? `${monthsLeft} mesi rimanenti`
-                                : monthsLeft === 0
-                                    ? "Scade questo mese"
-                                    : "Scaduto";
-                        }
+                        const pacing = getDeadlinePacing(goal);
+                        const pacingBadge = pacing ? PACING_BADGE[pacing.status] : null;
 
                         return (
                             <Card key={goal.id} className={`overflow-hidden rounded-3xl border bg-card/80 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg ${isComplete ? "border-emerald-300/80 dark:border-emerald-800" : "border-border/70"}`}>
@@ -388,18 +439,52 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                                         {isComplete && <span className="font-bold text-emerald-600">Obiettivo raggiunto!</span>}
                                     </div>
 
-                                    {(deadlineInfo || estimated) && (
+                                    {pacing && pacingBadge && (
+                                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-border/70 bg-muted/30 px-3 py-2.5">
+                                            <div className="min-w-0">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                    {pacing.status === "expired"
+                                                        ? "Scadenza superata"
+                                                        : pacing.monthsLeft === 0
+                                                            ? "Serve entro questo mese"
+                                                            : "Serve al mese"}
+                                                </p>
+                                                <p className="text-sm font-extrabold text-foreground">
+                                                    {formatEuro(pacing.requiredMonthly)}
+                                                    {pacing.status !== "expired" && pacing.monthsLeft > 0 && (
+                                                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                                                            per {pacing.monthsLeft} mes{pacing.monthsLeft === 1 ? "e" : "i"}
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                {pacing.status !== "expired" && pacing.historicalMonthly > 0 && (
+                                                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                                        Ritmo attuale: {formatEuro(pacing.historicalMonthly)}/mese
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span
+                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold ${pacingBadge.className}`}
+                                                title={
+                                                    pacing.status === "on-track"
+                                                        ? "Al tuo ritmo attuale raggiungerai l'obiettivo entro la scadenza"
+                                                        : pacing.status === "stretch"
+                                                            ? "Ci sei vicino ma devi aumentare leggermente il ritmo di risparmio"
+                                                            : pacing.status === "behind"
+                                                                ? "Al ritmo attuale non arriverai in tempo: serve uno sforzo extra"
+                                                                : "La scadenza e' passata e l'obiettivo non e' stato raggiunto"
+                                                }
+                                            >
+                                                {pacingBadge.icon} {pacingBadge.label}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {!pacing && estimated && !isComplete && (
                                         <div className="flex flex-wrap gap-2 pt-1">
-                                            {deadlineInfo && (
-                                                <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${deadlineInfo.includes("Scaduto") ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-muted text-muted-foreground"}`}>
-                                                    {deadlineInfo}
-                                                </span>
-                                            )}
-                                            {estimated && !isComplete && (
-                                                <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
-                                                    Stima: {estimated}
-                                                </span>
-                                            )}
+                                            <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                                Stima: {estimated}
+                                            </span>
                                         </div>
                                     )}
                                 </CardContent>
