@@ -101,6 +101,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 15 aprile 2026 (FIRE — fix rendimento reale con equazione di Fisher esatta)
+
+- **Bug finanziario critico risolto nel calcolo del rendimento reale** — il motore FIRE (`fire-projection.ts`), il tab FIRE (`fire-dashboard.tsx`) e il consulente acquisti (`advisor-dashboard.tsx`) calcolavano il rendimento reale con la formula approssimata `realReturn = (nominal − inflation) / 100`. Per tassi tipici di un piano FIRE (7% nominale, 3% inflazione) questa scorciatoia dava 4.000% mentre l'equazione di Fisher esatta da' 3.883% — un errore relativo del ~3% che si compone nel tempo: su 30 anni portava a sovrastimare il capitale finale di circa il +3-4% e ad anticipare artificialmente il momento FIRE di quasi un anno. Peggio ancora, il calcolatore inflazione (`inflation-calculator.tsx`) usava gia' la formula corretta, quindi la stessa app mostrava **rendimenti reali diversi a seconda del tab** visitato
+- **Unica fonte di verita' per il rendimento reale** — introdotta la funzione pura `computeRealReturn(nominalPct, inflationPct)` in `src/lib/finance/fire-projection.ts` che applica Fisher esatto `(1 + nominale) / (1 + inflazione) - 1` e include sanitizzazione degli input (NaN → 0) e guard contro scenari degeneri (inflazione ≤ -100%). Tutti i moduli finance ora usano questo helper, eliminando le tre copie della formula sbagliata e garantendo coerenza tra FIRE dashboard, advisor e calcolatore inflazione
+- **Proiezione FIRE piu' robusta** — in `projectFire` il `monthlyRate` e' ora protetto contro rendimenti reali ≤ -100% (prima avrebbe prodotto `NaN` nel ciclo di simulazione) e anche il `coastFireTarget` ha un fallback sicuro nello stesso scenario degenere
+- **Regressione bloccata da 18 nuovi test** — nuovo file `fire-projection.test.ts` con copertura completa di `computeRealReturn` (Fisher vs sottrazione, reale negativo, input NaN, inflazione iperbolica) e di `projectFire` (fireTarget corretto, scenari con/senza acquisto, output non negativi, `alreadyFire`, coerenza con il calcolatore inflazione). Suite totale: da 112 a **130 test passati**
+
 ### 15 aprile 2026 (obiettivi — contributo mensile richiesto e pacing badge)
 
 - **Contributo mensile necessario** — ogni obiettivo di risparmio con scadenza ora mostra quanto devi mettere da parte ogni mese per arrivare al traguardo in tempo. Il calcolo e' semplice ma trasparente: `(obiettivo − gia' risparmiato) / mesi rimanenti`, cosi' invece di vedere solo "8 mesi rimanenti" capisci subito che servono ad esempio "1.000 €/mese per 8 mesi"
