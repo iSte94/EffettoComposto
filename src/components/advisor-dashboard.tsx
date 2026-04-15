@@ -20,7 +20,7 @@ import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
 import { Button } from "@/components/ui/button";
 import { Trash2, Calendar } from "lucide-react";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
-import { projectFire } from "@/lib/finance/fire-projection";
+import { projectFire, computeRealReturn } from "@/lib/finance/fire-projection";
 import { toast } from "sonner";
 
 interface AdvisorDashboardProps {
@@ -332,8 +332,14 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       residualValue = sim.totalPrice * Math.pow(1.02, tcoYears);
     }
 
-    // Costo opportunita: se investissi la stessa somma al rendimento reale atteso dell'utente
-    const realReturnForOpportunity = Math.max(0, (snapshot.fireExpectedReturn - snapshot.expectedInflation) / 100);
+    // Costo opportunita: se investissi la stessa somma al rendimento reale atteso dell'utente.
+    // Usiamo l'equazione di Fisher esatta (via computeRealReturn) per coerenza con la
+    // proiezione FIRE: l'approssimazione (nominal - inflation) sovrastimava il costo
+    // opportunita' rendendo ogni acquisto artificialmente piu' costoso.
+    const realReturnForOpportunity = Math.max(
+      0,
+      computeRealReturn(snapshot.fireExpectedReturn, snapshot.expectedInflation),
+    );
     const cashOutlay = sim.isFinanced ? sim.downPayment : sim.totalPrice;
     const opportunityCost = cashOutlay * Math.pow(1 + realReturnForOpportunity, tcoYears) - cashOutlay;
 

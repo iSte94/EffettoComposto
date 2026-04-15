@@ -13,6 +13,7 @@ import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Load
 import { toast } from "sonner";
 import { calculateIrpef } from "@/lib/finance/irpef";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { computeRealReturn } from "@/lib/finance/fire-projection";
 import {
     calculatePropertyAnnualNetIncome,
     sumRealEstateAnnualNetIncome,
@@ -266,9 +267,14 @@ export function FireDashboard({ user }: FireDashboardProps) {
     // Starting capital
     const startingCapital = includeIlliquidInFire ? currentNetWorth : currentLiquidAssets;
 
-    // Rendimento reale = nominale - inflazione (approccio WalletBurst: tutto in euro odierni)
-    const realReturnDecimal = (fireExpectedReturn - expectedInflation) / 100;
-    const coastFireTarget = fireTarget / Math.pow(1 + realReturnDecimal, yearsToRetirement);
+    // Rendimento reale via equazione di Fisher esatta (tutto in euro odierni).
+    // La precedente approssimazione `(nominal - inflation) / 100` sovrastimava
+    // il tasso reale del ~3% (es. 4.00% vs 3.88% reale per 7% nominale / 3% inflazione),
+    // anticipando erroneamente il momento FIRE. Vedi computeRealReturn() per dettagli.
+    const realReturnDecimal = computeRealReturn(fireExpectedReturn, expectedInflation);
+    const coastFireTarget = 1 + realReturnDecimal > 0
+        ? fireTarget / Math.pow(1 + realReturnDecimal, yearsToRetirement)
+        : fireTarget;
     const coastFireReached = startingCapital >= coastFireTarget;
 
     // Helper to calculate total active installments at a given month in the future

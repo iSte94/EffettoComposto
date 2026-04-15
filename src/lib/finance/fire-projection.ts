@@ -1,6 +1,41 @@
 // Motore di proiezione FIRE deterministico e puro.
 // Riutilizzabile dal tab FIRE e dal Consulente per confronti "con / senza acquisto".
-// Tutto in euro odierni: il rendimento reale e' gia' nominale - inflazione.
+// Tutto in euro odierni: il rendimento reale segue l'equazione di Fisher esatta.
+
+/**
+ * Calcola il rendimento reale (decimale) dato il rendimento nominale e l'inflazione
+ * usando l'equazione di Fisher ESATTA:
+ *
+ *     (1 + reale) = (1 + nominale) / (1 + inflazione)
+ *
+ * L'approssimazione ingenua `reale = nominale - inflazione` e' accettabile solo
+ * quando entrambi i tassi sono molto piccoli. Per valori tipici di un piano FIRE
+ * (es. nominale 7%, inflazione 3%) l'errore relativo e' gia' del ~3% e si
+ * compone nel tempo: su 30 anni porta a una sovrastima del capitale finale
+ * intorno al +3-4%, sufficiente ad anticipare erroneamente la data FIRE di
+ * quasi un anno.
+ *
+ * Questo helper e' la UNICA fonte di verita' per il rendimento reale del
+ * progetto e viene riusato da fire-dashboard, advisor-dashboard e Monte Carlo.
+ *
+ * @param nominalPct rendimento nominale atteso in percentuale (es. 7 per 7%)
+ * @param inflationPct inflazione attesa in percentuale (es. 3 per 3%)
+ * @returns rendimento reale in decimale (es. 0.0388 per 3.88%)
+ */
+export function computeRealReturn(nominalPct: number, inflationPct: number): number {
+    // Input sanitization: NaN/undefined fallback a 0 per evitare proiezioni corrotte.
+    const nominal = Number.isFinite(nominalPct) ? nominalPct : 0;
+    const inflation = Number.isFinite(inflationPct) ? inflationPct : 0;
+
+    // Guard: inflazione = -100% farebbe dividere per zero. In quel caso (scenario
+    // degenere) ricadiamo sulla sottrazione semplice che resta finita.
+    const denom = 1 + inflation / 100;
+    if (denom <= 0) {
+        return (nominal - inflation) / 100;
+    }
+
+    return (1 + nominal / 100) / denom - 1;
+}
 
 export interface FireProjectionParams {
     startingCapital: number;
@@ -41,7 +76,7 @@ export interface FireProjectionResult {
  *
  * Formule chiave:
  *   - fireTarget = (monthlyExpensesAtFire * 12) / (withdrawalRate / 100)
- *   - realReturn = nominalReturn - inflation  (euro odierni)
+ *   - realReturn = (1 + nominal) / (1 + inflation) - 1   (Fisher esatto, euro odierni)
  *   - monthlyRate = (1 + realReturn) ^ (1/12) - 1
  *   - capital[m+1] = capital[m] * (1 + monthlyRate) + netSaving[m]
  *   - netSaving[m] = monthlySavings - recurring (se m < recurringMonths) - ongoing (se m < ongoingMonths)
@@ -68,8 +103,11 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
     const swr = Math.max(0.1, withdrawalRatePct) / 100;
     const fireTarget = annualExpenses / swr;
 
-    const realReturn = (expectedReturnPct - inflationPct) / 100;
-    const monthlyRate = Math.pow(1 + realReturn, 1 / 12) - 1;
+    // Fisher equation esatta: evita la sovrastima da ~3-4% su 30 anni tipica
+    // dell'approssimazione (nominal - inflation).
+    const realReturn = computeRealReturn(expectedReturnPct, inflationPct);
+    // Proteggi da rendimenti reali <= -100% (scenario degenere irrealistico).
+    const monthlyRate = 1 + realReturn > 0 ? Math.pow(1 + realReturn, 1 / 12) - 1 : -1;
 
     let capital = Math.max(0, startingCapital - oneTimeOutflow);
     const chartData: FireProjectionPoint[] = [];
