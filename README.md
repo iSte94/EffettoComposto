@@ -13,6 +13,8 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
+**Versione corrente:** `v0.2.0`
+
 ---
 
 *Simulatore mutuo, calcolatore FIRE, tracker patrimonio, carriera, stipendio netto, budget e molto altro.*
@@ -99,7 +101,22 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ---
 
+## Versioning
+
+- **Fonte di verita'** - il numero versione del software vive in `package.json` (`version`) ed e' la base sia del repo sia del frontend
+- **Regola di release** - ogni deploy applicativo su VPS deve includere bump versione + nuova voce nel changelog con lo stesso numero
+- **Bump rapido** - per i prossimi rilasci puoi usare `npm run release:patch`, `npm run release:minor` oppure `npm run release:major`
+- **UI discreta** - la versione corrente viene mostrata in piccolo sotto il brand nell'header, in grigio tenue, cosi' resta sempre verificabile senza sporcare la dashboard
+
+---
+
 ## Changelog
+
+### v0.2.0 — 16 aprile 2026 (versioning release)
+
+- **Numero versione ufficiale nel repo** - `package.json` diventa la fonte canonica della versione software e viene portato a `v0.2.0`, con script dedicati per incrementi `patch`, `minor` e `major`
+- **Versione visibile anche nel frontend** - aggiunta una micro-etichetta grigia sotto il logo nell'header principale, pensata per essere sempre disponibile ma visivamente discreta
+- **Processo di rilascio reso esplicito** - documentato nel repository che ogni deploy applicativo deve allineare numero versione e changelog, cosi' l'avanzamento del software resta sempre tracciabile
 
 ### 16 aprile 2026 (fix critico debiti — rollover rate minime + edge-case obiettivi e Monte Carlo)
 

@@ -4,6 +4,7 @@ import { lazy, Suspense, useState } from "react";
 import { BarChart3, Bot, Briefcase, Building2, Flame, Github, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuthModal } from "@/components/auth-modal";
+import { AppVersionLabel } from "@/components/app-version-label";
 import { BrandLogo } from "@/components/brand-logo";
 import { ExportReportModal } from "@/components/export-report-modal";
 import { HeaderKpisBar } from "@/components/header-kpis";
@@ -61,13 +62,16 @@ export default function CalculatorPage() {
     <div className="space-y-8 pb-24">
       <header className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-xl sm:p-5 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <BrandLogo
-            className="w-full max-w-[14rem] sm:max-w-[18rem] md:max-w-[21rem]"
-            imageClassName="drop-shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
-            priority
-            subtitle="Il cruscotto della tua liberta finanziaria"
-            subtitleClassName="pl-2 pt-1"
-          />
+          <div className="flex flex-col">
+            <BrandLogo
+              className="w-full max-w-[14rem] sm:max-w-[18rem] md:max-w-[21rem]"
+              imageClassName="drop-shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
+              priority
+              subtitle="Il cruscotto della tua liberta finanziaria"
+              subtitleClassName="pl-2 pt-1"
+            />
+            <AppVersionLabel className="-mt-1" />
+          </div>
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-2 md:w-auto md:justify-end">
