@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 16 aprile 2026 (UX — skeleton loader per caricamento tab e simulatore FIRE)
+
+- **Skeleton loader globale per tutti i tab** — il `TabFallback` usato come Suspense fallback per tutti i 9 tab lazy-loaded e' stato trasformato da un semplice spinner centrato in uno skeleton strutturato che mima il layout tipico di una dashboard: blocco hero con titolo/sottotitolo, griglia di 4 card metriche e area grafico. Cosi' l'utente percepisce immediatamente il tipo di contenuto in arrivo invece di fissare uno spinner anonimo, migliorando significativamente la perceived loading performance su ogni cambio tab (specialmente su connessioni lente o dispositivi meno potenti)
+- **Skeleton dedicato per il simulatore FIRE** — il tab FIRE (uno dei piu' pesanti: ~1150 righe, fetch preferenze + patrimonio + calcoli derivati) ora mostra uno skeleton strutturato durante il caricamento iniziale dei dati, con 5 card KPI placeholder, barra tab e area grafico. Prima il componente renderizzava immediatamente con tutti i valori a zero (€0 patrimonio, 0 anni al FIRE, obiettivo €0) causando un flash confuso di dati falsi prima che i valori reali apparissero — un pattern che poteva sembrare un bug. L'`isLoadingUser` flag gia' presente e' stato riutilizzato come gate per il rendering dello skeleton, senza aggiungere stato nuovo
+- **Cleanup import** — rimossa l'importazione inutilizzata di `Loader2` da `page.tsx` (l'icona spinner non serve piu' nel nuovo TabFallback basato su Skeleton)
+
 ### 16 aprile 2026 (AI Advisor v2 — profilo utente, tool calling, derived data, API key cifrata)
 
 - **"Parlami di te" — profilo personale persistente iniettato in ogni prompt** — nuovo pulsante in header al tab AI che apre un modal con textarea libera (max 8000 caratteri) dove l'utente racconta eta', lavoro, situazione familiare, obiettivi di vita, tolleranza al rischio, vincoli e preferenze d'investimento. Il testo viene salvato sul DB nel modello `Preference.aiUserProfile` (cross-device, sopravvive ai refresh) e iniettato in ogni system prompt come blocco dedicato `--- PROFILO UTENTE ---` separato dallo snapshot dati. Cosi' l'AI ha sempre il contesto su CHI sei prima di guardare i numeri. Status bar mostra "Profilo: compilato (N car.)" / "vuoto — clicca per compilare" come scorciatoia

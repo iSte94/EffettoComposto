@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -251,6 +252,41 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 </div>
                 <h2 className="text-3xl font-extrabold text-slate-800 dark:text-slate-200">Financial Independence, Retire Early</h2>
                 <p className="text-slate-500 max-w-md">Accedi o crea un account per calcolare quando raggiungerai la libertà finanziaria usando i tuoi asset reali.</p>
+            </div>
+        );
+    }
+
+    if (isLoadingUser) {
+        return (
+            <div className="space-y-10 animate-in fade-in duration-500 pb-20">
+                {/* Hero skeleton */}
+                <div className="text-center space-y-4 pt-6">
+                    <Skeleton className="mx-auto h-10 w-72 rounded-xl md:h-12 md:w-96" />
+                    <Skeleton className="mx-auto h-5 w-80 rounded-lg sm:w-[28rem]" />
+                    <div className="grid grid-cols-1 gap-4 px-2 pt-6 md:grid-cols-2 lg:grid-cols-5">
+                        {[...Array(5)].map((_, i) => (
+                            <div key={i} className="rounded-2xl border border-slate-200/80 bg-white/75 p-6 shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+                                <Skeleton className="mb-2 h-3 w-24 rounded" />
+                                <Skeleton className="mb-1 h-7 w-32 rounded-lg" />
+                                <Skeleton className="h-3 w-40 rounded" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                {/* Tabs skeleton */}
+                <div className="space-y-6">
+                    <div className="flex justify-center">
+                        <Skeleton className="h-11 w-full max-w-2xl rounded-2xl" />
+                    </div>
+                    {/* Chart area skeleton */}
+                    <div className="rounded-3xl border border-border/70 bg-card/80 p-6 shadow-sm backdrop-blur-xl">
+                        <div className="mb-4 flex items-center justify-between">
+                            <Skeleton className="h-5 w-48 rounded-lg" />
+                            <Skeleton className="h-8 w-24 rounded-xl" />
+                        </div>
+                        <Skeleton className="h-[320px] w-full rounded-2xl sm:h-[400px]" />
+                    </div>
+                </div>
             </div>
         );
     }

@@ -1,7 +1,8 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Bot, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, Wallet, Wrench } from "lucide-react";
+import { BarChart3, Bot, Briefcase, Building2, Flame, Github, LineChart, ShieldCheck, Wallet, Wrench } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AuthModal } from "@/components/auth-modal";
 import { BrandLogo } from "@/components/brand-logo";
 import { HeaderKpisBar } from "@/components/header-kpis";
@@ -21,8 +22,27 @@ const AiDashboard = lazy(() => import("@/components/ai-dashboard").then((m) => (
 
 function TabFallback() {
   return (
-    <div className="flex items-center justify-center rounded-2xl border border-border/70 bg-card/70 py-24 shadow-sm backdrop-blur-sm">
-      <Loader2 className="size-8 animate-spin text-muted-foreground" />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Hero skeleton */}
+      <div className="rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-40 rounded-lg" />
+            <Skeleton className="h-8 w-56 rounded-lg" />
+          </div>
+          <Skeleton className="h-9 w-28 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+      {/* Chart area skeleton */}
+      <div className="rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-xl">
+        <Skeleton className="mb-4 h-5 w-48 rounded-lg" />
+        <Skeleton className="h-[280px] w-full rounded-2xl sm:h-[360px]" />
+      </div>
     </div>
   );
 }
