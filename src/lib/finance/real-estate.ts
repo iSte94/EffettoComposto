@@ -43,7 +43,10 @@ export function calculatePropertyAnnualNetIncome(
 
     const rent = Math.max(0, prop.rent || 0);
     const totalCosts = calculatePropertyAnnualCosts(prop);
-    return Math.max(0, rent - totalCosts);
+    // Permettiamo rendita negativa: un immobile in perdita (costi > affitto)
+    // DEVE ridurre il reddito passivo totale, altrimenti il target FIRE viene
+    // sottostimato (es. 2 immobili, uno a +7k e uno a -5k = +2k, non +7k).
+    return rent - totalCosts;
 }
 
 /**

@@ -69,14 +69,16 @@ describe('calculatePropertyAnnualNetIncome', () => {
         expect(net).toBe(5000);
     });
 
-    it('non permette rendita netta negativa (floor a 0)', () => {
+    it('riporta rendita netta negativa per immobili in perdita', () => {
+        // Un immobile con costi > affitto DEVE contribuire negativamente
+        // al reddito passivo totale, altrimenti il target FIRE viene sottostimato.
         const net = calculatePropertyAnnualNetIncome({
             rent: 1000,
             costs: 3000,
             imu: 500,
             isRented: true,
         });
-        expect(net).toBe(0);
+        expect(net).toBe(1000 - 3000 - 500); // -2500
     });
 
     it('considera rentStartDate futura: 0 prima della maturazione', () => {
@@ -114,5 +116,19 @@ describe('sumRealEstateAnnualNetIncome', () => {
 
     it('gestisce lista vuota', () => {
         expect(sumRealEstateAnnualNetIncome([])).toBe(0);
+    });
+
+    it('immobile in perdita riduce il reddito passivo totale', () => {
+        // Scenario reale: un immobile redditizio + uno in perdita.
+        // PRIMA del fix: +9000 + 0 = 9000 (floor a 0 nascondeva la perdita)
+        // DOPO il fix:   +9000 + (-2500) = 6500 (corretto)
+        // Impatto sul FIRE target (SWR 4%, spese 30k/anno):
+        //   PRIMA: (30000 - 9000) / 0.04 = 525.000€
+        //   DOPO:  (30000 - 6500) / 0.04 = 587.500€  (+62.500€ di differenza!)
+        const total = sumRealEstateAnnualNetIncome([
+            { rent: 12000, costs: 2000, imu: 1000, isRented: true },           // +9000
+            { rent: 1000, costs: 3000, imu: 500, isRented: true },             // -2500
+        ]);
+        expect(total).toBe(9000 + (-2500));
     });
 });

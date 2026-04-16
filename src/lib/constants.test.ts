@@ -23,7 +23,7 @@ describe('constants', () => {
     it('IRPEF_BRACKETS has correct structure', () => {
         expect(IRPEF_BRACKETS).toHaveLength(3);
         expect(IRPEF_BRACKETS[0]).toEqual({ limit: 28000, rate: 0.23 });
-        expect(IRPEF_BRACKETS[1]).toEqual({ limit: 50000, rate: 0.35 });
+        expect(IRPEF_BRACKETS[1]).toEqual({ limit: 50000, rate: 0.33 });
         expect(IRPEF_BRACKETS[2]).toEqual({ limit: Infinity, rate: 0.43 });
     });
 

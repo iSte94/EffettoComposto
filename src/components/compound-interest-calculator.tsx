@@ -141,7 +141,7 @@ export function CompoundInterestCalculator() {
                         </div>
                         <div className="flex items-center justify-center gap-1.5 rounded-2xl border border-border/60 bg-muted/50 p-3 text-center">
                             <span className="text-xs font-bold text-muted-foreground">
-                                {((result.totalInterest / result.finalBalance) * 100).toFixed(0)}% da interessi composti
+                                {(result.finalBalance > 0 ? (result.totalInterest / result.finalBalance) * 100 : 0).toFixed(0)}% da interessi composti
                             </span>
                             <InfoTooltip iconClassName="w-3 h-3">Quota del capitale finale generata esclusivamente dagli interessi sugli interessi (effetto compounding), non dai versamenti diretti.</InfoTooltip>
                         </div>

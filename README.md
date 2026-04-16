@@ -101,6 +101,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 16 aprile 2026 (fix critico FIRE — rendita immobiliare negativa + IRPEF + UI)
+
+- **Bug finanziario critico risolto: rendita immobiliare negativa ignorata** — `calculatePropertyAnnualNetIncome()` in `src/lib/finance/real-estate.ts` applicava `Math.max(0, rent - totalCosts)`, azzerando silenziosamente la perdita di immobili in cui i costi superano l'affitto. Quando un utente aveva sia un immobile redditizio (+€9k) sia uno in perdita (-€2.5k), il sistema calcolava un reddito passivo totale di €9k invece del corretto €6.5k, sottostimando il target FIRE di decine di migliaia di euro (es. con SWR 4% e spese €30k/anno: target calcolato €525k invece del corretto €587.5k, errore di **€62.5k / 12%**). Il bug si propagava nel Monte Carlo, nel calcolo deterministico FIRE, nel Coast FIRE e nel consulente acquisti — ovunque venisse usata `sumRealEstateAnnualNetIncome()`. Fix: rimosso il floor, la rendita netta puo' ora essere negativa e viene correttamente compensata nella somma aggregata
+- **IRPEF_BRACKETS costante disallineata** — il secondo scaglione in `src/lib/constants.ts` dichiarava aliquota 0.35 (35%, scaglioni 2024) ma il motore di calcolo effettivo `irpef.ts` usava correttamente 0.33 (33%, scaglioni 2026). Aggiornata la costante e il commento a "IRPEF 2026" per prevenire errori in futuri refactor che la importassero al posto dei valori hardcoded
+- **Fix NaN nel calcolatore interesse composto** — quando capitale iniziale e contributo mensile erano entrambi 0, la percentuale "da interessi composti" calcolava `0/0 = NaN`, mostrando "NaN%" nell'UI. Aggiunto guard: se il bilancio finale e' zero, mostra 0%
+- **Pulizia dead code IRPEF detrazioni** — `Math.max(690, 1955)` in `irpef.ts` restituiva sempre 1955 (690 e' strettamente minore): semplificato a `1955` per chiarezza
+- **Test aggiornati e nuovi** — aggiornato il test `real-estate.test.ts` per verificare che la rendita negativa venga correttamente propagata (non piu' azzerata), aggiunto test di regressione che dimostra l'impatto sul reddito passivo aggregato con immobili misti, aggiornato `constants.test.ts` per aspettarsi 0.33 nel secondo scaglione. Suite totale: **156 test passati**
+
 ### 16 aprile 2026 (UX — skeleton loader per caricamento tab e simulatore FIRE)
 
 - **Skeleton loader globale per tutti i tab** — il `TabFallback` usato come Suspense fallback per tutti i 9 tab lazy-loaded e' stato trasformato da un semplice spinner centrato in uno skeleton strutturato che mima il layout tipico di una dashboard: blocco hero con titolo/sottotitolo, griglia di 4 card metriche e area grafico. Cosi' l'utente percepisce immediatamente il tipo di contenuto in arrivo invece di fissare uno spinner anonimo, migliorando significativamente la perceived loading performance su ogni cambio tab (specialmente su connessioni lente o dispositivi meno potenti)
