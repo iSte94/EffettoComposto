@@ -101,6 +101,10 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 16 aprile 2026 (fix AI — enum Gemini)
+
+- **Fix errore 400 Gemini su tool calling con enum numerici** — le `functionDeclarations` inviate a Gemini contenevano valori `enum` di tipo `integer` (es. `[12, 13, 14]` per le mensilita' e `[15, 20, 30]` per la durata mutuo) ma l'API Gemini richiede che tutti i valori enum siano stringhe, indipendentemente dal tipo della proprieta'. Aggiunta funzione `geminiSanitizeSchema()` in `src/lib/ai/providers.ts` che converte ricorsivamente ogni array `enum` in stringhe prima di inviare lo schema a Gemini. Il path OpenRouter resta invariato
+
 ### 16 aprile 2026 (UX — allocazione asset leggibile e accessibile nel Riepilogo)
 
 - **Percentuali visibili nella legenda allocazione asset** — la barra di asset allocation nel tab Riepilogo mostrava le percentuali di ogni categoria (Immobili, Liquidita' & ETF, Crypto, Altro) solo tramite attributo `title` sulle sezioni colorate della barra. Gli utenti su mobile e tablet non potevano in alcun modo visualizzare questi valori (il `title` richiede hover con il mouse). Ora ogni voce della legenda mostra il valore percentuale in grassetto accanto al nome della categoria, rendendo l'informazione immediatamente visibile su qualsiasi dispositivo senza necessita' di interazione

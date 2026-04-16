@@ -180,6 +180,21 @@ interface GeminiContent {
     parts: GeminiPart[];
 }
 
+/** Gemini richiede che i valori enum siano sempre stringhe. */
+function geminiSanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(schema)) {
+        if (k === "enum" && Array.isArray(v)) {
+            out[k] = v.map((x) => String(x));
+        } else if (v && typeof v === "object" && !Array.isArray(v)) {
+            out[k] = geminiSanitizeSchema(v as Record<string, unknown>);
+        } else {
+            out[k] = v;
+        }
+    }
+    return out;
+}
+
 async function chatGemini(req: AiChatRequest): Promise<AiChatResult> {
     const trace: AiToolTraceEntry[] = [];
 
@@ -192,7 +207,7 @@ async function chatGemini(req: AiChatRequest): Promise<AiChatResult> {
         ? [{ functionDeclarations: req.tools!.map((t) => ({
                 name: t.name,
                 description: t.description,
-                parameters: t.parameters,
+                parameters: geminiSanitizeSchema(t.parameters),
             })) }]
         : undefined;
 
