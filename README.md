@@ -101,6 +101,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### 16 aprile 2026 (UX — allocazione asset leggibile e accessibile nel Riepilogo)
+
+- **Percentuali visibili nella legenda allocazione asset** — la barra di asset allocation nel tab Riepilogo mostrava le percentuali di ogni categoria (Immobili, Liquidita' & ETF, Crypto, Altro) solo tramite attributo `title` sulle sezioni colorate della barra. Gli utenti su mobile e tablet non potevano in alcun modo visualizzare questi valori (il `title` richiede hover con il mouse). Ora ogni voce della legenda mostra il valore percentuale in grassetto accanto al nome della categoria, rendendo l'informazione immediatamente visibile su qualsiasi dispositivo senza necessita' di interazione
+- **Accessibilita' screen reader** — aggiunto `role="img"` e `aria-label` descrittivo alla barra di allocazione, cosi' gli screen reader leggono il breakdown completo ("Allocazione asset: Immobili 45.2%, Liquidita' & ETF 30.1%, ...") invece di ignorare silenziosamente un elemento puramente decorativo. Rimossi i `title` individuali dai segmenti (ora ridondanti con la legenda visibile e l'aria-label sul contenitore)
+- **Pulizia dead code** — rimossa la variabile `sparkData` (array di 30 punti per sparkline) che veniva calcolata dentro il `useMemo` principale ma mai restituita ne' renderizzata, eliminando un'allocazione inutile ad ogni ricalcolo delle metriche
+
 ### 16 aprile 2026 (fix critico FIRE — rendita immobiliare negativa + IRPEF + UI)
 
 - **Bug finanziario critico risolto: rendita immobiliare negativa ignorata** — `calculatePropertyAnnualNetIncome()` in `src/lib/finance/real-estate.ts` applicava `Math.max(0, rent - totalCosts)`, azzerando silenziosamente la perdita di immobili in cui i costi superano l'affitto. Quando un utente aveva sia un immobile redditizio (+€9k) sia uno in perdita (-€2.5k), il sistema calcolava un reddito passivo totale di €9k invece del corretto €6.5k, sottostimando il target FIRE di decine di migliaia di euro (es. con SWR 4% e spese €30k/anno: target calcolato €525k invece del corretto €587.5k, errore di **€62.5k / 12%**). Il bug si propagava nel Monte Carlo, nel calcolo deterministico FIRE, nel Coast FIRE e nel consulente acquisti — ovunque venisse usata `sumRealEstateAnnualNetIncome()`. Fix: rimosso il floor, la rendita netta puo' ora essere negativa e viene correttamente compensata nella somma aggregata

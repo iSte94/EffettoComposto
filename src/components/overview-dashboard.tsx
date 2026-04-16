@@ -113,12 +113,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         const btcValue = (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
         const otherAssets = (latest.safeHavens || 0) + (latest.pensionFund || 0);
 
-        // Sparkline data (ultimi 30 records o tutti se meno)
-        const sparkData = history.slice(-30).map(item => ({
-            date: item.date,
-            value: item.totalNetWorth || 0
-        }));
-
         // Asset allocation percentages
         const totalGross = realEstateValue + liquidValue + btcValue + otherAssets;
         const allocation = totalGross > 0 ? {
@@ -155,7 +149,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             currentNetWorth, netWorthChange, netWorthChangePercent, changeBreakdown, hasPrevious: !!previous,
             totalDebts, debtToAssetRatio,
             realEstateValue, liquidValue, btcValue, otherAssets,
-            sparkData, allocation,
+            allocation,
             fireTarget, fireProgress,
             emergencyFund, emergencyMonths,
             snapshotCount: history.length,
@@ -402,25 +396,29 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             {/* Asset Allocation Bar */}
             <div className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl shadow-sm p-5 sm:p-6">
                 <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em] mb-4">Allocazione Asset</h3>
-                <div className="w-full h-6 bg-muted rounded-full overflow-hidden flex">
+                <div
+                    className="w-full h-6 bg-muted rounded-full overflow-hidden flex"
+                    role="img"
+                    aria-label={`Allocazione asset: Immobili ${metrics.allocation.immobili.toFixed(1)}%, Liquidità & ETF ${metrics.allocation.liquidita.toFixed(1)}%, Crypto ${metrics.allocation.crypto.toFixed(1)}%, Altro ${metrics.allocation.altro.toFixed(1)}%`}
+                >
                     {metrics.allocation.immobili > 0 && (
-                        <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.immobili}%` }} title={`Immobili ${metrics.allocation.immobili.toFixed(1)}%`} />
+                        <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.immobili}%` }} />
                     )}
                     {metrics.allocation.liquidita > 0 && (
-                        <div className="bg-purple-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.liquidita}%` }} title={`Liquidita ${metrics.allocation.liquidita.toFixed(1)}%`} />
+                        <div className="bg-purple-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.liquidita}%` }} />
                     )}
                     {metrics.allocation.crypto > 0 && (
-                        <div className="bg-amber-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.crypto}%` }} title={`Crypto ${metrics.allocation.crypto.toFixed(1)}%`} />
+                        <div className="bg-amber-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.crypto}%` }} />
                     )}
                     {metrics.allocation.altro > 0 && (
-                        <div className="bg-slate-400 h-full transition-all duration-700" style={{ width: `${metrics.allocation.altro}%` }} title={`Altro ${metrics.allocation.altro.toFixed(1)}%`} />
+                        <div className="bg-slate-400 h-full transition-all duration-700" style={{ width: `${metrics.allocation.altro}%` }} />
                     )}
                 </div>
                 <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 text-xs font-medium text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Immobili</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Liquidità & ETF</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Crypto</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Altro</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Immobili <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.immobili.toFixed(1)}%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Liquidità & ETF <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.liquidita.toFixed(1)}%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Crypto <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.crypto.toFixed(1)}%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Altro <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.altro.toFixed(1)}%</span></span>
                 </div>
             </div>
 
