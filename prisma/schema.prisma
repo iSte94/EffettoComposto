@@ -64,12 +64,14 @@ model Preference {
   birthYear                Int?
   retirementAge            Int?
   expectedMonthlyExpenses  Float?
+  monthlySavings           Float    @default(1000)
   fireWithdrawalRate       Float    @default(3.25)
   fireExpectedReturn       Float    @default(6.0)
   fireVolatility           Float    @default(15.0)
   expectedPublicPension    Float    @default(0)
   publicPensionAge         Int      @default(67)
   applyTaxStamp            Boolean  @default(true)
+  includeIlliquidInFire    Boolean  @default(false)
   separateEmergencyFund    Boolean  @default(false)
 
   // Fondo Pensione Complementare

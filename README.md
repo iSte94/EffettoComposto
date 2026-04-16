@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.2.2`
+**Versione corrente:** `v0.2.3`
 
 ---
 
@@ -111,6 +111,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.2.3 - 17 aprile 2026 (fix FIRE in tempo reale)
+
+- **Mappa FIRE coerente in tempo reale** - il target FIRE, la timeline del viaggio, le milestone e le linee di riferimento ora si ricalcolano subito usando il capitale netto realmente richiesto dal piano, quindi modifiche a pensione pubblica, eta' pensionabile, eta' FIRE, rendita immobiliare e altri parametri aggiornano tutta la schermata in modo allineato
+- **Auto-salvataggio piu' rapido e trasparente** - le preferenze FIRE vengono salvate con debounce piu' corto e la UI mostra chiaramente quando ci sono modifiche in attesa oppure un salvataggio in corso
+- **Persistenza completata per i parametri FIRE** - `monthlySavings` e `includeIlliquidInFire` entrano nello schema validato, nel database e nel caricamento iniziale, evitando stati incoerenti tra impostazioni mostrate e dati realmente salvati
+- **Test dedicati sulla logica Coast FIRE** - aggiunta copertura per verificare che pensione pubblica ed eta' pensionabile riducano davvero il target netto e il capitale richiesto
 
 ### v0.2.2 - 17 aprile 2026 (fix UI AI: solo risposta finale in italiano)
 
