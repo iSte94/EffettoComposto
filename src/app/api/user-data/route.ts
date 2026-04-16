@@ -12,11 +12,12 @@ export async function GET(req: Request) {
         const { searchParams } = new URL(req.url);
         const includeDerived = searchParams.get('ai') === '1';
 
-        const [preferences, assets, goals, budgetTransactions] = await Promise.all([
+        const [preferences, assets, goals, budgetTransactions, dividends] = await Promise.all([
             prisma.preference.findUnique({ where: { userId } }),
             prisma.assetRecord.findMany({ where: { userId }, orderBy: { date: 'asc' } }),
             prisma.savingsGoal.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
             prisma.budgetTransaction.findMany({ where: { userId }, orderBy: { date: 'asc' } }),
+            prisma.dividendRecord.findMany({ where: { userId }, orderBy: { paymentDate: 'desc' } }),
         ]);
 
         // Rimuoviamo i campi interni (userId, id) che non servono per l'import
@@ -49,6 +50,11 @@ export async function GET(req: Request) {
             } catch { /* noop */ }
         }
 
+        const cleanDividends = dividends.map(({ id, userId: _u, createdAt: _c, updatedAt: _up, ...rest }) => {
+            void id; void _u; void _c; void _up;
+            return rest;
+        });
+
         const exportData: Record<string, unknown> = {
             version: 1,
             exportedAt: new Date().toISOString(),
@@ -57,6 +63,7 @@ export async function GET(req: Request) {
             obiettivi: cleanGoals,
             abbonamenti: subscriptions,
             budgetTransactions: cleanBudgetTransactions,
+            dividends: cleanDividends,
         };
 
         if (includeDerived) {

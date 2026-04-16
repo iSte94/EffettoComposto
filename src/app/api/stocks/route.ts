@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server';
-import { getFxRates } from '@/lib/fx-rates';
+import { getFxRates, normalizePriceToEur } from '@/lib/fx-rates';
+import { scrapeBondPriceByIsin, isItalianBondIsin } from '@/lib/borsa-italiana/bond-scraper';
 
 export async function GET(req: Request) {
     try {
         const { searchParams } = new URL(req.url);
         const ticker = searchParams.get('ticker');
+        const isin = searchParams.get('isin');
 
         if (!ticker) {
             return NextResponse.json({ error: 'Ticker is required' }, { status: 400 });
         }
 
-        const { usdToEur: USD_TO_EUR, gbpToEur: GBP_TO_EUR } = await getFxRates();
+        const rates = await getFxRates();
 
         let price = 0;
         let currency = 'EUR';
@@ -32,13 +34,12 @@ export async function GET(req: Request) {
                 const data = await yfResponse.json();
                 if (data.chart?.result?.[0]) {
                     const meta = data.chart.result[0].meta;
-                    price = meta.regularMarketPrice;
+                    const rawPrice = meta.regularMarketPrice;
                     currency = meta.currency || 'EUR';
                     exchangeName = meta.exchangeName || 'Unknown';
                     symbol = meta.symbol;
 
-                    if (currency === 'USD') price = price * USD_TO_EUR;
-                    else if (currency === 'GBp') price = (price / 100) * GBP_TO_EUR;
+                    price = normalizePriceToEur(rawPrice, currency, rates);
 
                     // Try to get dividend yield from Yahoo Finance summary
                     let dividendYield = 0;
@@ -57,10 +58,8 @@ export async function GET(req: Request) {
                             const detail = summaryData.quoteSummary?.result?.[0]?.summaryDetail;
                             if (detail) {
                                 dividendYield = detail.trailingAnnualDividendYield?.raw || detail.yield?.raw || 0;
-                                annualDividend = detail.trailingAnnualDividendRate?.raw || detail.dividendRate?.raw || 0;
-                                // Convert dividend to EUR if needed
-                                if (currency === 'USD' && annualDividend > 0) annualDividend *= USD_TO_EUR;
-                                else if (currency === 'GBp' && annualDividend > 0) annualDividend = (annualDividend / 100) * GBP_TO_EUR;
+                                const rawAnnualDiv = detail.trailingAnnualDividendRate?.raw || detail.dividendRate?.raw || 0;
+                                annualDividend = rawAnnualDiv > 0 ? normalizePriceToEur(rawAnnualDiv, currency, rates) : 0;
                             }
                         }
                     } catch {
@@ -112,6 +111,28 @@ export async function GET(req: Request) {
             }
         } catch {
             console.log(`Stooq fallback failed for ${ticker}`);
+        }
+
+        // --- METHOD 3: BORSA ITALIANA MOT FALLBACK (for Italian bonds with ISIN) ---
+        const targetIsin = isin || (isItalianBondIsin(ticker) ? ticker : null);
+        if (targetIsin) {
+            try {
+                const bondResult = await scrapeBondPriceByIsin(targetIsin);
+                if (bondResult.price !== null) {
+                    console.log(`Borsa Italiana fallback successful for ${targetIsin} (${bondResult.priceType})`);
+                    return NextResponse.json({
+                        ticker: targetIsin,
+                        price: bondResult.price,
+                        currency: 'EUR',
+                        originalCurrency: 'EUR',
+                        exchangeName: `Borsa Italiana MOT (${bondResult.priceType})`,
+                        dividendYield: 0,
+                        annualDividend: 0,
+                    });
+                }
+            } catch (err) {
+                console.log(`Borsa Italiana fallback failed for ${targetIsin}:`, err);
+            }
         }
 
         return NextResponse.json({ error: 'Ticker not found across all providers' }, { status: 404 });

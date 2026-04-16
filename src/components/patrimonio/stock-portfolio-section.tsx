@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Switch } from "@/components/ui/switch";
-import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote, HelpCircle } from "lucide-react";
+import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote, HelpCircle, Receipt } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { OwnerFilterBar, OwnerBadgeSelect, type OwnerFilter } from "@/components/patrimonio/owner-filter";
+import { SaleTaxModal } from "@/components/patrimonio/sale-tax-modal";
 import type { AssetOwner, CustomStock } from "@/types";
 
 /** Compute effective total value for a stock, preferring manualValue over price*shares */
@@ -237,6 +238,25 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                                             )}
                                         </div>
                                     </div>
+
+                                    {stock.ticker && stock.shares > 0 && (stock.currentPrice ?? 0) > 0 && (
+                                        <SaleTaxModal
+                                            ticker={stock.ticker}
+                                            defaultShares={stock.shares}
+                                            defaultCurrentPrice={stock.currentPrice}
+                                            trigger={
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-11 w-11 justify-self-start rounded-full text-violet-500 transition-colors hover:bg-violet-50 hover:text-violet-700 dark:text-violet-300 dark:hover:bg-violet-950/50"
+                                                    aria-label="Simula vendita"
+                                                    title="Simula impatto fiscale vendita"
+                                                >
+                                                    <Receipt className="h-4 w-4" />
+                                                </Button>
+                                            }
+                                        />
+                                    )}
 
                                     <Button
                                         variant="ghost"

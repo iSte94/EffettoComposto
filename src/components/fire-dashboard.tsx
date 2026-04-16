@@ -23,6 +23,8 @@ import { liquidatePensionFund, shouldLiquidatePensionFund } from "@/lib/finance/
 import type { AssetRecord, ExistingLoan, AcceptedPurchase } from "@/types";
 import { formatEuro } from "@/lib/format";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
+import { CoastFireScenarios } from "@/components/fire/coast-fire-scenarios";
+import { SensitivityMatrix } from "@/components/fire/sensitivity-matrix";
 
 interface FireDashboardProps {
     user: { username: string } | null;
@@ -243,6 +245,20 @@ export function FireDashboard({ user }: FireDashboardProps) {
         expectedPublicPension, publicPensionAge, applyTaxStamp,
         user, isLoadingUser, handleSavePreferences
     ]);
+
+    // IMPORTANTE: questi hook DEVONO stare prima degli early-return.
+    // Altrimenti, alla transizione isLoadingUser true -> false, il numero di
+    // hook chiamati cambia tra due render consecutivi e React in produzione
+    // lancia "Rendered more hooks than during the previous render",
+    // facendo scattare l'error boundary ("Qualcosa e' andato storto").
+    const mcWorkerRef = useRef<Worker | null>(null);
+    useEffect(() => {
+        return () => {
+            if (mcWorkerRef.current) {
+                mcWorkerRef.current.terminate();
+            }
+        };
+    }, []);
 
     if (!user) {
         return (
@@ -493,9 +509,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const isFireAlready = startingCapital >= fireTarget;
 
     // 2. MONTE CARLO SIMULATION (Web Worker)
+    // NB: mcWorkerRef e il relativo cleanup useEffect sono dichiarati piu' in
+    // alto, prima degli early-return, per rispettare le Rules of Hooks.
     const mcSimYears = Math.max(displayYears, 30);
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const mcWorkerRef = useRef<Worker | null>(null);
 
     const runMonteCarloSimulation = () => {
         if (mcIsCalculating) return;
@@ -574,16 +590,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
             lifeExpectancy,
         });
     };
-
-    // Cleanup worker on unmount
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useEffect(() => {
-        return () => {
-            if (mcWorkerRef.current) {
-                mcWorkerRef.current.terminate();
-            }
-        };
-    }, []);
 
     // 3. STRESS TEST (Lost Decade)
     // Run the user's plan through 2000-2009 S&P500 real returns
@@ -1029,6 +1035,40 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                 ? `Complimenti! Hai superato la soglia di ${formatEuro(coastFireTarget)}. Significa che potresti Smettere Di Risparmiare OGGI, e grazie all'interesse composto di ${fireExpectedReturn}% reale annuo sul tuo capitale attuale, arriverai a ${retirementAge} anni con la cifra esatta del tuo obiettivo FIRE (${formatEuro(fireTarget)}).`
                                                 : `Il Coast FIRE è il traguardo intermedio. Ti mancano ${formatEuro(coastFireTarget - startingCapital)} per raggiungere i ${formatEuro(coastFireTarget)}. Raggiunta, potrai smettere di risparmiare e il mercato farà il resto per farti arrivare in FIRE a ${retirementAge} anni.`}
                                         </p>
+                                    </div>
+
+                                    {/* Coast FIRE Scenarios with State Pension */}
+                                    <div className="mt-8">
+                                        <CoastFireScenarios
+                                            input={{
+                                                currentAge,
+                                                retirementAge,
+                                                publicPensionAge,
+                                                currentCapital: startingCapital,
+                                                monthlyExpenses: expectedMonthlyExpenses,
+                                                monthlyPublicPension: expectedPublicPension,
+                                                monthlyRealEstateIncome: activeRealEstatePassiveIncome / 12,
+                                                withdrawalRatePct: fireWithdrawalRate,
+                                                nominalReturnPct: fireExpectedReturn,
+                                                inflationPct: expectedInflation,
+                                            }}
+                                        />
+                                    </div>
+
+                                    {/* Sensitivity Matrix: expenses × savings */}
+                                    <div className="mt-8">
+                                        <SensitivityMatrix
+                                            input={{
+                                                startingCapital,
+                                                currentAge,
+                                                retirementAge,
+                                                monthlyExpensesBaseline: expectedMonthlyExpenses,
+                                                monthlySavingsBaseline: monthlySavings,
+                                                nominalReturnPct: fireExpectedReturn,
+                                                inflationPct: expectedInflation,
+                                                withdrawalRatePct: fireWithdrawalRate,
+                                            }}
+                                        />
                                     </div>
                                 </TabsContent>
 
