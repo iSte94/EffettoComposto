@@ -180,12 +180,27 @@ interface GeminiContent {
     parts: GeminiPart[];
 }
 
-/** Gemini richiede che i valori enum siano sempre stringhe. */
-function geminiSanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+/**
+ * Gemini accetta gli enum solo come stringhe; per gli enum numerici convertiamo
+ * sia i valori sia il type, lasciando invariato lo schema usato dagli altri provider.
+ */
+export function geminiSanitizeSchema(schema: Record<string, unknown>): Record<string, unknown> {
+    const hasNonStringEnum = Array.isArray(schema.enum)
+        && schema.enum.some((value) => typeof value !== "string");
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(schema)) {
         if (k === "enum" && Array.isArray(v)) {
             out[k] = v.map((x) => String(x));
+        } else if (k === "type" && hasNonStringEnum) {
+            out[k] = "string";
+        } else if (k === "default" && hasNonStringEnum && v !== undefined) {
+            out[k] = String(v);
+        } else if (Array.isArray(v)) {
+            out[k] = v.map((item) => (
+                item && typeof item === "object"
+                    ? geminiSanitizeSchema(item as Record<string, unknown>)
+                    : item
+            ));
         } else if (v && typeof v === "object" && !Array.isArray(v)) {
             out[k] = geminiSanitizeSchema(v as Record<string, unknown>);
         } else {

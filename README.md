@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.2.0`
+**Versione corrente:** `v0.2.1`
 
 ---
 
@@ -112,6 +112,11 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v0.2.1 - 17 aprile 2026 (fix AI Gemini)
+
+- **Fix errore 400 Gemini su tool calling con enum numerici** - le `functionDeclarations` inviate a Gemini contenevano `enum` numerici (per esempio `mensilita` e `durata mutuo`) che l'API rifiuta se non rappresentati come stringhe. Il bridge Gemini ora normalizza ricorsivamente gli schemi dei tool convertendo `enum`, `type` e `default` in formato compatibile solo per il provider Google, senza alterare il comportamento OpenRouter
+- **Copertura di regressione dedicata** - aggiunto un test su `geminiSanitizeSchema()` per bloccare il ritorno di questo bug su futuri tool con enum numerici
+
 ### v0.2.0 — 16 aprile 2026 (versioning release)
 
 - **Numero versione ufficiale nel repo** - `package.json` diventa la fonte canonica della versione software e viene portato a `v0.2.0`, con script dedicati per incrementi `patch`, `minor` e `major`
@@ -134,10 +139,6 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 - **FIRE piu' ricco e piu' robusto** - il dashboard FIRE ora include il pannello "Coast FIRE - scenari di mercato" e la matrice di sensitivita' spese/risparmio; inoltre e' stato corretto un bug potenziale di Rules of Hooks legato al worker Monte Carlo, spostando `useRef` e cleanup prima degli early-return.
 - **Export report patrimoniale pronto per PDF/stampa** - nel top bar appare il nuovo `ExportReportModal`, da cui l'utente sceglie quali sezioni includere (Patrimonio, Allocazione, Performance, FIRE, Mutuo/Debiti, Dividendi). Il report viene generato su `/report/export`, impaginato per stampa e pensato per essere salvato facilmente in PDF dal browser.
 - **Refactor dati e compatibilita' mercati** - `user-data` ora esporta anche i dividendi, i tassi FX coprono anche CHF/JPY/CAD/AUD oltre a USD/GBP, e la normalizzazione prezzi/dividendi in EUR e' stata centralizzata in `normalizePriceToEur()` per evitare conversioni duplicate e incoerenti tra route diverse.
-
-### 16 aprile 2026 (fix AI — enum Gemini)
-
-- **Fix errore 400 Gemini su tool calling con enum numerici** — le `functionDeclarations` inviate a Gemini contenevano valori `enum` di tipo `integer` (es. `[12, 13, 14]` per le mensilita' e `[15, 20, 30]` per la durata mutuo) ma l'API Gemini richiede che tutti i valori enum siano stringhe, indipendentemente dal tipo della proprieta'. Aggiunta funzione `geminiSanitizeSchema()` in `src/lib/ai/providers.ts` che converte ricorsivamente ogni array `enum` in stringhe prima di inviare lo schema a Gemini. Il path OpenRouter resta invariato
 
 ### 16 aprile 2026 (UX — allocazione asset leggibile e accessibile nel Riepilogo)
 
