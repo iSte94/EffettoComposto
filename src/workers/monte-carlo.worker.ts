@@ -172,11 +172,12 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
         const currentData = [];
         for (let y = 0; y <= simYears; y++) {
             const sortedCol = [...allPaths[y]].sort((a, b) => a - b);
+            const maxIdx = runsCompleted - 1;
             currentData.push({
                 age: currentAge + y,
-                p10: Math.round(sortedCol[Math.floor(runsCompleted * 0.1)]),
-                p50: Math.round(sortedCol[Math.floor(runsCompleted * 0.5)]),
-                p90: Math.round(sortedCol[Math.floor(runsCompleted * 0.9)]),
+                p10: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.1), maxIdx)]),
+                p50: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.5), maxIdx)]),
+                p90: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.9), maxIdx)]),
                 Target: fireTarget
             });
         }

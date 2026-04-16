@@ -126,7 +126,10 @@ function getDeadlinePacing(goal: SavingsGoal): DeadlinePacing | null {
     const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
 
     if (monthsLeft < 0) {
-        return { requiredMonthly: remaining, monthsLeft, historicalMonthly: 0, status: "expired" };
+        const created = new Date(goal.createdAt);
+        const monthsElapsed = Math.max(1, differenceInMonths(now, created));
+        const historical = goal.currentAmount / monthsElapsed;
+        return { requiredMonthly: 0, monthsLeft, historicalMonthly: historical, status: "expired" };
     }
 
     const effectiveMonths = Math.max(1, monthsLeft);
@@ -535,14 +538,21 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                                                             : "Serve al mese"}
                                                 </p>
                                                 <p className="text-sm font-extrabold text-foreground">
-                                                    {formatEuro(pacing.requiredMonthly)}
+                                                    {pacing.status === "expired"
+                                                        ? formatEuro(remaining)
+                                                        : formatEuro(pacing.requiredMonthly)}
                                                     {pacing.status !== "expired" && pacing.monthsLeft > 0 && (
                                                         <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
                                                             per {pacing.monthsLeft} mes{pacing.monthsLeft === 1 ? "e" : "i"}
                                                         </span>
                                                     )}
+                                                    {pacing.status === "expired" && (
+                                                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                                                            ancora da risparmiare
+                                                        </span>
+                                                    )}
                                                 </p>
-                                                {pacing.status !== "expired" && pacing.historicalMonthly > 0 && (
+                                                {pacing.historicalMonthly > 0 && (
                                                     <p className="mt-0.5 text-[10px] text-muted-foreground">
                                                         Ritmo attuale: {formatEuro(pacing.historicalMonthly)}/mese
                                                     </p>
