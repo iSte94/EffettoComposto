@@ -171,6 +171,8 @@ async function chatOpenRouter(req: AiChatRequest): Promise<AiChatResult> {
 
 interface GeminiPart {
     text?: string;
+    thought?: boolean;
+    thoughtSignature?: string;
     functionCall?: { name: string; args?: Record<string, unknown> };
     functionResponse?: { name: string; response: Record<string, unknown> };
 }
@@ -208,6 +210,13 @@ export function geminiSanitizeSchema(schema: Record<string, unknown>): Record<st
         }
     }
     return out;
+}
+
+export function extractGeminiVisibleText(parts: GeminiPart[]): string {
+    return parts
+        .filter((part) => typeof part.text === "string" && !part.thought)
+        .map((part) => part.text ?? "")
+        .join("");
 }
 
 async function chatGemini(req: AiChatRequest): Promise<AiChatResult> {
@@ -253,7 +262,7 @@ async function chatGemini(req: AiChatRequest): Promise<AiChatResult> {
         const functionCalls = parts.filter((p): p is GeminiPart & { functionCall: NonNullable<GeminiPart["functionCall"]> } => !!p.functionCall);
 
         if (functionCalls.length === 0 || !toolsDecl || round === maxRounds) {
-            const text = parts.map((p) => p.text ?? "").join("");
+            const text = extractGeminiVisibleText(parts);
             return { text, toolTrace: trace };
         }
 

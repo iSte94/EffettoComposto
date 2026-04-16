@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.2.1`
+**Versione corrente:** `v0.2.2`
 
 ---
 
@@ -111,6 +111,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.2.2 - 17 aprile 2026 (fix UI AI: solo risposta finale in italiano)
+
+- **Niente piu' ragionamenti interni visibili in chat** - il bridge Gemini/Gemma ora filtra i `Part` marcati come `thought`, cosi' l'utente vede solo la risposta finale dell'assistente invece di thought summaries o note interne del modello
+- **Comportamento italiano rinforzato** - il prompt operativo dell'AI Advisor esplicita che devono essere mostrati solo output finali rivolti all'utente, sempre in italiano, senza checklist o testo di lavoro
+- **Test di regressione sul caso reale** - aggiunta copertura per il caso in cui Gemini restituisce un thought in inglese seguito dalla risposta finale in italiano, in modo da evitare ricadute su future modifiche del provider
 
 ### v0.2.1 - 17 aprile 2026 (fix AI Gemini)
 

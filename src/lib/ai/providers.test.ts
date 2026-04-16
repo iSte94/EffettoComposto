@@ -1,4 +1,4 @@
-import { geminiSanitizeSchema } from "@/lib/ai/providers";
+import { extractGeminiVisibleText, geminiSanitizeSchema } from "@/lib/ai/providers";
 
 describe("geminiSanitizeSchema", () => {
     it("converte gli enum numerici in stringhe compatibili con Gemini", () => {
@@ -48,5 +48,22 @@ describe("geminiSanitizeSchema", () => {
 
         expect(schema.properties.mensilita.type).toBe("integer");
         expect(schema.properties.mensilita.enum).toEqual([12, 13, 14]);
+    });
+});
+
+describe("extractGeminiVisibleText", () => {
+    it("nasconde i thought summaries e lascia solo la risposta finale", () => {
+        const visible = extractGeminiVisibleText([
+            {
+                text: `"ciaociao" (informal greeting). The user is greeting the assistant.`,
+                thought: true,
+                thoughtSignature: "sig-1",
+            },
+            {
+                text: "Ciao! Come posso aiutarti oggi con la tua pianificazione finanziaria?",
+            },
+        ]);
+
+        expect(visible).toBe("Ciao! Come posso aiutarti oggi con la tua pianificazione finanziaria?");
     });
 });
