@@ -112,6 +112,10 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v0.2.4 - 17 aprile 2026 (UX — skeleton loader Abbonamenti Ricorrenti)
+
+- **Skeleton loader per il tracker abbonamenti** — il componente `SubscriptionTracker` restituiva `null` durante il caricamento asincrono delle preferenze utente, lasciando un vuoto visivo nella pagina fino al completamento della fetch. Ora mostra uno skeleton strutturato che replica il layout reale del componente (titolo con icona, 3 righe abbonamento placeholder, e le due card riepilogo costo mensile/annuale), allineandosi al pattern gia' adottato nei tab FIRE, Riepilogo e nel fallback globale dei tab lazy-loaded. L'utente percepisce immediatamente il tipo di contenuto in arrivo invece di fissare un buco vuoto, migliorando la perceived loading performance specialmente su connessioni lente e dispositivi mobili
+
 ### v0.2.3 - 17 aprile 2026 (fix FIRE in tempo reale)
 
 - **Mappa FIRE coerente in tempo reale** - il target FIRE, la timeline del viaggio, le milestone e le linee di riferimento ora si ricalcolano subito usando il capitale netto realmente richiesto dal piano, quindi modifiche a pensione pubblica, eta' pensionabile, eta' FIRE, rendita immobiliare e altri parametri aggiornano tutta la schermata in modo allineato
