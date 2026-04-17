@@ -31,6 +31,44 @@ describe("computeCoastFireScenarios", () => {
         expect(baseWith!.coastFireTarget).toBeLessThan(baseWithout!.coastFireTarget);
     });
 
+    it("non produce NaN/Infinity con withdrawalRatePct = 0", () => {
+        const result = computeCoastFireScenarios({
+            ...baseInput,
+            withdrawalRatePct: 0,
+        });
+
+        for (const s of result.scenarios) {
+            expect(Number.isFinite(s.coastFireTarget)).toBe(true);
+            expect(Number.isFinite(s.fireTargetNet)).toBe(true);
+            expect(Number.isFinite(s.pensionPresentValue)).toBe(true);
+            expect(s.coastFireTarget).toBeGreaterThan(0);
+        }
+        expect(Number.isFinite(result.baseFireTarget)).toBe(true);
+        expect(result.baseFireTarget).toBeGreaterThan(0);
+    });
+
+    it("non produce NaN/Infinity con withdrawalRatePct negativo", () => {
+        const result = computeCoastFireScenarios({
+            ...baseInput,
+            withdrawalRatePct: -5,
+        });
+
+        expect(Number.isFinite(result.baseFireTarget)).toBe(true);
+        expect(result.baseFireTarget).toBeGreaterThan(0);
+    });
+
+    it("gestisce monthlyExpenses = 0 senza errori", () => {
+        const result = computeCoastFireScenarios({
+            ...baseInput,
+            monthlyExpenses: 0,
+        });
+
+        const base = result.scenarios.find((s) => s.scenario === "base");
+        expect(base).toBeDefined();
+        expect(base!.fireTargetNet).toBe(0);
+        expect(base!.coastFireTarget).toBe(0);
+    });
+
     it("anticipare l'eta pensionabile abbassa il capitale richiesto", () => {
         const latePension = computeCoastFireScenarios({
             ...baseInput,

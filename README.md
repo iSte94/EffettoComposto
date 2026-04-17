@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.2.3`
+**Versione corrente:** `v0.2.5`
 
 ---
 
@@ -111,6 +111,15 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.2.5 - 17 aprile 2026 (fix critico — divisione per zero nei calcoli finanziari)
+
+- **Bug finanziario critico risolto: divisione per zero in 4 moduli di calcolo** — identificata e corretta una famiglia di vulnerabilita' matematiche che producevano `NaN`, `Infinity` o loop infiniti quando l'utente inseriva valori zero o di confine per parametri critici (durata mutuo, tasso di prelievo SWR, rata minima debiti). I valori corrotti si propagavano nei grafici, nei KPI e nelle proiezioni FIRE, rendendo l'intera dashboard finanziariamente inaffidabile
+- **Confronto Mutui (`mortgage-comparison.tsx`)** — con `anni = 0` (campo svuotato dall'utente), `numPayments = 0` causava divisione per zero nella formula della rata mensile francese `(P * r * (1+r)^n) / ((1+r)^n - 1)` e nel calcolo del debito residuo `P * ((1+r)^n - (1+r)^k) / ((1+r)^n - 1)`, producendo `Infinity` nella rata, `NaN` nel grafico Debito Residuo nel Tempo e valori assurdi nel riepilogo confronto. Fix: guard `numPayments > 0` prima di ogni divisione, con fallback a rata zero e debito residuo pari all'importo originale
+- **Coast FIRE (`coast-fire.ts`)** — con `withdrawalRatePct = 0`, il FIRE target lordo `annualExpenses / (swr / 100)` produceva `Infinity`, che si propagava nel Coast FIRE target, nelle tre varianti Bear/Base/Bull e nel gap "quanto ti manca". Fix: clamp SWR a minimo 0.1% (`Math.max(0.1, withdrawalRatePct)`), allineato alla stessa guardia gia' presente in `fire-projection.ts` ma mancante in `coast-fire.ts`
+- **Dashboard FIRE (`fire-dashboard.tsx`)** — stessa divisione per zero del Coast FIRE nel calcolo `grossFireTarget = annualExpenses / (fireWithdrawalRate / 100)`. Fix: stessa guardia `Math.max(0.1, ...)` applicata anche qui per coerenza
+- **Strategia Debiti (`debt-strategy.ts`)** — con debiti a saldo zero/negativo o rata minima zero e nessun extra mensile, la simulazione snowball/avalanche entrava in un loop di 600 iterazioni senza progredire (nessun pagamento effettuato, interessi che si accumulano). Fix: filtro preventivo dei debiti con `balance <= 0`, clamp `rate` e `minPayment` a >= 0, early return quando il budget totale e' zero, e soglia di completamento abbassata da `0.01` a `0.005` per evitare residui fantasma
+- **18 nuovi unit test** — `mortgage-comparison.test.ts` (12 test: rata standard, anni=0, tasso=0, tasso=0+anni=0, anticipo>=prezzo, prezzo=0, anni negativi, debito residuo a t=0/t=meta'/t=fine, debito con numPayments=0, debito a tasso 0%), `coast-fire.test.ts` (+3 test: SWR=0, SWR negativo, spese=0), `debt-strategy.test.ts` (+3 test: debiti con saldo zero/negativo, budget zero senza loop infinito, tassi negativi). Suite totale: **190 test passati**
 
 ### v0.2.4 - 17 aprile 2026 (UX — skeleton loader Abbonamenti Ricorrenti)
 

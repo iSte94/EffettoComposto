@@ -104,7 +104,8 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
     const pensionDeferredYears = Math.max(0, publicPensionAge - retirementAge);
     const pensionDuration = Math.max(0, lifeExpectancy - Math.max(retirementAge, publicPensionAge));
 
-    const baseFireTarget = annualExpenses / (withdrawalRatePct / 100);
+    const swr = Math.max(0.1, withdrawalRatePct) / 100;
+    const baseFireTarget = annualExpenses / swr;
 
     // Base real return (scenario bull = +2%, bear = -2%)
     const baseReal = computeRealReturn(nominalReturnPct, inflationPct);

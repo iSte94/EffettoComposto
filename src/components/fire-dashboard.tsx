@@ -340,7 +340,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     // FIRE Target
     const annualExpenses = expectedMonthlyExpenses * 12;
     const netAnnualExpenses = Math.max(0, annualExpenses - activeRealEstatePassiveIncome);
-    const grossFireTarget = annualExpenses / (fireWithdrawalRate / 100);
+    const grossFireTarget = annualExpenses / (Math.max(0.1, fireWithdrawalRate) / 100);
 
     // Starting capital
     const startingCapital = includeIlliquidInFire ? currentNetWorth : currentLiquidAssets;

@@ -124,6 +124,36 @@ describe('simulatePayoff', () => {
         expect(result.months).toBeLessThanOrEqual(600);
     });
 
+    it('ignora debiti con saldo zero o negativo', () => {
+        const debts: Debt[] = [
+            { id: "1", name: "Estinto", balance: 0, rate: 12, minPayment: 100 },
+            { id: "2", name: "Negativo", balance: -50, rate: 12, minPayment: 50 },
+            { id: "3", name: "Attivo", balance: 1000, rate: 6, minPayment: 50 },
+        ];
+        const result = simulatePayoff(debts, "snowball", 100);
+        expect(result.order).toEqual(["Attivo"]);
+        expect(result.months).toBeGreaterThan(0);
+        expect(result.months).toBeLessThan(12);
+    });
+
+    it('gestisce budget zero (nessuna rata e nessun extra) senza loop infinito', () => {
+        const debts: Debt[] = [
+            { id: "1", name: "Impossibile", balance: 5000, rate: 10, minPayment: 0 },
+        ];
+        const result = simulatePayoff(debts, "snowball", 0);
+        expect(result.months).toBe(600);
+    });
+
+    it('gestisce tassi negativi senza crash (li clamppa a 0)', () => {
+        const debts: Debt[] = [
+            { id: "1", name: "TassoNeg", balance: 1000, rate: -5, minPayment: 100 },
+        ];
+        const result = simulatePayoff(debts, "snowball", 0);
+        expect(result.months).toBeGreaterThan(0);
+        expect(result.months).toBeLessThanOrEqual(10);
+        expect(result.totalInterest).toBe(0);
+    });
+
     it('interessi a tasso zero producono totalInterest = 0', () => {
         const debts: Debt[] = [
             { id: "1", name: "Zero", balance: 1000, rate: 0, minPayment: 100 },

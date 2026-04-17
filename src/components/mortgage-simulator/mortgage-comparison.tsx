@@ -45,10 +45,16 @@ function createDefaultScenario(id: number): MortgageScenario {
 function calculateScenario(s: MortgageScenario): ScenarioResult {
     const loanAmount = Math.max(0, s.propertyPrice - s.downpayment);
     const monthlyRate = (s.rate / 100) / 12;
-    const numPayments = s.years * 12;
-    const monthlyPayment = loanAmount > 0 && monthlyRate > 0
-        ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
-        : loanAmount > 0 ? loanAmount / numPayments : 0;
+    const numPayments = Math.max(0, s.years * 12);
+    let monthlyPayment = 0;
+    if (loanAmount > 0 && numPayments > 0) {
+        if (monthlyRate > 0) {
+            const factor = Math.pow(1 + monthlyRate, numPayments);
+            monthlyPayment = (loanAmount * monthlyRate * factor) / (factor - 1);
+        } else {
+            monthlyPayment = loanAmount / numPayments;
+        }
+    }
     const totalPaid = monthlyPayment * numPayments;
     const totalInterest = Math.max(0, totalPaid - loanAmount);
     return { ...s, loanAmount, monthlyPayment, totalPaid, totalInterest };
@@ -93,7 +99,7 @@ export function MortgageComparison() {
         },
     ];
 
-    const maxYears = Math.max(...results.map(r => r.years));
+    const maxYears = Math.max(1, ...results.map(r => r.years));
     const debtOverTime = Array.from({ length: maxYears + 1 }, (_, year) => {
         const point: Record<string, string | number> = { anno: `Anno ${year}` };
         for (const r of results) {
@@ -104,6 +110,10 @@ export function MortgageComparison() {
             const monthlyRate = (r.rate / 100) / 12;
             const numPayments = r.years * 12;
             const monthsPassed = year * 12;
+            if (numPayments <= 0) {
+                point[r.label] = Math.max(0, r.loanAmount);
+                continue;
+            }
             if (monthlyRate > 0 && r.loanAmount > 0) {
                 const factor = Math.pow(1 + monthlyRate, numPayments);
                 const factorPassed = Math.pow(1 + monthlyRate, monthsPassed);
