@@ -5,8 +5,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Car, Euro, Percent, Calendar, CreditCard, TrendingDown, ChevronDown, ChevronUp } from "lucide-react";
+import { Car, Euro, Percent, Calendar, CreditCard, ChevronDown, ChevronUp, Users, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { usePreferences } from "@/hooks/usePreferences";
+import { ExistingLoan, getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { DTI_THRESHOLD } from "@/lib/constants";
 import {
     ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
     Legend, CartesianGrid,
@@ -78,6 +81,9 @@ export function LoanCalculator() {
     const [tasso, setTasso] = useState(2.5);
     const [durata, setDurata] = useState(60);
     const [showTable, setShowTable] = useState(false);
+    const [intestatario, setIntestatario] = useState<"person1" | "person2" | "both">("person1");
+
+    const { preferences } = usePreferences();
 
     const principal = Math.max(0, importo - anticipo);
 
@@ -87,6 +93,62 @@ export function LoanCalculator() {
     );
 
     const costoPct = principal > 0 ? (result.totalInterest / principal) * 100 : 0;
+
+    const person1Name = preferences.person1Name || "Persona 1";
+    const person2Name = preferences.person2Name || "Persona 2";
+
+    const existingLoans: ExistingLoan[] = useMemo(() => {
+        try { return JSON.parse(preferences.existingLoansList); } catch { return []; }
+    }, [preferences.existingLoansList]);
+
+    const dtiData = useMemo(() => {
+        const relevantLoans = intestatario === "both"
+            ? existingLoans
+            : existingLoans.filter((l) =>
+                intestatario === "person1" ? l.owner !== "person2" : l.owner !== "person1",
+            );
+
+        const now = new Date();
+        let activeCount = 0;
+        const existingInstallment = relevantLoans.reduce((acc, loan) => {
+            if (!loan.startDate || !loan.endDate) {
+                activeCount++;
+                return acc + (Number(loan.installment) || 0);
+            }
+            const start = new Date(loan.startDate + "-01");
+            const end = new Date(loan.endDate + "-01");
+            const totalMonths =
+                (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+            const monthsPassed =
+                (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
+            if (monthsPassed >= totalMonths) return acc;
+            activeCount++;
+            return acc + getInstallmentAmountForMonth(loan, monthsPassed, totalMonths, monthsPassed);
+        }, 0);
+
+        const income =
+            intestatario === "person1" ? (preferences.person1Income || 0)
+            : intestatario === "person2" ? (preferences.person2Income || 0)
+            : (preferences.person1Income || 0) + (preferences.person2Income || 0);
+
+        const totalInstallment = existingInstallment + result.installment;
+        const dti = income > 0 ? totalInstallment / income : 0;
+        const maxNewInstallment = Math.max(0, income * DTI_THRESHOLD - existingInstallment);
+
+        return {
+            activeCount,
+            existingInstallment,
+            income,
+            totalInstallment,
+            dti,
+            dtiPct: dti * 100,
+            isOk: dti > 0 && dti <= DTI_THRESHOLD,
+            isWarning: dti > DTI_THRESHOLD && dti <= 0.4,
+            isDanger: dti > 0.4,
+            hasIncome: income > 0,
+            maxNewInstallment,
+        };
+    }, [existingLoans, intestatario, preferences.person1Income, preferences.person2Income, result.installment]);
 
     return (
         <div className="space-y-6">
@@ -129,6 +191,32 @@ export function LoanCalculator() {
                                 onChange={(e) => setAnticipo(Math.max(0, Number(e.target.value) || 0))}
                                 className="min-h-11 rounded-xl text-sm"
                             />
+                        </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                        <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Users className="h-3 w-3" /> Intestatario
+                        </Label>
+                        <div className="flex gap-2">
+                            {([
+                                { value: "person1", label: person1Name },
+                                { value: "person2", label: person2Name },
+                                { value: "both", label: "Entrambi" },
+                            ] as const).map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setIntestatario(opt.value)}
+                                    className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
+                                        intestatario === opt.value
+                                            ? "bg-orange-500 text-white shadow-sm"
+                                            : "bg-muted/40 text-muted-foreground hover:bg-muted"
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
                         </div>
                     </div>
 
@@ -204,6 +292,93 @@ export function LoanCalculator() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* DTI Analysis */}
+            {dtiData.hasIncome && result.installment > 0 && (
+                <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+                    <CardContent className="p-5 space-y-4">
+                        <div className="flex items-center gap-2">
+                            <Users className="h-4 w-4 text-muted-foreground" />
+                            <h3 className="text-sm font-bold text-foreground">Analisi Rata / Reddito</h3>
+                            <span className="ml-auto rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                {intestatario === "both" ? `${person1Name} + ${person2Name}` : intestatario === "person1" ? person1Name : person2Name}
+                            </span>
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Reddito netto mensile</span>
+                                <span className="font-semibold">{formatEuro(dtiData.income)}</span>
+                            </div>
+                            {dtiData.existingInstallment > 0 && (
+                                <div className="flex justify-between text-muted-foreground">
+                                    <span>Rate esistenti ({dtiData.activeCount} prestit{dtiData.activeCount === 1 ? "o" : "i"} attiv{dtiData.activeCount === 1 ? "o" : "i"})</span>
+                                    <span>{formatEuro(dtiData.existingInstallment)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">+ Nuova rata finanziamento</span>
+                                <span className="font-semibold text-orange-600 dark:text-orange-400">{formatEuro(result.installment)}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-border/60 pt-2 font-bold">
+                                <span>Totale rate mensili</span>
+                                <span>{formatEuro(dtiData.totalInstallment)}</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <div className="flex justify-between text-xs">
+                                <span className="text-muted-foreground">Rapporto rata / reddito</span>
+                                <span className={`font-bold ${dtiData.isOk ? "text-emerald-600" : dtiData.isWarning ? "text-amber-600" : "text-red-600"}`}>
+                                    {dtiData.dtiPct.toFixed(1)}% su max 33%
+                                </span>
+                            </div>
+                            <div className="relative h-3 overflow-hidden rounded-full bg-muted">
+                                <div className="absolute inset-y-0 left-0 w-px bg-emerald-500/60" style={{ left: "66%" }} />
+                                <div className="absolute inset-y-0 left-0 w-px bg-amber-500/60" style={{ left: "80%" }} />
+                                <div
+                                    className={`h-full rounded-full transition-all duration-300 ${dtiData.isOk ? "bg-emerald-500" : dtiData.isWarning ? "bg-amber-500" : "bg-red-500"}`}
+                                    style={{ width: `${Math.min(100, (dtiData.dtiPct / 50) * 100)}%` }}
+                                />
+                            </div>
+                            <div className="flex justify-between text-[10px] text-muted-foreground">
+                                <span>0%</span>
+                                <span className="text-emerald-600 font-medium">33%</span>
+                                <span className="text-amber-500 font-medium">40%</span>
+                                <span>50%</span>
+                            </div>
+                        </div>
+
+                        <div className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-xs ${
+                            dtiData.isOk
+                                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                : dtiData.isWarning
+                                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                                : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300"
+                        }`}>
+                            {dtiData.isOk
+                                ? <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
+                                : dtiData.isDanger
+                                ? <XCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
+                                : <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />}
+                            <span>
+                                {dtiData.isOk
+                                    ? `Rapporto rata/reddito al ${dtiData.dtiPct.toFixed(1)}%, entro il limite del 33%. La banca dovrebbe approvare il finanziamento.`
+                                    : dtiData.isWarning
+                                    ? `Rapporto rata/reddito al ${dtiData.dtiPct.toFixed(1)}%, oltre il 33% consigliato. L'approvazione dipende dalla politica del singolo istituto.`
+                                    : `Rapporto rata/reddito al ${dtiData.dtiPct.toFixed(1)}%, oltre il 40%. La banca difficilmente approverà il finanziamento nelle condizioni attuali.`}
+                            </span>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                            Rata massima aggiuntiva sostenibile al 33%:{" "}
+                            <span className={`font-semibold ${dtiData.maxNewInstallment > 0 ? "text-foreground" : "text-red-500"}`}>
+                                {dtiData.maxNewInstallment > 0 ? formatEuro(dtiData.maxNewInstallment) : "soglia già superata dalle rate esistenti"}
+                            </span>
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* KPI cards */}
             <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
