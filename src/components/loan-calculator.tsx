@@ -73,9 +73,9 @@ function computeAmortization(principal: number, annualRatePct: number, months: n
 }
 
 export function LoanCalculator() {
-    const [importo, setImporto] = useState(20000);
+    const [importo, setImporto] = useState(50000);
     const [anticipo, setAnticipo] = useState(0);
-    const [tasso, setTasso] = useState(6.99);
+    const [tasso, setTasso] = useState(2.5);
     const [durata, setDurata] = useState(60);
     const [showTable, setShowTable] = useState(false);
 
@@ -181,6 +181,26 @@ export function LoanCalculator() {
                             Capitale finanziato: <span className="font-semibold text-foreground">{formatEuro(principal)}</span>
                             {" "}(importo {formatEuro(importo)} − anticipo {formatEuro(anticipo)})
                         </p>
+                    )}
+
+                    {/* Live summary */}
+                    {principal > 0 && (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-orange-200/80 bg-orange-50/70 px-4 py-3 dark:border-orange-900/60 dark:bg-orange-950/25">
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Rata mensile</p>
+                                <p className="text-2xl font-extrabold tabular-nums text-orange-600 dark:text-orange-400">
+                                    {formatEuro(result.installment)}
+                                </p>
+                                <p className="text-[10px] text-orange-400">per {durata} mesi</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Interessi totali</p>
+                                <p className="text-2xl font-extrabold tabular-nums text-red-600 dark:text-red-400">
+                                    {formatEuro(result.totalInterest)}
+                                </p>
+                                <p className="text-[10px] text-red-400">costo del credito ({costoPct.toFixed(1)}%)</p>
+                            </div>
+                        </div>
                     )}
                 </CardContent>
             </Card>
