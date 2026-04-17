@@ -71,6 +71,7 @@ export function InflationCalculator() {
                             </Label>
                             <Input
                                 type="number"
+                                min="0"
                                 value={amount || ""}
                                 onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
                                 className="min-h-11 rounded-xl text-sm"
@@ -82,6 +83,7 @@ export function InflationCalculator() {
                             </Label>
                             <Input
                                 type="number"
+                                min="0"
                                 step="0.1"
                                 value={inflationRate || ""}
                                 onChange={(e) => setInflationRate(Math.max(0, Number(e.target.value) || 0))}
@@ -94,6 +96,8 @@ export function InflationCalculator() {
                             </Label>
                             <Input
                                 type="number"
+                                min="1"
+                                max="50"
                                 value={years || ""}
                                 onChange={(e) => setYears(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
                                 className="min-h-11 rounded-xl text-sm"
@@ -105,6 +109,7 @@ export function InflationCalculator() {
                             </Label>
                             <Input
                                 type="number"
+                                min="0"
                                 step="0.1"
                                 value={nominalReturn || ""}
                                 onChange={(e) => setNominalReturn(Number(e.target.value) || 0)}

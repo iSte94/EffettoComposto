@@ -362,9 +362,10 @@ export function ProgressioneDashboard() {
                                 Configuratore
                                 <div className="space-x-2">
                                     <Label className="mr-2 text-xs text-muted-foreground">Anni Proiezione</Label>
-                                    <Input 
-                                        type="number" 
-                                        value={progressionData.yearsToSimulate} 
+                                    <Input
+                                        type="number"
+                                        min="1"
+                                        value={progressionData.yearsToSimulate}
                                         onChange={e => setProgressionData(p => ({...p, yearsToSimulate: Number(e.target.value)}))}
                                         className="inline-block h-9 w-20 text-center text-xs tabular-nums"
                                     />
@@ -444,11 +445,11 @@ export function ProgressioneDashboard() {
                                                             <div className="grid grid-cols-2 gap-2 mb-2">
                                                                 <div>
                                                                     <Label className="text-[9px] font-bold uppercase text-muted-foreground">Anno Previsto</Label>
-                                                                    <Input type="number" value={promo.targetYear} onChange={e => updateBonus(activePersonTab, promo.id, "targetYear", Number(e.target.value))} className="h-9 text-xs bg-background/80 focus-visible:ring-emerald-500 tabular-nums" />
+                                                                    <Input type="number" min="1" value={promo.targetYear} onChange={e => updateBonus(activePersonTab, promo.id, "targetYear", Number(e.target.value))} className="h-9 text-xs bg-background/80 focus-visible:ring-emerald-500 tabular-nums" />
                                                                 </div>
                                                                 <div>
                                                                     <Label className="text-[9px] font-bold uppercase text-muted-foreground">Aumento Netto Annuo</Label>
-                                                                    <Input type="number" value={promo.amount} onChange={e => updateBonus(activePersonTab, promo.id, "amount", Number(e.target.value))} className="h-9 text-xs bg-background/80 font-bold text-emerald-600 focus-visible:ring-emerald-500 tabular-nums" />
+                                                                    <Input type="number" min="0" value={promo.amount} onChange={e => updateBonus(activePersonTab, promo.id, "amount", Number(e.target.value))} className="h-9 text-xs bg-background/80 font-bold text-emerald-600 focus-visible:ring-emerald-500 tabular-nums" />
                                                                 </div>
                                                             </div>
                                                             <Input value={promo.description} onChange={e => updateBonus(activePersonTab, promo.id, "description", e.target.value)} placeholder="Es. Promozione Quadro" className="h-9 border-transparent bg-transparent px-1 text-xs focus-visible:ring-emerald-500 hover:border-border/70" />

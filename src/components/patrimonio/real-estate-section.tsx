@@ -107,6 +107,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Valore Stimato</Label>
                                     <Input
                                         type="number"
+                                        min="0"
                                         value={prop.value}
                                         onChange={e => updateProp(prop.id, { value: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
@@ -128,6 +129,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Spese Fisse</Label>
                                     <Input
                                         type="number"
+                                        min="0"
                                         value={prop.costs}
                                         onChange={e => updateProp(prop.id, { costs: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
@@ -138,6 +140,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Costo IMU</Label>
                                     <Input
                                         type="number"
+                                        min="0"
                                         value={prop.imu || 0}
                                         onChange={e => updateProp(prop.id, { imu: Number(e.target.value) })}
                                         onBlur={onTriggerSave}
@@ -148,6 +151,7 @@ export const RealEstateSection = memo(function RealEstateSection({
                                     <Label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">Rendita Annua Attesa</Label>
                                     <Input
                                         type="number"
+                                        min="0"
                                         value={prop.rent}
                                         onChange={e => updateProp(prop.id, { rent: Number(e.target.value) })}
                                         onBlur={onTriggerSave}

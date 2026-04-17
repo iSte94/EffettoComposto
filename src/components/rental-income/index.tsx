@@ -258,25 +258,25 @@ const PropertyInputsSection = memo(function PropertyInputsSection({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">IMU Annuale</Label>
-                    <Input type="number" step="50" value={values.imuAnnual}
+                    <Input type="number" min="0" step="50" value={values.imuAnnual}
                         onChange={(e) => onChange("imuAnnual", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Condominio /mese</Label>
-                    <Input type="number" step="10" value={values.condominiumMonthly}
+                    <Input type="number" min="0" step="10" value={values.condominiumMonthly}
                         onChange={(e) => onChange("condominiumMonthly", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Assicurazione /anno</Label>
-                    <Input type="number" step="50" value={values.insuranceAnnual}
+                    <Input type="number" min="0" step="50" value={values.insuranceAnnual}
                         onChange={(e) => onChange("insuranceAnnual", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Manutenzione /anno</Label>
-                    <Input type="number" step="100" value={values.maintenanceAnnual}
+                    <Input type="number" min="0" step="100" value={values.maintenanceAnnual}
                         onChange={(e) => onChange("maintenanceAnnual", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -326,13 +326,13 @@ const ShortTermPanel = memo(function ShortTermPanel({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Tariffa Media /notte</Label>
-                    <Input type="number" step="5" value={values.nightlyRate}
+                    <Input type="number" min="0" step="5" value={values.nightlyRate}
                         onChange={(e) => onChange("nightlyRate", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Durata Media Soggiorno (notti)</Label>
-                    <Input type="number" step="1" value={values.averageStayNights}
+                    <Input type="number" min="1" step="1" value={values.averageStayNights}
                         onChange={(e) => onChange("averageStayNights", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -343,13 +343,13 @@ const ShortTermPanel = memo(function ShortTermPanel({
                     <Label className="text-xs text-slate-500 flex items-center gap-1">
                         <Brush className="w-3 h-3" /> Pulizia /soggiorno
                     </Label>
-                    <Input type="number" step="5" value={values.cleaningCostPerStay}
+                    <Input type="number" min="0" step="5" value={values.cleaningCostPerStay}
                         onChange={(e) => onChange("cleaningCostPerStay", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Biancheria e Consumabili /soggiorno</Label>
-                    <Input type="number" step="5" value={values.laundryConsumablesPerStay}
+                    <Input type="number" min="0" step="5" value={values.laundryConsumablesPerStay}
                         onChange={(e) => onChange("laundryConsumablesPerStay", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -360,7 +360,7 @@ const ShortTermPanel = memo(function ShortTermPanel({
                     <Label className="text-xs text-slate-500 flex items-center gap-1">
                         <Percent className="w-3 h-3" /> Commissione Piattaforma (%)
                     </Label>
-                    <Input type="number" step="0.5" value={values.platformFeePercent}
+                    <Input type="number" min="0" step="0.5" value={values.platformFeePercent}
                         onChange={(e) => onChange("platformFeePercent", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -368,7 +368,7 @@ const ShortTermPanel = memo(function ShortTermPanel({
                     <Label className="text-xs text-slate-500 flex items-center gap-1">
                         <Wifi className="w-3 h-3" /> Utenze Extra /mese
                     </Label>
-                    <Input type="number" step="10" value={values.utilitiesMonthly}
+                    <Input type="number" min="0" step="10" value={values.utilitiesMonthly}
                         onChange={(e) => onChange("utilitiesMonthly", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -379,7 +379,7 @@ const ShortTermPanel = memo(function ShortTermPanel({
                     <Label className="text-xs text-slate-500 flex items-center gap-1">
                         <Receipt className="w-3 h-3" /> Tassa di Soggiorno /notte
                     </Label>
-                    <Input type="number" step="0.5" value={values.touristTaxPerNight}
+                    <Input type="number" min="0" step="0.5" value={values.touristTaxPerNight}
                         onChange={(e) => onChange("touristTaxPerNight", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -420,7 +420,7 @@ const TransitionalPanel = memo(function TransitionalPanel({
             {/* Canone rapido per tutti i mesi */}
             <div className="flex items-center gap-3">
                 <Label className="text-xs text-slate-500 whitespace-nowrap">Imposta tutti a</Label>
-                <Input type="number" step="50" placeholder="€ canone"
+                <Input type="number" min="0" step="50" placeholder="€ canone"
                     className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100 w-28 h-8 text-xs"
                     onKeyDown={(e) => {
                         if (e.key === "Enter") applyToAll(Number((e.target as HTMLInputElement).value));
@@ -446,7 +446,7 @@ const TransitionalPanel = memo(function TransitionalPanel({
                             <Switch checked={entry.occupied}
                                 onCheckedChange={(v) => onScheduleUpdate(i, "occupied", v)} size="sm" />
                         </div>
-                        <Input type="number" step="50" value={entry.rent}
+                        <Input type="number" min="0" step="50" value={entry.rent}
                             onChange={(e) => onScheduleUpdate(i, "rent", Number(e.target.value))}
                             disabled={!entry.occupied}
                             className="h-7 text-xs bg-white/70 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100 disabled:opacity-40" />
@@ -457,13 +457,13 @@ const TransitionalPanel = memo(function TransitionalPanel({
             <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-200 dark:border-slate-700">
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Costo Agenzia (mesi di canone)</Label>
-                    <Input type="number" step="0.5" value={values.agencyFeeMonths}
+                    <Input type="number" min="0" step="0.5" value={values.agencyFeeMonths}
                         onChange={(e) => onChange("agencyFeeMonths", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Ammortamento Arredamento /anno</Label>
-                    <Input type="number" step="100" value={values.furnishingAmortization}
+                    <Input type="number" min="0" step="100" value={values.furnishingAmortization}
                         onChange={(e) => onChange("furnishingAmortization", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -481,7 +481,7 @@ const TransitionalPanel = memo(function TransitionalPanel({
             {values.utilitiesIncluded && (
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Costo Utenze /mese (a tuo carico)</Label>
-                    <Input type="number" step="10" value={values.utilitiesMonthly}
+                    <Input type="number" min="0" step="10" value={values.utilitiesMonthly}
                         onChange={(e) => onChange("utilitiesMonthly", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -522,13 +522,13 @@ const ResidentialPanel = memo(function ResidentialPanel({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Canone Mensile</Label>
-                    <Input type="number" step="50" value={values.monthlyRent}
+                    <Input type="number" min="0" step="50" value={values.monthlyRent}
                         onChange={(e) => onChange("monthlyRent", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Registrazione Contratto /anno</Label>
-                    <Input type="number" step="10" value={values.registrationCostAnnual}
+                    <Input type="number" min="0" step="10" value={values.registrationCostAnnual}
                         onChange={(e) => onChange("registrationCostAnnual", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -537,13 +537,13 @@ const ResidentialPanel = memo(function ResidentialPanel({
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Adeguamento ISTAT Annuo (%)</Label>
-                    <Input type="number" step="0.1" value={values.istatAdjustment}
+                    <Input type="number" min="0" step="0.1" value={values.istatAdjustment}
                         onChange={(e) => onChange("istatAdjustment", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
                 <div className="space-y-2">
                     <Label className="text-xs text-slate-500">Rischio Morosità (%)</Label>
-                    <Input type="number" step="1" value={values.defaultRiskPercent}
+                    <Input type="number" min="0" step="1" value={values.defaultRiskPercent}
                         onChange={(e) => onChange("defaultRiskPercent", Number(e.target.value))}
                         className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                 </div>
@@ -945,7 +945,7 @@ export function RentalIncomeAnalyzer() {
                         {taxRegime === "irpef" && (
                             <div className="space-y-2">
                                 <Label className="text-xs text-slate-500">Reddito Annuo Lordo (altri redditi)</Label>
-                                <Input type="number" step="1000" value={otherAnnualIncome}
+                                <Input type="number" min="0" step="1000" value={otherAnnualIncome}
                                     onChange={(e) => setOtherAnnualIncome(Number(e.target.value))}
                                     className="bg-white/50 dark:bg-slate-800/50 border-slate-200 text-slate-900 dark:text-slate-100" />
                                 <p className="text-[10px] text-slate-400">Serve per calcolare l&apos;aliquota marginale IRPEF sul reddito da affitto</p>

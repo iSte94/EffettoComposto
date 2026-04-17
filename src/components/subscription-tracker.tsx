@@ -201,6 +201,7 @@ export function SubscriptionTracker() {
                                         </Label>
                                         <Input
                                             type="number"
+                                            min="0"
                                             step="0.01"
                                             value={sub.amount}
                                             onChange={(e) => updateSub(sub.id, { amount: Number(e.target.value) })}

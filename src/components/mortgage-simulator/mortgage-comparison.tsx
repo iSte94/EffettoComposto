@@ -172,19 +172,19 @@ export function MortgageComparison() {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div className="space-y-1">
                                     <Label className="text-xs text-slate-500 dark:text-slate-400">Prezzo Immobile</Label>
-                                    <Input type="number" value={s.propertyPrice || ""} onChange={e => updateScenario(s.id, "propertyPrice", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
+                                    <Input type="number" min="0" value={s.propertyPrice || ""} onChange={e => updateScenario(s.id, "propertyPrice", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs text-slate-500 dark:text-slate-400">Anticipo</Label>
-                                    <Input type="number" value={s.downpayment || ""} onChange={e => updateScenario(s.id, "downpayment", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
+                                    <Input type="number" min="0" value={s.downpayment || ""} onChange={e => updateScenario(s.id, "downpayment", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs text-slate-500 dark:text-slate-400">Tasso %</Label>
-                                    <Input type="number" step="0.1" value={s.rate || ""} onChange={e => updateScenario(s.id, "rate", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
+                                    <Input type="number" min="0" step="0.1" value={s.rate || ""} onChange={e => updateScenario(s.id, "rate", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                                 <div className="space-y-1">
                                     <Label className="text-xs text-slate-500 dark:text-slate-400">Durata (anni)</Label>
-                                    <Input type="number" value={s.years || ""} onChange={e => updateScenario(s.id, "years", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
+                                    <Input type="number" min="1" value={s.years || ""} onChange={e => updateScenario(s.id, "years", e.target.value)} className="h-11 rounded-lg border-slate-200 bg-white/80 dark:border-slate-700 dark:bg-slate-800/50" />
                                 </div>
                             </div>
 

@@ -112,6 +112,11 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v0.2.6 - 17 aprile 2026 (UX — validazione input numerici: vincolo min su tutti i campi finanziari)
+
+- **Prevenzione valori negativi su tutti gli input numerici della piattaforma** — aggiunti attributi HTML `min="0"` (per importi e percentuali) e `min="1"` (per durate in anni e notti) su circa 50 campi `<Input type="number">` distribuiti in 10 componenti. Prima dell'intervento, l'utente poteva digitare valori negativi per importi mutuo, saldi debiti, tassi di interesse, canoni di affitto, costi IMU, quantita' BTC, contributi mensili e numerosi altri campi finanziari, producendo dati logicamente invalidi che si propagavano nei calcoli derivati (grafici, proiezioni FIRE, confronti mutui, strategie debito). Il browser ora impedisce la selezione di valori sotto la soglia tramite spinner e validazione nativa, fornendo un primo livello di difesa lato client senza modificare la logica applicativa esistente
+- **Componenti aggiornati**: `inflation-calculator`, `subscription-tracker`, `debt-strategy`, `compound-interest-calculator`, `progressione-dashboard`, `patrimonio-dashboard`, `patrimonio/real-estate-section`, `rental-income`, `mortgage-simulator/mortgage-inputs`, `mortgage-simulator/mortgage-comparison`
+
 ### v0.2.5 - 17 aprile 2026 (fix critico — divisione per zero nei calcoli finanziari)
 
 - **Bug finanziario critico risolto: divisione per zero in 4 moduli di calcolo** — identificata e corretta una famiglia di vulnerabilita' matematiche che producevano `NaN`, `Infinity` o loop infiniti quando l'utente inseriva valori zero o di confine per parametri critici (durata mutuo, tasso di prelievo SWR, rata minima debiti). I valori corrotti si propagavano nei grafici, nei KPI e nelle proiezioni FIRE, rendendo l'intera dashboard finanziariamente inaffidabile

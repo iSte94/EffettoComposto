@@ -82,6 +82,7 @@ export function CompoundInterestCalculator() {
                                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Capitale Iniziale</Label>
                                 <Input
                                     type="number"
+                                    min="0"
                                     step={1000}
                                     value={initialCapital}
                                     onChange={(e) => setInitialCapital(Number(e.target.value))}
@@ -94,6 +95,7 @@ export function CompoundInterestCalculator() {
                                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Contributo Mensile</Label>
                                 <Input
                                     type="number"
+                                    min="0"
                                     step={50}
                                     value={monthlyContribution}
                                     onChange={(e) => setMonthlyContribution(Number(e.target.value))}

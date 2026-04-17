@@ -89,6 +89,7 @@ export function DebtStrategy() {
                                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Saldo</Label>
                                         <Input
                                             type="number"
+                                            min="0"
                                             value={debt.balance}
                                             onChange={(e) => updateDebt(debt.id, { balance: Number(e.target.value) })}
                                             className="min-h-10 rounded-xl border-border/70 bg-transparent text-sm font-bold text-red-600 dark:text-red-400"
@@ -98,6 +99,7 @@ export function DebtStrategy() {
                                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Tasso %</Label>
                                         <Input
                                             type="number"
+                                            min="0"
                                             step="0.1"
                                             value={debt.rate}
                                             onChange={(e) => updateDebt(debt.id, { rate: Number(e.target.value) })}
@@ -108,6 +110,7 @@ export function DebtStrategy() {
                                         <Label className="text-[10px] font-bold uppercase text-muted-foreground">Rata Min.</Label>
                                         <Input
                                             type="number"
+                                            min="0"
                                             value={debt.minPayment}
                                             onChange={(e) => updateDebt(debt.id, { minPayment: Number(e.target.value) })}
                                             className="min-h-10 rounded-xl border-border/70 bg-transparent text-sm font-mono"
@@ -135,6 +138,7 @@ export function DebtStrategy() {
                         </div>
                         <Input
                             type="number"
+                            min="0"
                             step={50}
                             value={extraMonthly}
                             onChange={(e) => setExtraMonthly(Number(e.target.value))}

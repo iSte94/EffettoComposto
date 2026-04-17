@@ -40,6 +40,7 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <Input
                             type="number"
+                            min="0"
                             step="100"
                             value={netIncome}
                             onChange={(e) => onUpdate("netIncome", Number(e.target.value))}
@@ -102,15 +103,15 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="space-y-2">
                             <Label htmlFor="taxes" className="text-xs text-slate-500 dark:text-slate-400">Imposte</Label>
-                            <Input id="taxes" type="number" step="100" value={purchaseTaxes} onChange={(e) => onUpdate("purchaseTaxes", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                            <Input id="taxes" type="number" min="0" step="100" value={purchaseTaxes} onChange={(e) => onUpdate("purchaseTaxes", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="notary" className="text-xs text-slate-500 dark:text-slate-400">Notaio</Label>
-                            <Input id="notary" type="number" step="100" value={notaryFees} onChange={(e) => onUpdate("notaryFees", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                            <Input id="notary" type="number" min="0" step="100" value={notaryFees} onChange={(e) => onUpdate("notaryFees", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="agency" className="text-xs text-slate-500 dark:text-slate-400">Agenzia</Label>
-                            <Input id="agency" type="number" step="100" value={agencyFees} onChange={(e) => onUpdate("agencyFees", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                            <Input id="agency" type="number" min="0" step="100" value={agencyFees} onChange={(e) => onUpdate("agencyFees", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                         </div>
                     </div>
                 </div>
@@ -118,11 +119,11 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                 <div className="grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 dark:border-slate-800 sm:grid-cols-2">
                     <div className="space-y-3">
                         <Label htmlFor="rate" className="font-semibold text-slate-700 dark:text-slate-300">Tasso Nuovo Mutuo (%)</Label>
-                        <Input id="rate" type="number" step="0.1" value={rate} onChange={(e) => onUpdate("rate", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                        <Input id="rate" type="number" min="0" step="0.1" value={rate} onChange={(e) => onUpdate("rate", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                     </div>
                     <div className="space-y-3">
                         <Label htmlFor="years" className="font-semibold text-slate-700 dark:text-slate-300">Durata (Anni)</Label>
-                        <Input id="years" type="number" value={years} onChange={(e) => onUpdate("years", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                        <Input id="years" type="number" min="1" value={years} onChange={(e) => onUpdate("years", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-lg text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                     </div>
                 </div>
             </section>
@@ -137,11 +138,11 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-3">
                         <Label htmlFor="rent" className="font-semibold text-slate-700 dark:text-slate-300">Affitto Mensile Atteso</Label>
-                        <Input id="rent" type="number" step="50" value={expectedRent} onChange={(e) => onUpdate("expectedRent", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                        <Input id="rent" type="number" min="0" step="50" value={expectedRent} onChange={(e) => onUpdate("expectedRent", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                     </div>
                     <div className="space-y-3">
                         <Label htmlFor="maint" className="font-semibold text-slate-700 dark:text-slate-300">Spese (IMU, Cedolare, ecc.)</Label>
-                        <Input id="maint" type="number" step="10" value={maintenanceTaxes} onChange={(e) => onUpdate("maintenanceTaxes", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                        <Input id="maint" type="number" min="0" step="10" value={maintenanceTaxes} onChange={(e) => onUpdate("maintenanceTaxes", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                     </div>
                 </div>
 
@@ -152,15 +153,15 @@ export function MortgageInputs({ preferences, onUpdate }: MortgageInputsProps) {
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <div className="space-y-2">
                             <Label htmlFor="vacancy" className="text-xs text-slate-500 dark:text-slate-400">Sfitto Annuo (%)</Label>
-                            <Input id="vacancy" type="number" step="1" value={vacancyRate} onChange={(e) => onUpdate("vacancyRate", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                            <Input id="vacancy" type="number" min="0" step="1" value={vacancyRate} onChange={(e) => onUpdate("vacancyRate", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="inflation" className="text-xs text-slate-500 dark:text-slate-400">Inflaz. Affitti (%)</Label>
-                            <Input id="inflation" type="number" step="0.5" value={rentInflation} onChange={(e) => onUpdate("rentInflation", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                            <Input id="inflation" type="number" min="0" step="0.5" value={rentInflation} onChange={(e) => onUpdate("rentInflation", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="extramaint" className="text-xs text-slate-500 dark:text-slate-400">Manut. Straord. (€)</Label>
-                            <Input id="extramaint" type="number" step="1000" value={extraMaintenance} onChange={(e) => onUpdate("extraMaintenance", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
+                            <Input id="extramaint" type="number" min="0" step="1000" value={extraMaintenance} onChange={(e) => onUpdate("extraMaintenance", Number(e.target.value))} className="h-11 border-slate-200 bg-white/80 text-slate-900 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-100" />
                         </div>
                     </div>
                 </div>

@@ -955,7 +955,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                         <div className="space-y-2">
                                                             <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{person1Name}</Label>
                                                             <div className="relative">
-                                                                <Input type="number" step="0.001" value={bitcoinAmountP1} onChange={(e) => setBitcoinAmountP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 pl-14 text-lg text-slate-900 focus-visible:ring-amber-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
+                                                                <Input type="number" min="0" step="0.001" value={bitcoinAmountP1} onChange={(e) => setBitcoinAmountP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 pl-14 text-lg text-slate-900 focus-visible:ring-amber-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
                                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-600 dark:text-amber-400">BTC</div>
                                                             </div>
                                                             {currentBtcPrice > 0 && bitcoinAmountP1 > 0 && <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{formatEuro(bitcoinAmountP1 * currentBtcPrice)}</p>}
@@ -963,7 +963,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                         <div className="space-y-2">
                                                             <Label className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">{person2Name}</Label>
                                                             <div className="relative">
-                                                                <Input type="number" step="0.001" value={bitcoinAmountP2} onChange={(e) => setBitcoinAmountP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 pl-14 text-lg text-slate-900 focus-visible:ring-amber-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
+                                                                <Input type="number" min="0" step="0.001" value={bitcoinAmountP2} onChange={(e) => setBitcoinAmountP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 pl-14 text-lg text-slate-900 focus-visible:ring-amber-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
                                                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-amber-600 dark:text-amber-400">BTC</div>
                                                             </div>
                                                             {currentBtcPrice > 0 && bitcoinAmountP2 > 0 && <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400">{formatEuro(bitcoinAmountP2 * currentBtcPrice)}</p>}
@@ -988,11 +988,11 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                                             <div className="space-y-1">
                                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{person1Name}</Label>
-                                                                <Input type="number" value={safeHavensP1} onChange={(e) => setSafeHavensP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
+                                                                <Input type="number" min="0" value={safeHavensP1} onChange={(e) => setSafeHavensP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">{person2Name}</Label>
-                                                                <Input type="number" value={safeHavensP2} onChange={(e) => setSafeHavensP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
+                                                                <Input type="number" min="0" value={safeHavensP2} onChange={(e) => setSafeHavensP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
                                                             </div>
                                                         </div>
                                                         {safeHavens > 0 && (
@@ -1008,11 +1008,11 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                                             <div className="space-y-1">
                                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">{person1Name}</Label>
-                                                                <Input type="number" value={pensionFundP1} onChange={(e) => setPensionFundP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
+                                                                <Input type="number" min="0" value={pensionFundP1} onChange={(e) => setPensionFundP1(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-blue-200 bg-blue-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-blue-900 dark:bg-blue-950/30 dark:text-slate-100" />
                                                             </div>
                                                             <div className="space-y-1">
                                                                 <Label className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400">{person2Name}</Label>
-                                                                <Input type="number" value={pensionFundP2} onChange={(e) => setPensionFundP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
+                                                                <Input type="number" min="0" value={pensionFundP2} onChange={(e) => setPensionFundP2(Number(e.target.value))} onBlur={triggerSave} className="h-11 border-violet-200 bg-violet-50/50 text-lg text-slate-900 focus-visible:ring-indigo-500 dark:border-violet-900 dark:bg-violet-950/30 dark:text-slate-100" />
                                                             </div>
                                                         </div>
                                                         {pensionFund > 0 && (
@@ -1126,6 +1126,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                     {editingDebtId === loan.id ? (
                                                         <Input
                                                             type="number"
+                                                            min="0"
                                                             autoFocus
                                                             value={editingDebtValue}
                                                             onChange={(e) => setEditingDebtValue(e.target.value)}
