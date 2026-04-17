@@ -10,9 +10,9 @@ export const DTI_THRESHOLD = 0.33; // Rapporto rata/reddito massimo sostenibile 
 // Rivalutazione immobiliare default
 export const DEFAULT_PROPERTY_APPRECIATION = 0.02; // 2% annuo
 
-// IRPEF 2024/2025 brackets
+// IRPEF 2026 brackets (allineati con irpef.ts: 23%, 33%, 43%)
 export const IRPEF_BRACKETS = [
     { limit: 28000, rate: 0.23 },
-    { limit: 50000, rate: 0.35 },
+    { limit: 50000, rate: 0.33 },
     { limit: Infinity, rate: 0.43 },
 ] as const;

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getFxRates } from '@/lib/fx-rates';
+import { getFxRates, normalizePriceToEur } from '@/lib/fx-rates';
 
 
 export async function GET(req: Request) {
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Ticker is required' }, { status: 400 });
         }
 
-        const { usdToEur: USD_TO_EUR, gbpToEur: GBP_TO_EUR } = await getFxRates();
+        const rates = await getFxRates();
 
         const normalizedTicker = ticker.toUpperCase();
 
@@ -71,16 +71,10 @@ export async function GET(req: Request) {
 
         // Format into a flat array of data points
         const history = timestamps.map((ts: number, index: number) => {
-            let price = closePrices[index];
-
-            // Currency Normalization
-            if (price !== null && price !== undefined) {
-                if (currency === 'USD') {
-                    price = price * USD_TO_EUR;
-                } else if (currency === 'GBp') {
-                    price = (price / 100) * GBP_TO_EUR;
-                }
-            }
+            const rawPrice = closePrices[index];
+            const price = rawPrice !== null && rawPrice !== undefined
+                ? normalizePriceToEur(rawPrice, currency, rates)
+                : 0;
 
             return {
                 timestamp: ts * 1000, // Convert to JS milliseconds

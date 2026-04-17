@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
     Target, Plus, Trash2, Pencil, Check, X,
     Home, PiggyBank, TrendingUp, Plane, Sparkles, CircleDot,
+    Zap, AlertTriangle, Clock, CalendarClock,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { format, differenceInMonths, parseISO } from "date-fns";
@@ -105,6 +106,84 @@ function getEstimatedDate(current: number, target: number, createdAt: string): s
     estimated.setMonth(estimated.getMonth() + monthsToGo);
     return format(estimated, "MMM yyyy", { locale: it });
 }
+
+type PacingStatus = "on-track" | "stretch" | "behind" | "expired";
+
+interface DeadlinePacing {
+    requiredMonthly: number;
+    monthsLeft: number;
+    historicalMonthly: number;
+    status: PacingStatus;
+}
+
+function getDeadlinePacing(goal: SavingsGoal): DeadlinePacing | null {
+    if (!goal.deadline) return null;
+    if (goal.currentAmount >= goal.targetAmount) return null;
+
+    const deadlineDate = parseISO(goal.deadline + "-01");
+    const now = new Date();
+    const monthsLeft = differenceInMonths(deadlineDate, now);
+    const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
+
+    if (monthsLeft < 0) {
+        const created = new Date(goal.createdAt);
+        const monthsElapsed = Math.max(1, differenceInMonths(now, created));
+        const historical = goal.currentAmount / monthsElapsed;
+        return { requiredMonthly: 0, monthsLeft, historicalMonthly: historical, status: "expired" };
+    }
+
+    const effectiveMonths = Math.max(1, monthsLeft);
+    const requiredMonthly = remaining / effectiveMonths;
+
+    const created = new Date(goal.createdAt);
+    const monthsElapsed = Math.max(1, differenceInMonths(now, created));
+    const historicalMonthly = goal.currentAmount / monthsElapsed;
+
+    let status: PacingStatus = "behind";
+    if (historicalMonthly >= requiredMonthly) status = "on-track";
+    else if (historicalMonthly >= requiredMonthly * 0.6) status = "stretch";
+
+    return { requiredMonthly, monthsLeft, historicalMonthly, status };
+}
+
+// Priorità di ordinamento: più bassa = mostrata per prima.
+// Obiettivi in ritardo/scaduti per primi, poi stretch, poi on-track,
+// poi goal senza scadenza, infine quelli completati.
+function getGoalSortPriority(goal: SavingsGoal, pacing: DeadlinePacing | null): number {
+    const isComplete = goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount;
+    if (isComplete) return 100;
+    if (!pacing) return 50;
+    switch (pacing.status) {
+        case "expired": return 0;
+        case "behind": return 10;
+        case "stretch": return 20;
+        case "on-track": return 30;
+        default: return 50;
+    }
+}
+
+const PACING_BADGE: Record<PacingStatus, { label: string; className: string; icon: React.ReactNode }> = {
+    "on-track": {
+        label: "In linea",
+        className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/60",
+        icon: <Check className="h-3 w-3" />,
+    },
+    stretch: {
+        label: "Da accelerare",
+        className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/60",
+        icon: <Zap className="h-3 w-3" />,
+    },
+    behind: {
+        label: "In ritardo",
+        className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60",
+        icon: <AlertTriangle className="h-3 w-3" />,
+    },
+    expired: {
+        label: "Scaduto",
+        className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/60",
+        icon: <Clock className="h-3 w-3" />,
+    },
+};
 
 interface SavingsGoalsProps {
     user: { username: string } | null;
@@ -206,6 +285,53 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
         }
     };
 
+    const {
+        totalTarget,
+        totalCurrent,
+        overallProgress,
+        totalRemaining,
+        totalRequiredMonthly,
+        completedCount,
+        sortedGoals,
+    } = useMemo(() => {
+        const targetSum = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
+        const currentSum = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
+        const progress = targetSum > 0 ? (currentSum / targetSum) * 100 : 0;
+        const remaining = Math.max(0, targetSum - currentSum);
+
+        let monthlySum = 0;
+        let completed = 0;
+
+        const decorated = goals.map((goal) => {
+            const pacing = getDeadlinePacing(goal);
+            if (pacing && pacing.status !== "expired" && pacing.monthsLeft > 0) {
+                monthlySum += pacing.requiredMonthly;
+            }
+            if (goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount) {
+                completed += 1;
+            }
+            return { goal, pacing, priority: getGoalSortPriority(goal, pacing) };
+        });
+
+        decorated.sort((a, b) => {
+            if (a.priority !== b.priority) return a.priority - b.priority;
+            // Tie-breaker: scadenza più vicina prima, poi quelli senza scadenza
+            const aDeadline = a.goal.deadline ? parseISO(a.goal.deadline + "-01").getTime() : Number.POSITIVE_INFINITY;
+            const bDeadline = b.goal.deadline ? parseISO(b.goal.deadline + "-01").getTime() : Number.POSITIVE_INFINITY;
+            return aDeadline - bDeadline;
+        });
+
+        return {
+            totalTarget: targetSum,
+            totalCurrent: currentSum,
+            overallProgress: progress,
+            totalRemaining: remaining,
+            totalRequiredMonthly: monthlySum,
+            completedCount: completed,
+            sortedGoals: decorated,
+        };
+    }, [goals]);
+
     if (!user) {
         return (
             <div className="flex flex-col items-center justify-center space-y-4 px-4 py-16 text-center">
@@ -217,10 +343,6 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
             </div>
         );
     }
-
-    const totalTarget = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
-    const totalCurrent = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
-    const overallProgress = totalTarget > 0 ? (totalCurrent / totalTarget) * 100 : 0;
 
     return (
         <div className="space-y-6">
@@ -263,6 +385,33 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                             className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-700"
                             style={{ width: `${Math.min(overallProgress, 100)}%` }}
                         />
+                    </div>
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5">
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <Target className="h-3 w-3" /> Da risparmiare
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">{formatEuro(totalRemaining)}</p>
+                        </div>
+                        <div
+                            className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5"
+                            title="Somma delle rate mensili necessarie per gli obiettivi con scadenza attiva"
+                        >
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <CalendarClock className="h-3 w-3" /> Ritmo richiesto
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">
+                                {totalRequiredMonthly > 0 ? `${formatEuro(totalRequiredMonthly)}/mese` : "—"}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5">
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <Check className="h-3 w-3" /> Completati
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">
+                                {completedCount} <span className="text-xs font-normal text-muted-foreground">/ {goals.length}</span>
+                            </p>
+                        </div>
                     </div>
                 </div>
             )}
@@ -329,23 +478,13 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    {goals.map((goal) => {
+                    {sortedGoals.map(({ goal, pacing }) => {
                         const category = getCategoryInfo(goal.category);
                         const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
                         const isComplete = progress >= 100;
                         const estimated = getEstimatedDate(goal.currentAmount, goal.targetAmount, goal.createdAt);
                         const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
-
-                        let deadlineInfo: string | null = null;
-                        if (goal.deadline) {
-                            const deadlineDate = parseISO(goal.deadline + "-01");
-                            const monthsLeft = differenceInMonths(deadlineDate, new Date());
-                            deadlineInfo = monthsLeft > 0
-                                ? `${monthsLeft} mesi rimanenti`
-                                : monthsLeft === 0
-                                    ? "Scade questo mese"
-                                    : "Scaduto";
-                        }
+                        const pacingBadge = pacing ? PACING_BADGE[pacing.status] : null;
 
                         return (
                             <Card key={goal.id} className={`overflow-hidden rounded-3xl border bg-card/80 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg ${isComplete ? "border-emerald-300/80 dark:border-emerald-800" : "border-border/70"}`}>
@@ -388,18 +527,59 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                                         {isComplete && <span className="font-bold text-emerald-600">Obiettivo raggiunto!</span>}
                                     </div>
 
-                                    {(deadlineInfo || estimated) && (
+                                    {pacing && pacingBadge && (
+                                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-dashed border-border/70 bg-muted/30 px-3 py-2.5">
+                                            <div className="min-w-0">
+                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                    {pacing.status === "expired"
+                                                        ? "Scadenza superata"
+                                                        : pacing.monthsLeft === 0
+                                                            ? "Serve entro questo mese"
+                                                            : "Serve al mese"}
+                                                </p>
+                                                <p className="text-sm font-extrabold text-foreground">
+                                                    {pacing.status === "expired"
+                                                        ? formatEuro(remaining)
+                                                        : formatEuro(pacing.requiredMonthly)}
+                                                    {pacing.status !== "expired" && pacing.monthsLeft > 0 && (
+                                                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                                                            per {pacing.monthsLeft} mes{pacing.monthsLeft === 1 ? "e" : "i"}
+                                                        </span>
+                                                    )}
+                                                    {pacing.status === "expired" && (
+                                                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                                                            ancora da risparmiare
+                                                        </span>
+                                                    )}
+                                                </p>
+                                                {pacing.historicalMonthly > 0 && (
+                                                    <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                                        Ritmo attuale: {formatEuro(pacing.historicalMonthly)}/mese
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <span
+                                                className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold ${pacingBadge.className}`}
+                                                title={
+                                                    pacing.status === "on-track"
+                                                        ? "Al tuo ritmo attuale raggiungerai l'obiettivo entro la scadenza"
+                                                        : pacing.status === "stretch"
+                                                            ? "Ci sei vicino ma devi aumentare leggermente il ritmo di risparmio"
+                                                            : pacing.status === "behind"
+                                                                ? "Al ritmo attuale non arriverai in tempo: serve uno sforzo extra"
+                                                                : "La scadenza e' passata e l'obiettivo non e' stato raggiunto"
+                                                }
+                                            >
+                                                {pacingBadge.icon} {pacingBadge.label}
+                                            </span>
+                                        </div>
+                                    )}
+
+                                    {!pacing && estimated && !isComplete && (
                                         <div className="flex flex-wrap gap-2 pt-1">
-                                            {deadlineInfo && (
-                                                <span className={`rounded-full px-2 py-1 text-[10px] font-medium ${deadlineInfo.includes("Scaduto") ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300" : "bg-muted text-muted-foreground"}`}>
-                                                    {deadlineInfo}
-                                                </span>
-                                            )}
-                                            {estimated && !isComplete && (
-                                                <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
-                                                    Stima: {estimated}
-                                                </span>
-                                            )}
+                                            <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
+                                                Stima: {estimated}
+                                            </span>
                                         </div>
                                     )}
                                 </CardContent>

@@ -18,7 +18,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Settings, Download, Upload, LogOut } from "lucide-react";
+import { Settings, Download, Upload, LogOut, Bot } from "lucide-react";
+import { AiSettingsModal } from "@/components/ai-settings-modal";
 
 interface AuthModalProps {
     user: { username: string } | null;
@@ -32,6 +33,7 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
+    const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -120,7 +122,8 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
                 toast.success(
                     `Dati importati! Preferenze: ${result.results.preferences ? "sì" : "no"}, ` +
                     `Snapshot: ${result.results.patrimonio}, Obiettivi: ${result.results.obiettivi}` +
-                    (result.results.abbonamenti ? `, Abbonamenti: ${result.results.abbonamenti}` : "")
+                    (result.results.abbonamenti ? `, Abbonamenti: ${result.results.abbonamenti}` : "") +
+                    (result.results.budgetTransactions ? `, Transazioni: ${result.results.budgetTransactions}` : "")
                 );
                 // Ricarica la pagina per riflettere i nuovi dati
                 setTimeout(() => window.location.reload(), 1500);
@@ -167,6 +170,16 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
                             Importa dati
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            onSelect={(e) => {
+                                e.preventDefault();
+                                setAiSettingsOpen(true);
+                            }}
+                        >
+                            <Bot className="size-4 mr-2" />
+                            Impostazioni AI
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
                             <LogOut className="size-4 mr-2" />
                             Logout
@@ -179,6 +192,11 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
                     accept=".json"
                     onChange={handleImport}
                     className="hidden"
+                />
+                <AiSettingsModal
+                    open={aiSettingsOpen}
+                    onOpenChange={setAiSettingsOpen}
+                    trigger={<span className="hidden" />}
                 />
             </div>
         );

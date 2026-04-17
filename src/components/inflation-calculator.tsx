@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TrendingDown, Euro, Calendar, Percent } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
+import { projectInflation } from "@/lib/finance/inflation";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
     CartesianGrid,
@@ -17,30 +18,37 @@ export function InflationCalculator() {
     const [years, setYears] = useState(20);
     const [nominalReturn, setNominalReturn] = useState(7);
 
-    const data = useMemo(() => {
-        const realReturn = ((1 + nominalReturn / 100) / (1 + inflationRate / 100) - 1) * 100;
-        const points = [];
-        for (let year = 0; year <= years; year++) {
-            const inflationFactor = Math.pow(1 + inflationRate / 100, year);
-            const purchasingPower = amount / inflationFactor;
-            const nominalValue = amount * Math.pow(1 + nominalReturn / 100, year);
-            const realValue = nominalValue / inflationFactor;
-            points.push({
-                anno: year,
-                label: `Anno ${year}`,
-                "Potere d'Acquisto": Math.round(purchasingPower),
-                "Valore Nominale Investito": Math.round(nominalValue),
-                "Valore Reale Investito": Math.round(realValue),
-            });
-        }
-        return { points, realReturn };
-    }, [amount, inflationRate, years, nominalReturn]);
+    const projection = useMemo(
+        () => projectInflation({
+            amount,
+            inflationRatePct: inflationRate,
+            years,
+            nominalReturnPct: nominalReturn,
+        }),
+        [amount, inflationRate, years, nominalReturn],
+    );
 
-    const finalPurchasingPower = data.points[data.points.length - 1]["Potere d'Acquisto"];
-    const lostValue = amount - finalPurchasingPower;
-    const lostPercent = (lostValue / amount) * 100;
-    const finalNominal = data.points[data.points.length - 1]["Valore Nominale Investito"];
-    const finalReal = data.points[data.points.length - 1]["Valore Reale Investito"];
+    // Adatta i punti al formato richiesto da Recharts (keys con label leggibile).
+    const chartPoints = useMemo(
+        () => projection.points.map((p) => ({
+            anno: p.year,
+            label: p.label,
+            "Potere d'Acquisto": p.purchasingPower,
+            "Valore Nominale Investito": p.nominalValue,
+            "Valore Reale Investito": p.realValue,
+        })),
+        [projection.points],
+    );
+
+    const {
+        finalPurchasingPower,
+        finalNominal,
+        finalReal,
+        lostValue,
+        lostPercent,
+        equivalentFutureCapital,
+        realReturnPct,
+    } = projection;
 
     return (
         <div className="space-y-6">
@@ -113,10 +121,13 @@ export function InflationCalculator() {
                     <p className="mt-1 text-lg font-extrabold text-red-600 dark:text-red-400">{formatEuro(finalPurchasingPower)}</p>
                     <p className="mt-0.5 text-[10px] text-red-400">-{formatPercent(lostPercent, 0)} in {years} anni</p>
                 </div>
-                <div className="rounded-3xl border border-border/70 bg-muted/35 p-4">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Valore Perso</p>
-                    <p className="mt-1 text-lg font-extrabold text-foreground">{formatEuro(lostValue)}</p>
-                    <p className="mt-0.5 text-[10px] text-muted-foreground">erosione inflazionistica</p>
+                <div
+                    className="rounded-3xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30"
+                    title={`Per acquistare in ${years} anni gli stessi beni che oggi compri con ${formatEuro(amount)} servono ${formatEuro(equivalentFutureCapital)} nominali.`}
+                >
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500">Capitale Equivalente Futuro</p>
+                    <p className="mt-1 text-lg font-extrabold text-amber-600 dark:text-amber-400">{formatEuro(equivalentFutureCapital)}</p>
+                    <p className="mt-0.5 text-[10px] text-amber-500">per mantenere lo stesso potere d&apos;acquisto</p>
                 </div>
                 <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Se Investito (Nominale)</p>
@@ -126,16 +137,27 @@ export function InflationCalculator() {
                 <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">Valore Reale Investito</p>
                     <p className="mt-1 text-lg font-extrabold text-emerald-600 dark:text-emerald-400">{formatEuro(finalReal)}</p>
-                    <p className="mt-0.5 text-[10px] text-emerald-400">rendimento reale {formatPercent(data.realReturn)}</p>
+                    <p className="mt-0.5 text-[10px] text-emerald-400">
+                        rendimento reale {formatPercent(realReturnPct)}
+                        {realReturnPct < 0 && <span className="ml-1 text-red-500">(perdita reale)</span>}
+                    </p>
                 </div>
             </div>
+
+            {lostValue > 0 && (
+                <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">Erosione inflazionistica</span>: tenendo {formatEuro(amount)} fermi
+                    perdi {formatEuro(lostValue)} di potere d&apos;acquisto in {years} anni
+                    ({formatPercent(lostPercent, 0)}).
+                </div>
+            )}
 
             <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
                 <CardContent className="p-5">
                     <h3 className="mb-4 text-sm font-bold text-muted-foreground">Evoluzione nel Tempo</h3>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={data.points} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <AreaChart data={chartPoints} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                                 <XAxis
                                     dataKey="anno"

@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Trash2, Repeat, CreditCard } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { useAuth } from "@/contexts/auth-context";
@@ -98,7 +99,28 @@ export function SubscriptionTracker() {
         return { monthly, annual: monthly * 12 };
     }, [subscriptions]);
 
-    if (!loaded) return null;
+    if (!loaded) return (
+        <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+            <CardContent className="space-y-5 p-5 sm:p-6">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-5 rounded" />
+                        <Skeleton className="h-5 w-44 rounded-lg" />
+                    </div>
+                    <Skeleton className="h-10 w-24 rounded-xl" />
+                </div>
+                <div className="space-y-3">
+                    {[0, 1, 2].map((i) => (
+                        <Skeleton key={i} className="h-14 rounded-2xl" />
+                    ))}
+                </div>
+                <div className="grid grid-cols-1 gap-3 border-t border-border/70 pt-3 sm:grid-cols-2">
+                    <Skeleton className="h-20 rounded-2xl" />
+                    <Skeleton className="h-20 rounded-2xl" />
+                </div>
+            </CardContent>
+        </Card>
+    );
 
     return (
         <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">

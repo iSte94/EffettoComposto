@@ -1,9 +1,12 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Briefcase, Building2, Flame, Github, Loader2, LineChart, ShieldCheck, Wallet, Wrench } from "lucide-react";
+import { BarChart3, Bot, Briefcase, Building2, Flame, Github, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AuthModal } from "@/components/auth-modal";
+import { AppVersionLabel } from "@/components/app-version-label";
 import { BrandLogo } from "@/components/brand-logo";
+import { ExportReportModal } from "@/components/export-report-modal";
 import { HeaderKpisBar } from "@/components/header-kpis";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/auth-context";
@@ -17,11 +20,32 @@ const ProgressioneDashboard = lazy(() => import("@/components/progressione-dashb
 const RealEstateAnalysis = lazy(() => import("@/components/real-estate-analysis").then((m) => ({ default: m.RealEstateAnalysis })));
 const CalculatorsDashboard = lazy(() => import("@/components/calculators-dashboard").then((m) => ({ default: m.CalculatorsDashboard })));
 const BudgetingDashboard = lazy(() => import("@/components/budgeting-dashboard").then((m) => ({ default: m.BudgetingDashboard })));
+const AiDashboard = lazy(() => import("@/components/ai-dashboard").then((m) => ({ default: m.AiDashboard })));
+const PerformanceDashboard = lazy(() => import("@/components/performance-dashboard").then((m) => ({ default: m.PerformanceDashboard })));
 
 function TabFallback() {
   return (
-    <div className="flex items-center justify-center rounded-2xl border border-border/70 bg-card/70 py-24 shadow-sm backdrop-blur-sm">
-      <Loader2 className="size-8 animate-spin text-muted-foreground" />
+    <div className="space-y-8 animate-in fade-in duration-500">
+      {/* Hero skeleton */}
+      <div className="rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-6">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-40 rounded-lg" />
+            <Skeleton className="h-8 w-56 rounded-lg" />
+          </div>
+          <Skeleton className="h-9 w-28 rounded-xl" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </div>
+      </div>
+      {/* Chart area skeleton */}
+      <div className="rounded-3xl border border-border/70 bg-card/80 p-5 shadow-sm backdrop-blur-xl">
+        <Skeleton className="mb-4 h-5 w-48 rounded-lg" />
+        <Skeleton className="h-[280px] w-full rounded-2xl sm:h-[360px]" />
+      </div>
     </div>
   );
 }
@@ -38,17 +62,21 @@ export default function CalculatorPage() {
     <div className="space-y-8 pb-24">
       <header className="flex flex-col gap-4 rounded-3xl border border-border/70 bg-card/80 p-4 shadow-sm backdrop-blur-xl sm:p-5 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
-          <BrandLogo
-            className="w-full max-w-[14rem] sm:max-w-[18rem] md:max-w-[21rem]"
-            imageClassName="drop-shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
-            priority
-            subtitle="Il cruscotto della tua liberta finanziaria"
-            subtitleClassName="pl-2 pt-1"
-          />
+          <div className="flex flex-col">
+            <BrandLogo
+              className="w-full max-w-[14rem] sm:max-w-[18rem] md:max-w-[21rem]"
+              imageClassName="drop-shadow-[0_12px_24px_rgba(15,23,42,0.08)]"
+              priority
+              subtitle="Il cruscotto della tua liberta finanziaria"
+              subtitleClassName="pl-2 pt-1"
+            />
+            <AppVersionLabel className="-mt-1" />
+          </div>
         </div>
 
         <div className="flex w-full flex-wrap items-center justify-start gap-2 md:w-auto md:justify-end">
           {kpis && <HeaderKpisBar kpis={kpis} onNavigate={setActiveTab} />}
+          {user && <ExportReportModal />}
           <a
             href="https://github.com/iSte94/EffettoComposto"
             target="_blank"
@@ -65,7 +93,7 @@ export default function CalculatorPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         <div className="flex justify-center">
-          <TabsList className="grid w-full max-w-6xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-4 md:grid-cols-8">
+          <TabsList className="grid w-full max-w-7xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
             <TabsTrigger value="overview" className={triggerClass}>
               <BarChart3 className="size-4 text-teal-500" />
               <span>Riepilogo</span>
@@ -73,6 +101,10 @@ export default function CalculatorPage() {
             <TabsTrigger value="patrimonio" className={triggerClass}>
               <LineChart className="size-4" />
               <span>Patrimonio</span>
+            </TabsTrigger>
+            <TabsTrigger value="performance" className={triggerClass}>
+              <TrendingUp className="size-4 text-pink-500" />
+              <span>Performance</span>
             </TabsTrigger>
             <TabsTrigger value="carriera" className={triggerClass}>
               <Briefcase className="size-4 text-violet-500" />
@@ -98,6 +130,10 @@ export default function CalculatorPage() {
               <Wrench className="size-4 text-teal-500" />
               <span>Strumenti</span>
             </TabsTrigger>
+            <TabsTrigger value="ai" className={triggerClass}>
+              <Bot className="size-4 text-purple-500" />
+              <span>AI</span>
+            </TabsTrigger>
           </TabsList>
         </div>
 
@@ -108,6 +144,10 @@ export default function CalculatorPage() {
 
           <TabsContent value="patrimonio">
             <PatrimonioDashboard user={user} />
+          </TabsContent>
+
+          <TabsContent value="performance">
+            <PerformanceDashboard user={user} />
           </TabsContent>
 
           <TabsContent value="carriera">
@@ -132,6 +172,10 @@ export default function CalculatorPage() {
 
           <TabsContent value="calculators">
             <CalculatorsDashboard />
+          </TabsContent>
+
+          <TabsContent value="ai">
+            <AiDashboard user={user} />
           </TabsContent>
         </Suspense>
       </Tabs>

@@ -2,16 +2,22 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
 import { z } from 'zod/v4';
+import { buildDerived } from '@/lib/ai/derived';
 
 // GET: Esporta tutti i dati dell'utente (preferenze, snapshot patrimonio, obiettivi)
-export async function GET() {
+// Query string `?ai=1` arricchisce la risposta con il blocco `derived` (aggregati per AI).
+export async function GET(req: Request) {
     try {
         const userId = await getAuthenticatedUserId();
+        const { searchParams } = new URL(req.url);
+        const includeDerived = searchParams.get('ai') === '1';
 
-        const [preferences, assets, goals] = await Promise.all([
+        const [preferences, assets, goals, budgetTransactions, dividends] = await Promise.all([
             prisma.preference.findUnique({ where: { userId } }),
             prisma.assetRecord.findMany({ where: { userId }, orderBy: { date: 'asc' } }),
             prisma.savingsGoal.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+            prisma.budgetTransaction.findMany({ where: { userId }, orderBy: { date: 'asc' } }),
+            prisma.dividendRecord.findMany({ where: { userId }, orderBy: { paymentDate: 'desc' } }),
         ]);
 
         // Rimuoviamo i campi interni (userId, id) che non servono per l'import
@@ -31,6 +37,11 @@ export async function GET() {
             return rest;
         });
 
+        const cleanBudgetTransactions = budgetTransactions.map(({ id, userId: _u, ...rest }) => {
+            void id; void _u;
+            return rest;
+        });
+
         // Estrarre subscriptionsList come array per leggibilità nel JSON esportato
         let subscriptions: unknown[] = [];
         if (cleanPreferences?.subscriptionsList) {
@@ -39,14 +50,30 @@ export async function GET() {
             } catch { /* noop */ }
         }
 
-        const exportData = {
+        const cleanDividends = dividends.map(({ id, userId: _u, createdAt: _c, updatedAt: _up, ...rest }) => {
+            void id; void _u; void _c; void _up;
+            return rest;
+        });
+
+        const exportData: Record<string, unknown> = {
             version: 1,
             exportedAt: new Date().toISOString(),
             preferences: cleanPreferences,
             patrimonio: cleanAssets,
             obiettivi: cleanGoals,
             abbonamenti: subscriptions,
+            budgetTransactions: cleanBudgetTransactions,
+            dividends: cleanDividends,
         };
+
+        if (includeDerived) {
+            exportData.derived = buildDerived({
+                preferences: cleanPreferences as Parameters<typeof buildDerived>[0]["preferences"],
+                snapshots: cleanAssets as Parameters<typeof buildDerived>[0]["snapshots"],
+                goals: cleanGoals as Parameters<typeof buildDerived>[0]["goals"],
+                transactions: cleanBudgetTransactions as Parameters<typeof buildDerived>[0]["transactions"],
+            });
+        }
 
         return NextResponse.json(exportData);
     } catch (error) {
@@ -76,6 +103,15 @@ const importSchema = z.object({
         amount: z.number(),
         frequency: z.enum(["mensile", "annuale"]),
     })).optional(),
+    budgetTransactions: z.array(z.object({
+        date: z.string(),
+        description: z.string(),
+        amount: z.number(),
+        category: z.string(),
+        categoryOverride: z.boolean().default(false),
+        hash: z.string(),
+        importedAt: z.string().optional(),
+    })).optional(),
 });
 
 // POST: Importa tutti i dati dell'utente (sovrascrive preferenze, aggiunge snapshot e obiettivi)
@@ -93,7 +129,7 @@ export async function POST(req: Request) {
         }
 
         const data = parsed.data;
-        const results = { preferences: false, patrimonio: 0, obiettivi: 0, abbonamenti: 0 };
+        const results = { preferences: false, patrimonio: 0, obiettivi: 0, abbonamenti: 0, budgetTransactions: 0 };
 
         // 1. Import preferenze (upsert)
         if (data.preferences) {
@@ -161,11 +197,29 @@ export async function POST(req: Request) {
             results.obiettivi = data.obiettivi.length;
         }
 
+        // 4. Import budget transactions
+        if (data.budgetTransactions && data.budgetTransactions.length > 0) {
+            await prisma.budgetTransaction.deleteMany({ where: { userId } });
+
+            await prisma.budgetTransaction.createMany({
+                data: data.budgetTransactions.map((tx) => ({
+                    date: tx.date,
+                    description: tx.description,
+                    amount: tx.amount,
+                    category: tx.category,
+                    categoryOverride: tx.categoryOverride,
+                    hash: tx.hash,
+                    importedAt: tx.importedAt ? new Date(tx.importedAt) : new Date(),
+                    userId,
+                })),
+            });
+            results.budgetTransactions = data.budgetTransactions.length;
+        }
+
         return NextResponse.json({
             message: 'Dati importati con successo!',
             results,
         });
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
         console.error('Failed to import user data:', error);

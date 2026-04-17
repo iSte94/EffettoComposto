@@ -62,7 +62,7 @@ export function calculateNetSalary(config: SalaryConfig): SalaryResult {
   // 4. Detrazioni Lavoro Dipendente
   let detrazioniLavoro = 0;
   if (imponibileIrpef <= 15000) {
-    detrazioniLavoro = Math.max(690, 1955);
+    detrazioniLavoro = 1955;
   } else if (imponibileIrpef <= 28000) {
     // Aggiunto il +65 per matchare al 100% le direttive aggiornate della curva 2025/2026
     detrazioniLavoro = 1910 + 1190 * ((28000 - imponibileIrpef) / 13000) + 65; 

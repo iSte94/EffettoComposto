@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import {
     BarChart3, Home, Wallet, Bitcoin, Package,
     Flame, Target, ShieldAlert, TrendingDown, FileDown, CheckCircle2,
+    LineChart, Activity,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { computeHistoryStats } from "@/lib/finance/history-stats";
 import { FinancialAlerts } from "@/components/financial-alerts";
 import { NetWorthProjection } from "@/components/patrimonio/net-worth-projection";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -55,7 +57,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
 
     useEffect(() => {
-        if (!user) { setLoading(false); return; }
+        if (!user) return;
 
         Promise.all([
             fetch('/api/patrimonio').then(r => r.json()),
@@ -111,12 +113,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         const btcValue = (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
         const otherAssets = (latest.safeHavens || 0) + (latest.pensionFund || 0);
 
-        // Sparkline data (ultimi 30 records o tutti se meno)
-        const sparkData = history.slice(-30).map(item => ({
-            date: item.date,
-            value: item.totalNetWorth || 0
-        }));
-
         // Asset allocation percentages
         const totalGross = realEstateValue + liquidValue + btcValue + otherAssets;
         const allocation = totalGross > 0 ? {
@@ -125,6 +121,14 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             crypto: (btcValue / totalGross) * 100,
             altro: (otherAssets / totalGross) * 100,
         } : { immobili: 0, liquidita: 0, crypto: 0, altro: 0 };
+
+        // Statistiche storiche su tutta la serie (CAGR + max drawdown).
+        // Usano il totalNetWorth gia' arricchito sopra.
+        const historyPoints = history.map(item => ({
+            date: item.date,
+            value: item.totalNetWorth || 0,
+        }));
+        const historyStats = computeHistoryStats(historyPoints);
 
         // FIRE progress (se abbiamo i parametri)
         const fireWithdrawalRate = Number(preferences.fireWithdrawalRate) || 3.25;
@@ -145,11 +149,15 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             currentNetWorth, netWorthChange, netWorthChangePercent, changeBreakdown, hasPrevious: !!previous,
             totalDebts, debtToAssetRatio,
             realEstateValue, liquidValue, btcValue, otherAssets,
-            sparkData, allocation,
+            allocation,
             fireTarget, fireProgress,
             emergencyFund, emergencyMonths,
             snapshotCount: history.length,
             latestDate: latest.date,
+            cagrPercent: historyStats.cagrPercent,
+            cagrYears: historyStats.cagrYears,
+            maxDrawdownPercent: historyStats.maxDrawdownPercent,
+            peakValue: historyStats.peakValue,
         };
     }, [history, preferences]);
 
@@ -253,6 +261,61 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                 <div className="text-xs text-muted-foreground">
                     {metrics.snapshotCount} snapshot totali &middot; ultimo: {new Date(metrics.latestDate).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
+
+                {/* Statistiche storiche: CAGR + Max Drawdown */}
+                {(metrics.cagrPercent !== null || (metrics.maxDrawdownPercent !== null && metrics.maxDrawdownPercent < 0)) && (
+                    <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        {metrics.cagrPercent !== null && metrics.cagrYears !== null && (
+                            <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-xs font-semibold cursor-help">
+                                            <LineChart className="size-3.5 text-teal-500" />
+                                            <span className="text-muted-foreground">CAGR</span>
+                                            <span className={`tabular-nums ${metrics.cagrPercent >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                                {metrics.cagrPercent >= 0 ? '+' : ''}{metrics.cagrPercent.toFixed(1)}%
+                                            </span>
+                                            <span className="text-muted-foreground font-normal">
+                                                /anno
+                                            </span>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs">
+                                        <div className="text-xs space-y-1 p-1">
+                                            <div className="font-bold">Tasso di crescita annualizzato</div>
+                                            <div className="text-muted-foreground">
+                                                Crescita composta del patrimonio su {metrics.cagrYears.toFixed(1)} {metrics.cagrYears >= 2 ? 'anni' : 'anno'} di storico.
+                                            </div>
+                                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                        {metrics.maxDrawdownPercent !== null && metrics.maxDrawdownPercent < 0 && metrics.peakValue !== null && (
+                            <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-xs font-semibold cursor-help">
+                                            <Activity className="size-3.5 text-rose-500" />
+                                            <span className="text-muted-foreground">Max drawdown</span>
+                                            <span className="tabular-nums text-rose-600 dark:text-rose-400">
+                                                {metrics.maxDrawdownPercent.toFixed(1)}%
+                                            </span>
+                                        </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs">
+                                        <div className="text-xs space-y-1 p-1">
+                                            <div className="font-bold">Massimo calo da un picco</div>
+                                            <div className="text-muted-foreground">
+                                                Peggior contrazione percentuale osservata rispetto a un massimo storico. Picco registrato: {formatEuro(metrics.peakValue)}.
+                                            </div>
+                                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Metric Cards */}
@@ -333,25 +396,29 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             {/* Asset Allocation Bar */}
             <div className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl shadow-sm p-5 sm:p-6">
                 <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em] mb-4">Allocazione Asset</h3>
-                <div className="w-full h-6 bg-muted rounded-full overflow-hidden flex">
+                <div
+                    className="w-full h-6 bg-muted rounded-full overflow-hidden flex"
+                    role="img"
+                    aria-label={`Allocazione asset: Immobili ${metrics.allocation.immobili.toFixed(1)}%, Liquidità & ETF ${metrics.allocation.liquidita.toFixed(1)}%, Crypto ${metrics.allocation.crypto.toFixed(1)}%, Altro ${metrics.allocation.altro.toFixed(1)}%`}
+                >
                     {metrics.allocation.immobili > 0 && (
-                        <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.immobili}%` }} title={`Immobili ${metrics.allocation.immobili.toFixed(1)}%`} />
+                        <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.immobili}%` }} />
                     )}
                     {metrics.allocation.liquidita > 0 && (
-                        <div className="bg-purple-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.liquidita}%` }} title={`Liquidita ${metrics.allocation.liquidita.toFixed(1)}%`} />
+                        <div className="bg-purple-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.liquidita}%` }} />
                     )}
                     {metrics.allocation.crypto > 0 && (
-                        <div className="bg-amber-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.crypto}%` }} title={`Crypto ${metrics.allocation.crypto.toFixed(1)}%`} />
+                        <div className="bg-amber-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.crypto}%` }} />
                     )}
                     {metrics.allocation.altro > 0 && (
-                        <div className="bg-slate-400 h-full transition-all duration-700" style={{ width: `${metrics.allocation.altro}%` }} title={`Altro ${metrics.allocation.altro.toFixed(1)}%`} />
+                        <div className="bg-slate-400 h-full transition-all duration-700" style={{ width: `${metrics.allocation.altro}%` }} />
                     )}
                 </div>
                 <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 text-xs font-medium text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Immobili</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Liquidità & ETF</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Crypto</span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Altro</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Immobili <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.immobili.toFixed(1)}%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Liquidità & ETF <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.liquidita.toFixed(1)}%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Crypto <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.crypto.toFixed(1)}%</span></span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Altro <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.altro.toFixed(1)}%</span></span>
                 </div>
             </div>
 

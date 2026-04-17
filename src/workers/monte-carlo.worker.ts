@@ -92,6 +92,7 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
             let runCap = startingCapital;
             let runPensionCap = currentPensionFundValue;
             let runPensionAnnuity = 0;
+            let runPensionAccessed = false;
             let survived = true;
 
             for (let y = 0; y <= simYears; y++) {
@@ -138,8 +139,13 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                     if (!isRetired && totalAnnualPensionContribution > 0) {
                         runPensionCap += totalAnnualPensionContribution;
                     }
-                    if (yAge === pensionFundAccessAge && runPensionCap > 0) {
-                        const net = runPensionCap * (1 - pensionFundExitTaxRate / 100);
+                    // BUG FIX: prima si usava `yAge === pensionFundAccessAge` (strict
+                    // equality) che impediva la liquidazione quando l'eta' di partenza
+                    // era gia' oltre l'accesso, o per eta' non intere. Ora si usa un
+                    // flag idempotente con confronto >=.
+                    if (!runPensionAccessed && yAge >= pensionFundAccessAge && runPensionCap > 0) {
+                        const taxRate = Math.min(100, Math.max(0, pensionFundExitTaxRate));
+                        const net = runPensionCap * (1 - taxRate / 100);
                         const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
                         if (pensionExitMode === "hybrid") {
                             runCap += net * 0.5;
@@ -148,6 +154,7 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                             runPensionAnnuity = net / annuityMonths;
                         }
                         runPensionCap = 0;
+                        runPensionAccessed = true;
                     }
                 }
 
@@ -165,11 +172,12 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
         const currentData = [];
         for (let y = 0; y <= simYears; y++) {
             const sortedCol = [...allPaths[y]].sort((a, b) => a - b);
+            const maxIdx = runsCompleted - 1;
             currentData.push({
                 age: currentAge + y,
-                p10: Math.round(sortedCol[Math.floor(runsCompleted * 0.1)]),
-                p50: Math.round(sortedCol[Math.floor(runsCompleted * 0.5)]),
-                p90: Math.round(sortedCol[Math.floor(runsCompleted * 0.9)]),
+                p10: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.1), maxIdx)]),
+                p50: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.5), maxIdx)]),
+                p90: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.9), maxIdx)]),
                 Target: fireTarget
             });
         }

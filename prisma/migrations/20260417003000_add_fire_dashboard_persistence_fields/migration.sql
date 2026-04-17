@@ -1,0 +1,2 @@
+ALTER TABLE "Preference" ADD COLUMN "monthlySavings" REAL NOT NULL DEFAULT 1000;
+ALTER TABLE "Preference" ADD COLUMN "includeIlliquidInFire" BOOLEAN NOT NULL DEFAULT false;
