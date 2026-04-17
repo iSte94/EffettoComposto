@@ -42,7 +42,7 @@ const SCENARIO_STYLE: Record<string, {
 
 function ScenarioCard({ s, currentCapital }: { s: CoastFireScenarioResult; currentCapital: number }) {
     const style = SCENARIO_STYLE[s.scenario];
-    const progress = s.coastFireTarget > 0 ? Math.min(100, (currentCapital / s.coastFireTarget) * 100) : 100;
+    const progress = s.coastFireTarget > 0 ? Math.max(0, Math.min(100, (currentCapital / s.coastFireTarget) * 100)) : 100;
 
     return (
         <div className={`rounded-3xl border ${style.ring} ${style.bg} p-5 overflow-hidden relative transition-transform hover:-translate-y-0.5`}>

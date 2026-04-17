@@ -41,6 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatEuro } from "@/lib/format";
 import { calculateRemainingDebt, getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { cn } from "@/lib/utils";
 import type { AssetOwner, AssetRecord, CustomStock, ExistingLoan, MonthlyExpense, RealEstateProperty } from "@/types";
 
@@ -124,6 +125,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
 
             if (res.ok) {
                 setSaveStatus("saved");
+                broadcastFinancialDataChanged({ scope: "patrimonio", source: "patrimonio-dashboard" });
                 setTimeout(() => setSaveStatus("idle"), 2500);
             } else {
                 setSaveStatus("idle");
@@ -253,7 +255,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const savePreferences = async (newLoans: ExistingLoan[]) => {
         if (!user) return;
         try {
-            await fetch("/api/preferences", {
+            const res = await fetch("/api/preferences", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -267,6 +269,9 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     separateEmergencyFund,
                 }),
             });
+            if (res.ok) {
+                broadcastFinancialDataChanged({ scope: "preferences", source: "patrimonio-dashboard" });
+            }
         } catch (error) {
             console.error("Failed to save preferences", error);
         }
@@ -280,11 +285,14 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         if (!user) return;
 
         try {
-            await fetch("/api/preferences", {
+            const res = await fetch("/api/preferences", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ separateEmergencyFund: value }),
             });
+            if (res.ok) {
+                broadcastFinancialDataChanged({ scope: "preferences", source: "patrimonio-dashboard" });
+            }
         } catch (error) {
             console.error("Failed to save preference", error);
         }
@@ -555,6 +563,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
             });
             if (res.ok) {
                 toast.success("Record eliminato");
+                broadcastFinancialDataChanged({ scope: "patrimonio", source: "patrimonio-dashboard" });
                 fetchHistory(false);
             }
         } catch {

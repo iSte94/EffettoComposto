@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     calculatePropertyAnnualCosts,
     calculatePropertyAnnualNetIncome,
+    buildRealEstatePassiveIncomeStreams,
     sumRealEstateAnnualNetIncome,
 } from './real-estate';
 
@@ -130,5 +131,72 @@ describe('sumRealEstateAnnualNetIncome', () => {
             { rent: 1000, costs: 3000, imu: 500, isRented: true },             // -2500
         ]);
         expect(total).toBe(9000 + (-2500));
+    });
+});
+
+describe('buildRealEstatePassiveIncomeStreams', () => {
+    it('fa partire lo stream dal retirement se la rendita matura prima', () => {
+        const streams = buildRealEstatePassiveIncomeStreams([
+            {
+                rent: 12000,
+                costs: 2000,
+                imu: 1000,
+                isRented: false,
+                rentStartDate: '2032-01',
+            },
+        ], {
+            currentAge: 40,
+            retirementAge: 60,
+            asOfYearMonth: '2030-01',
+        });
+
+        expect(streams).toHaveLength(1);
+        expect(streams[0].annualAmount).toBe(9000);
+        expect(streams[0].startAge).toBe(60);
+    });
+
+    it('non usa mai il valore dell immobile e ignora proprieta senza rendita pianificata', () => {
+        const streams = buildRealEstatePassiveIncomeStreams([
+            {
+                rent: 0,
+                costs: 1500,
+                imu: 800,
+                isRented: false,
+            },
+            {
+                rent: 8000,
+                costs: 1000,
+                imu: 0,
+                isRented: true,
+            },
+        ], {
+            currentAge: 35,
+            retirementAge: 55,
+            asOfYearMonth: '2026-04',
+        });
+
+        expect(streams).toHaveLength(1);
+        expect(streams[0].annualAmount).toBe(7000);
+        expect(streams[0].startAge).toBe(55);
+    });
+
+    it('posticipa lo stream oltre il retirement se la rendita parte piu tardi', () => {
+        const streams = buildRealEstatePassiveIncomeStreams([
+            {
+                rent: 10000,
+                costs: 1000,
+                imu: 500,
+                isRented: false,
+                rentStartDate: '2056-04',
+            },
+        ], {
+            currentAge: 50,
+            retirementAge: 55,
+            asOfYearMonth: '2049-04',
+        });
+
+        expect(streams).toHaveLength(1);
+        expect(streams[0].annualAmount).toBe(8500);
+        expect(streams[0].startAge).toBe(57);
     });
 });

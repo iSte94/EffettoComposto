@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { toast } from "sonner";
+import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 
 export interface MortgagePreferences {
     propertyPrice: number;
@@ -157,13 +158,17 @@ export function usePreferences() {
             setIsSaving(true);
             try {
                 if (user) {
-                    await fetch('/api/preferences', {
+                    const res = await fetch('/api/preferences', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(preferences),
                     });
+                    if (res.ok) {
+                        broadcastFinancialDataChanged({ scope: "preferences", source: "usePreferences" });
+                    }
                 } else if (typeof window !== "undefined") {
                     window.localStorage.setItem(LOCAL_PREFERENCES_KEY, JSON.stringify(preferences));
+                    broadcastFinancialDataChanged({ scope: "preferences", source: "usePreferences" });
                 }
             } catch (error) {
                 console.error("Errore durante il salvataggio preferenze:", error);

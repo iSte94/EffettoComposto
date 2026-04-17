@@ -72,8 +72,8 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                         <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-200/80 bg-white/70 p-3 transition-all hover:bg-white dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800/70">
                             <div className="space-y-0.5">
                                 <div className="flex items-center gap-1">
-                                    <Label className="text-sm font-bold text-slate-900 dark:text-slate-100">Includi Immobili</Label>
-                                    <InfoTooltip>Se attivo, il valore degli immobili viene incluso nel capitale per il calcolo FIRE. Disattiva se consideri gli immobili non liquidabili.</InfoTooltip>
+                                    <Label className="text-sm font-bold text-slate-900 dark:text-slate-100">Includi Asset Extra</Label>
+                                    <InfoTooltip>Se attivo, il capitale FIRE include anche safe haven e fondo pensione gia&apos; accumulato. Il valore degli immobili non entra mai nel FIRE: contano solo le rendite nette future.</InfoTooltip>
                                 </div>
                             </div>
                             <Switch checked={props.includeIlliquidInFire} onCheckedChange={props.onIncludeIlliquidChange} />

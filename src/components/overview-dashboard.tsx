@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 
 import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
+import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
+import { addFinancialDataChangedListener } from "@/lib/client-data-events";
 import type { AssetRecord, AcceptedPurchase } from "@/types";
 
 interface OverviewDashboardProps {
@@ -52,17 +54,20 @@ function MetricCard({ icon, label, value, subtitle, color = "slate" }: {
 
 export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [history, setHistory] = useState<AssetRecord[]>([]);
-    const [preferences, setPreferences] = useState<Record<string, number | string | null>>({});
+    const [preferences, setPreferences] = useState<Record<string, unknown>>({});
     const [loading, setLoading] = useState(true);
     const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
 
-    useEffect(() => {
+    const loadOverviewData = useCallback(async (showLoading = true) => {
         if (!user) return;
+        if (showLoading) setLoading(true);
 
-        Promise.all([
-            fetch('/api/patrimonio').then(r => r.json()),
-            fetch('/api/preferences').then(r => r.json()),
-        ]).then(([patrimonioData, prefData]) => {
+        try {
+            const [patrimonioData, prefData] = await Promise.all([
+                fetch('/api/patrimonio').then(r => r.json()),
+                fetch('/api/preferences').then(r => r.json()),
+            ]);
+
             if (patrimonioData.history) {
                 // Calcola totalNetWorth per ogni record (esclusi immobili)
                 const enriched = patrimonioData.history.map((item: AssetRecord) => ({
@@ -74,12 +79,28 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                 setHistory(enriched);
             }
             if (prefData.preferences) {
-                setPreferences(prefData.preferences);
+                setPreferences(prefData.preferences as Record<string, unknown>);
                 try { setAcceptedPurchases(JSON.parse(prefData.preferences.acceptedPurchases || "[]")); } catch { /* empty */ }
             }
-        }).catch(console.error)
-            .finally(() => setLoading(false));
+        } catch (error) {
+            console.error(error);
+        } finally {
+            if (showLoading) setLoading(false);
+        }
     }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+        void loadOverviewData();
+    }, [user, loadOverviewData]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        return addFinancialDataChangedListener(() => {
+            void loadOverviewData(false);
+        });
+    }, [user, loadOverviewData]);
 
     const metrics = useMemo(() => {
         if (history.length === 0) return null;
@@ -121,6 +142,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             crypto: (btcValue / totalGross) * 100,
             altro: (otherAssets / totalGross) * 100,
         } : { immobili: 0, liquidita: 0, crypto: 0, altro: 0 };
+        const fireMetrics = computeFireMetricsFromSnapshot(latest, preferences);
 
         // Statistiche storiche su tutta la serie (CAGR + max drawdown).
         // Usano il totalNetWorth gia' arricchito sopra.
@@ -130,19 +152,11 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         }));
         const historyStats = computeHistoryStats(historyPoints);
 
-        // FIRE progress (se abbiamo i parametri)
-        const fireWithdrawalRate = Number(preferences.fireWithdrawalRate) || 3.25;
-        const expectedMonthlyExpenses = Number(preferences.expectedMonthlyExpenses) || 0;
-        const fireTarget = expectedMonthlyExpenses > 0
-            ? (expectedMonthlyExpenses * 12) / (fireWithdrawalRate / 100)
-            : 0;
-        const fireProgress = fireTarget > 0 ? Math.min(100, (currentNetWorth / fireTarget) * 100) : 0;
-
         // Emergency fund months - se separato usa emergencyFund, altrimenti liquidStockValue
         const isSeparate = !!preferences.separateEmergencyFund;
         const emergencyFundValue = isSeparate ? (latest.emergencyFund || 0) : (latest.liquidStockValue || 0);
         const emergencyFund = emergencyFundValue;
-        const monthlyExpenses = expectedMonthlyExpenses || 2000; // fallback
+        const monthlyExpenses = Number(preferences.expectedMonthlyExpenses) || 2000; // fallback
         const emergencyMonths = monthlyExpenses > 0 ? emergencyFund / monthlyExpenses : 0;
 
         return {
@@ -150,7 +164,10 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             totalDebts, debtToAssetRatio,
             realEstateValue, liquidValue, btcValue, otherAssets,
             allocation,
-            fireTarget, fireProgress,
+            fireTarget: fireMetrics.fireTarget,
+            fireProgress: fireMetrics.fireProgress,
+            fireGap: fireMetrics.fireGap,
+            fireCurrentCapital: fireMetrics.currentCapital,
             emergencyFund, emergencyMonths,
             snapshotCount: history.length,
             latestDate: latest.date,
@@ -375,8 +392,8 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                     <MetricCard
                         icon={<Target className="w-4 h-4 text-teal-500" />}
                         label="Distanza FIRE"
-                        value={formatEuro(Math.max(0, metrics.fireTarget - metrics.currentNetWorth))}
-                        subtitle={metrics.fireProgress >= 100 ? "Obiettivo raggiunto!" : "Capitale mancante"}
+                        value={formatEuro(metrics.fireGap)}
+                        subtitle={metrics.fireProgress >= 100 ? "Obiettivo raggiunto!" : "Capitale FIRE mancante"}
                         color="teal"
                     />
                 )}

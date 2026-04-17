@@ -1,3 +1,8 @@
+import {
+    AI_ATTACHMENT_MAX_REQUEST_BYTES,
+    formatBytes,
+    type AiAttachmentInput,
+} from "@/lib/ai/attachments";
 import type { AiToolDef } from "@/lib/ai/tools";
 
 export type AiProvider = "openrouter" | "gemini";
@@ -5,6 +10,7 @@ export type AiProvider = "openrouter" | "gemini";
 export interface AiChatMessage {
     role: "user" | "assistant";
     content: string;
+    attachments?: AiAttachmentInput[];
 }
 
 export interface AiToolTraceEntry {
@@ -65,10 +71,39 @@ export async function listModels(provider: AiProvider, apiKey: string): Promise<
 }
 
 export async function chat(req: AiChatRequest): Promise<AiChatResult> {
+    const totalAttachmentBytes = req.messages.reduce(
+        (sum, message) => sum + (message.attachments ?? []).reduce((messageSum, attachment) => messageSum + attachment.size, 0),
+        0,
+    );
+    if (totalAttachmentBytes > AI_ATTACHMENT_MAX_REQUEST_BYTES) {
+        throw new Error(
+            `Gli allegati della conversazione superano ${formatBytes(AI_ATTACHMENT_MAX_REQUEST_BYTES)}. Apri un nuovo thread o riduci i file.`,
+        );
+    }
     return req.provider === "openrouter" ? chatOpenRouter(req) : chatGemini(req);
 }
 
 // =================== OpenRouter (formato OpenAI) ===================
+
+interface OpenAiTextPart {
+    type: "text";
+    text: string;
+}
+
+interface OpenAiImagePart {
+    type: "image_url";
+    image_url: { url: string };
+}
+
+interface OpenAiFilePart {
+    type: "file";
+    file: {
+        filename: string;
+        file_data: string;
+    };
+}
+
+type OpenAiContentPart = OpenAiTextPart | OpenAiImagePart | OpenAiFilePart;
 
 interface OpenAiToolCall {
     id: string;
@@ -78,10 +113,36 @@ interface OpenAiToolCall {
 
 interface OpenAiMessage {
     role: "system" | "user" | "assistant" | "tool";
-    content: string | null;
+    content: string | OpenAiContentPart[] | null;
     name?: string;
     tool_calls?: OpenAiToolCall[];
     tool_call_id?: string;
+}
+
+function buildOpenAiContent(message: AiChatMessage): string | OpenAiContentPart[] {
+    const parts: OpenAiContentPart[] = [];
+    if (message.content.trim()) {
+        parts.push({ type: "text", text: message.content });
+    }
+    for (const attachment of message.attachments ?? []) {
+        if (attachment.kind === "image") {
+            parts.push({
+                type: "image_url",
+                image_url: { url: attachment.dataUrl },
+            });
+        } else {
+            parts.push({
+                type: "file",
+                file: {
+                    filename: attachment.filename,
+                    file_data: attachment.dataUrl,
+                },
+            });
+        }
+    }
+    if (parts.length === 0) return message.content;
+    if (parts.length === 1 && parts[0].type === "text") return parts[0].text;
+    return parts;
 }
 
 async function chatOpenRouter(req: AiChatRequest): Promise<AiChatResult> {
@@ -95,7 +156,7 @@ async function chatOpenRouter(req: AiChatRequest): Promise<AiChatResult> {
         { role: "system", content: req.systemPrompt },
         ...req.messages.map((m): OpenAiMessage => ({
             role: m.role === "assistant" ? "assistant" : "user",
-            content: m.content,
+            content: buildOpenAiContent(m),
         })),
     ];
 
@@ -171,6 +232,7 @@ async function chatOpenRouter(req: AiChatRequest): Promise<AiChatResult> {
 
 interface GeminiPart {
     text?: string;
+    inlineData?: { mimeType: string; data: string };
     thought?: boolean;
     thoughtSignature?: string;
     functionCall?: { name: string; args?: Record<string, unknown> };
@@ -219,12 +281,34 @@ export function extractGeminiVisibleText(parts: GeminiPart[]): string {
         .join("");
 }
 
+function extractDataUrlBase64(dataUrl: string): string {
+    const marker = ";base64,";
+    const markerIndex = dataUrl.indexOf(marker);
+    return markerIndex >= 0 ? dataUrl.slice(markerIndex + marker.length) : dataUrl;
+}
+
+function buildGeminiParts(message: AiChatMessage): GeminiPart[] {
+    const parts: GeminiPart[] = [];
+    if (message.content.trim()) {
+        parts.push({ text: message.content });
+    }
+    for (const attachment of message.attachments ?? []) {
+        parts.push({
+            inlineData: {
+                mimeType: attachment.mimeType,
+                data: extractDataUrlBase64(attachment.dataUrl),
+            },
+        });
+    }
+    return parts.length > 0 ? parts : [{ text: message.content }];
+}
+
 async function chatGemini(req: AiChatRequest): Promise<AiChatResult> {
     const trace: AiToolTraceEntry[] = [];
 
     const conversation: GeminiContent[] = req.messages.map((m): GeminiContent => ({
         role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
+        parts: buildGeminiParts(m),
     }));
 
     const toolsDecl = (req.tools ?? []).length > 0

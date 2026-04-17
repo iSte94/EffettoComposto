@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.2.5`
+**Versione corrente:** `v0.3.0`
 
 ---
 
@@ -111,6 +111,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.3.0 - 17 aprile 2026 (AI con allegati + FIRE coerente)
+
+- **AI Advisor ora accetta immagini e PDF** - la chat supporta allegati reali via picker o incolla, con anteprima nel composer, rendering dentro i messaggi, persistenza nei thread e recupero protetto via API. OpenRouter riceve content parts compatibili con immagini/file e Gemini usa `inlineData`, con limiti centralizzati su numero e peso dei file
+- **Persistenza completa degli allegati AI** - introdotto il modello Prisma `AssistantAttachment` e il salvataggio multipart su `/api/ai/threads/[id]/messages`, cosi' le conversazioni restano rileggibili anche dopo reload e un thread senza testo puo' usare il filename dell'allegato come titolo iniziale
+- **FIRE piu' realistico sugli immobili** - il valore degli immobili non entra piu' nel capitale FIRE: contano solo le rendite nette, anche future, ricavate da `rentStartDate` e convertite in stream passivi nel motore Coast FIRE. Header KPI, tab FIRE e Riepilogo usano ora la stessa `computeFireMetricsFromSnapshot()` per evitare discrepanze
+- **Dashboard sincronizzate in tempo reale** - cambi a patrimonio, preferenze FIRE o acquisti accettati propagano subito un evento client-side, cosi' overview, KPI in header e simulatore FIRE si aggiornano senza restare con dati stantii tra un tab e l'altro
+- **Regressioni coperte lato FIRE** - aggiunti test su rendite passive future, rendite negative e calcolo centralizzato delle metriche FIRE per bloccare ritorni di incoerenze sul target netto
 
 ### v0.2.6 - 17 aprile 2026 (UX — validazione input numerici: vincolo min su tutti i campi finanziari)
 

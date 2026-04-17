@@ -89,4 +89,40 @@ describe("computeCoastFireScenarios", () => {
         expect(baseEarly!.fireTargetNet).toBeLessThan(baseLate!.fireTargetNet);
         expect(baseEarly!.coastFireTarget).toBeLessThan(baseLate!.coastFireTarget);
     });
+
+    it("considera rendite passive programmate future nel target netto", () => {
+        const withoutPassive = computeCoastFireScenarios(baseInput);
+        const withFuturePassive = computeCoastFireScenarios({
+            ...baseInput,
+            passiveIncomeStreams: [
+                { annualAmount: 9_000, startAge: 63, endAge: 90 },
+            ],
+        });
+
+        const baseWithout = withoutPassive.scenarios.find((s) => s.scenario === "base");
+        const baseWithFuturePassive = withFuturePassive.scenarios.find((s) => s.scenario === "base");
+
+        expect(baseWithout).toBeDefined();
+        expect(baseWithFuturePassive).toBeDefined();
+        expect(baseWithFuturePassive!.fireTargetNet).toBeLessThan(baseWithout!.fireTargetNet);
+        expect(baseWithFuturePassive!.passiveIncomePresentValue).toBeGreaterThan(0);
+    });
+
+    it("una rendita passiva negativa aumenta il target FIRE netto", () => {
+        const withoutNegativePassive = computeCoastFireScenarios(baseInput);
+        const withNegativePassive = computeCoastFireScenarios({
+            ...baseInput,
+            passiveIncomeStreams: [
+                { annualAmount: -3_000, startAge: 60, endAge: 90 },
+            ],
+        });
+
+        const baseWithout = withoutNegativePassive.scenarios.find((s) => s.scenario === "base");
+        const baseWithNegative = withNegativePassive.scenarios.find((s) => s.scenario === "base");
+
+        expect(baseWithout).toBeDefined();
+        expect(baseWithNegative).toBeDefined();
+        expect(baseWithNegative!.fireTargetNet).toBeGreaterThan(baseWithout!.fireTargetNet);
+        expect(baseWithNegative!.passiveIncomePresentValue).toBeLessThan(0);
+    });
 });

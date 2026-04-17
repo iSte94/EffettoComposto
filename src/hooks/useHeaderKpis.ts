@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import type { AssetRecord } from "@/types";
+import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
+import { addFinancialDataChangedListener } from "@/lib/client-data-events";
 
 export interface HeaderKpis {
     netWorth: number;
@@ -11,16 +13,22 @@ export interface HeaderKpis {
 
 export function useHeaderKpis(user: { username: string } | null) {
     const [history, setHistory] = useState<AssetRecord[]>([]);
-    const [preferences, setPreferences] = useState<Record<string, number | string | null>>({});
+    const [preferences, setPreferences] = useState<Record<string, unknown>>({});
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        if (!user) { setLoading(false); return; }
+    const loadHeaderData = useCallback(async (showLoading = true) => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+        if (showLoading) setLoading(true);
 
-        Promise.all([
-            fetch("/api/patrimonio").then(r => r.json()),
-            fetch("/api/preferences").then(r => r.json()),
-        ]).then(([patrimonioData, prefData]) => {
+        try {
+            const [patrimonioData, prefData] = await Promise.all([
+                fetch("/api/patrimonio").then(r => r.json()),
+                fetch("/api/preferences").then(r => r.json()),
+            ]);
+
             if (patrimonioData.history) {
                 const enriched = patrimonioData.history.map((item: AssetRecord) => ({
                     ...item,
@@ -30,10 +38,25 @@ export function useHeaderKpis(user: { username: string } | null) {
                 }));
                 setHistory(enriched);
             }
-            if (prefData.preferences) setPreferences(prefData.preferences);
-        }).catch(console.error)
-            .finally(() => setLoading(false));
+            if (prefData.preferences) setPreferences(prefData.preferences as Record<string, unknown>);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            if (showLoading) setLoading(false);
+        }
     }, [user]);
+
+    useEffect(() => {
+        void loadHeaderData();
+    }, [loadHeaderData]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        return addFinancialDataChangedListener(() => {
+            void loadHeaderData(false);
+        });
+    }, [user, loadHeaderData]);
 
     const kpis = useMemo<HeaderKpis | null>(() => {
         if (history.length === 0) return null;
@@ -43,13 +66,7 @@ export function useHeaderKpis(user: { username: string } | null) {
         const currentNetWorth = latest.totalNetWorth || 0;
         const previousNetWorth = previous?.totalNetWorth || currentNetWorth;
 
-        // FIRE
-        const fireWithdrawalRate = Number(preferences.fireWithdrawalRate) || 3.25;
-        const expectedMonthlyExpenses = Number(preferences.expectedMonthlyExpenses) || 0;
-        const fireTarget = expectedMonthlyExpenses > 0
-            ? (expectedMonthlyExpenses * 12) / (fireWithdrawalRate / 100)
-            : 0;
-        const fireProgress = fireTarget > 0 ? Math.min(100, (currentNetWorth / fireTarget) * 100) : 0;
+        const fireMetrics = computeFireMetricsFromSnapshot(latest, preferences);
 
         // Savings rate
         const grossIncome = Number(preferences.person1Income || 0) + Number(preferences.person2Income || 0);
@@ -87,8 +104,8 @@ export function useHeaderKpis(user: { username: string } | null) {
         return {
             netWorth: currentNetWorth,
             netWorthChange: currentNetWorth - previousNetWorth,
-            fireProgress,
-            fireTarget,
+            fireProgress: fireMetrics.fireProgress,
+            fireTarget: fireMetrics.fireTarget,
             savingsRate,
         };
     }, [history, preferences]);

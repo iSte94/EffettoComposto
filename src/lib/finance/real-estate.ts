@@ -2,6 +2,8 @@
 // Convenzione: tutti gli importi di input (rent, costs, imu) sono ANNUALI in euro.
 // Vedi label "Rendita Annua Attesa" in real-estate-section.tsx e l'uso in patrimonio-dashboard.tsx.
 
+import type { PassiveIncomeStream } from "./coast-fire";
+
 export interface RealEstateCashflowInput {
     rent?: number;             // Rendita annua attesa
     costs?: number;            // Spese fisse annue (condominio, manutenzione, ecc.)
@@ -9,6 +11,35 @@ export interface RealEstateCashflowInput {
     isPrimaryResidence?: boolean;
     isRented?: boolean;
     rentStartDate?: string;    // YYYY-MM — se impostato e futuro, l'immobile non genera rendita finche' non matura
+}
+
+export interface BuildRealEstatePassiveIncomeStreamsInput {
+    currentAge: number;
+    retirementAge: number;
+    asOfYearMonth: string;
+    lifeExpectancy?: number;
+}
+
+const DEFAULT_LIFE_EXPECTANCY = 90;
+
+function parseYearMonth(value?: string): { year: number; month: number } | null {
+    if (!value || !/^\d{4}-\d{2}$/.test(value)) return null;
+    const [year, month] = value.split("-").map(Number);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+    return { year, month };
+}
+
+function monthsBetweenYearMonths(startYearMonth: string, endYearMonth: string): number | null {
+    const start = parseYearMonth(startYearMonth);
+    const end = parseYearMonth(endYearMonth);
+    if (!start || !end) return null;
+    return (end.year - start.year) * 12 + (end.month - start.month);
+}
+
+export function formatYearMonth(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, "0");
+    return `${year}-${month}`;
 }
 
 /**
@@ -26,6 +57,11 @@ export function calculatePropertyAnnualCosts(prop: RealEstateCashflowInput): num
     return costs + imuApplicable;
 }
 
+export function calculatePropertyAnnualPotentialNetIncome(prop: RealEstateCashflowInput): number {
+    const rent = Math.max(0, prop.rent || 0);
+    return rent - calculatePropertyAnnualCosts(prop);
+}
+
 /**
  * Rendita passiva netta annua di un immobile (rent - costi).
  * Ritorna 0 se l'immobile non e' attualmente affittato (e la data di inizio
@@ -41,12 +77,10 @@ export function calculatePropertyAnnualNetIncome(
     }
     if (!isCurrentlyRented) return 0;
 
-    const rent = Math.max(0, prop.rent || 0);
-    const totalCosts = calculatePropertyAnnualCosts(prop);
     // Permettiamo rendita negativa: un immobile in perdita (costi > affitto)
     // DEVE ridurre il reddito passivo totale, altrimenti il target FIRE viene
     // sottostimato (es. 2 immobili, uno a +7k e uno a -5k = +2k, non +7k).
-    return rent - totalCosts;
+    return calculatePropertyAnnualPotentialNetIncome(prop);
 }
 
 /**
@@ -61,4 +95,40 @@ export function sumRealEstateAnnualNetIncome(
         (acc, prop) => acc + calculatePropertyAnnualNetIncome(prop, atYearMonth),
         0,
     );
+}
+
+export function buildRealEstatePassiveIncomeStreams(
+    properties: RealEstateCashflowInput[],
+    input: BuildRealEstatePassiveIncomeStreamsInput,
+): PassiveIncomeStream[] {
+    const {
+        currentAge,
+        retirementAge,
+        asOfYearMonth,
+        lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
+    } = input;
+
+    return properties.flatMap((prop) => {
+        const willGenerateRent = !!prop.isRented || !!prop.rentStartDate;
+        if (!willGenerateRent) return [];
+
+        const annualAmount = calculatePropertyAnnualPotentialNetIncome(prop);
+        if (annualAmount === 0) return [];
+
+        let startAge = retirementAge;
+        if (!prop.isRented && prop.rentStartDate) {
+            const monthsUntilRent = monthsBetweenYearMonths(asOfYearMonth, prop.rentStartDate);
+            if (monthsUntilRent == null) return [];
+            startAge = currentAge + Math.max(0, monthsUntilRent) / 12;
+        }
+
+        const effectiveStartAge = Math.max(retirementAge, startAge);
+        if (!Number.isFinite(effectiveStartAge) || effectiveStartAge >= lifeExpectancy) return [];
+
+        return [{
+            annualAmount,
+            startAge: effectiveStartAge,
+            endAge: lifeExpectancy,
+        }];
+    });
 }

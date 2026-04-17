@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Trash2, Calendar } from "lucide-react";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { projectFire, computeRealReturn } from "@/lib/finance/fire-projection";
+import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { toast } from "sonner";
 
 interface AdvisorDashboardProps {
@@ -255,6 +256,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       if (res.ok) {
         setExistingLoans(updatedLoans);
         setAcceptedPurchases(updatedPurchases);
+        broadcastFinancialDataChanged({ scope: "preferences", source: "advisor-dashboard" });
         toast.success("Spesa accettata! Il prestito e stato aggiunto al tuo profilo finanziario.");
       } else {
         toast.error("Errore nel salvataggio");
@@ -282,6 +284,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       if (res.ok) {
         setAcceptedPurchases(updatedPurchases);
         setExistingLoans(updatedLoans);
+        broadcastFinancialDataChanged({ scope: "preferences", source: "advisor-dashboard" });
         toast.success("Acquisto rimosso");
       }
     } catch { toast.error("Errore di rete"); }

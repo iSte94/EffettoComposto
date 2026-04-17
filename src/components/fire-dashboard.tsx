@@ -14,13 +14,13 @@ import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Load
 import { toast } from "sonner";
 import { calculateIrpef } from "@/lib/finance/irpef";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
-import { computeCoastFireScenarios } from "@/lib/finance/coast-fire";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import {
     calculatePropertyAnnualNetIncome,
-    sumRealEstateAnnualNetIncome,
 } from "@/lib/finance/real-estate";
 import { liquidatePensionFund, shouldLiquidatePensionFund } from "@/lib/finance/pension-fund";
+import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
+import { addFinancialDataChangedListener, broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import type { AssetRecord, ExistingLoan, AcceptedPurchase } from "@/types";
 import { formatEuro } from "@/lib/format";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
@@ -52,8 +52,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [isLoadingUser, setIsLoadingUser] = useState(true);
 
     // Current Financial State (Fetched from Patrimonio)
-    const [currentNetWorth, setCurrentNetWorth] = useState<number>(0);
-    const [currentLiquidAssets, setCurrentLiquidAssets] = useState<number>(0);
+    const [latestSnapshot, setLatestSnapshot] = useState<AssetRecord | null>(null);
 
     // Existing Loans (Fetched from Preferences)
     const [existingLoansList, setExistingLoansList] = useState<ExistingLoan[]>([]);
@@ -74,8 +73,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [publicPensionAge, setPublicPensionAge] = useState<number>(67);
     const [applyTaxStamp, setApplyTaxStamp] = useState<boolean>(true); // 0.2% Bollo
 
-    // NEW: Real Estate Passive Income
-    const [activeRealEstatePassiveIncome, setActiveRealEstatePassiveIncome] = useState<number>(0);
     // Pension Optimizer States
     const [enablePensionOptimizer, setEnablePensionOptimizer] = useState<boolean>(false);
     const [grossIncome, setGrossIncome] = useState<number>(35000);
@@ -100,23 +97,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [includeIlliquidInFire, setIncludeIlliquidInFire] = useState<boolean>(false);
     const firePrefsHydratedRef = useRef(false);
 
-    useEffect(() => {
-        if (user) {
-            fetchData().finally(() => setIsLoadingUser(false));
-        } else {
-            setLoading(false);
-            setIsLoadingUser(false);
-        }
-    }, [user]);
-
-    useEffect(() => {
-        if (!user) {
-            firePrefsHydratedRef.current = false;
-            setHasPendingSave(false);
-        }
-    }, [user]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const prefRes = await fetch('/api/preferences');
@@ -163,34 +144,45 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
             if (patData.history && patData.history.length > 0) {
                 const last: AssetRecord = patData.history[patData.history.length - 1];
-                const totalAssets = last.liquidStockValue + (last.stocksSnapshotValue || 0) +
-                    (last.bitcoinAmount * last.bitcoinPrice) + last.safeHavens + last.emergencyFund + last.pensionFund;
-                const netW = totalAssets - last.debtsTotal;
-                setCurrentNetWorth(netW);
-
-                const liquid = last.liquidStockValue + (last.stocksSnapshotValue || 0) + (last.bitcoinAmount * last.bitcoinPrice) + last.emergencyFund;
-                setCurrentLiquidAssets(liquid);
+                setLatestSnapshot(last);
                 setCurrentPensionFundValue(last.pensionFund || 0);
-
-                // NEW: Calcola la rendita passiva ANNUA netta dagli immobili a rendita attiva.
-                // Tutti gli importi (rent, costs, imu) sono ANNUALI (vedi label "Rendita Annua Attesa"
-                // in real-estate-section.tsx).
-                let passiveIncome = 0;
-                if (last.realEstateList) {
-                    setRealEstateListStr(last.realEstateList);
-                    try {
-                        const parsedList = JSON.parse(last.realEstateList);
-                        passiveIncome = sumRealEstateAnnualNetIncome(parsedList);
-                    } catch (e) { console.error("Error parsing real estate list", e); }
-                }
-                setActiveRealEstatePassiveIncome(passiveIncome);
+                setRealEstateListStr(last.realEstateList || "");
+            } else {
+                setLatestSnapshot(null);
+                setCurrentPensionFundValue(0);
+                setRealEstateListStr("");
             }
         } catch {
             toast.error("Errore nel caricamento dei dati per il simulatore FIRE.");
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        if (user) {
+            fetchData().finally(() => setIsLoadingUser(false));
+        } else {
+            setLoading(false);
+            setIsLoadingUser(false);
+        }
+    }, [user, fetchData]);
+
+    useEffect(() => {
+        if (!user) {
+            firePrefsHydratedRef.current = false;
+            setHasPendingSave(false);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        if (!user) return;
+
+        return addFinancialDataChangedListener((detail) => {
+            if (detail.source === "fire-dashboard") return;
+            void fetchData();
+        });
+    }, [user, fetchData]);
 
     const handleSavePreferences = useCallback(async () => {
         if (!user) return; // Silent return for auto-save
@@ -228,6 +220,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 setHasPendingSave(true);
             } else {
                 setHasPendingSave(false);
+                broadcastFinancialDataChanged({ scope: "preferences", source: "fire-dashboard" });
             }
         } catch (e) {
             console.error("Network error during auto-save FIRE:", e);
@@ -336,38 +329,38 @@ export function FireDashboard({ user }: FireDashboardProps) {
     // --- BASE CALCULATIONS ---
     const currentYear = new Date().getFullYear();
     const currentAge = currentYear - birthYear;
+    const fireMetrics = computeFireMetricsFromSnapshot(latestSnapshot, {
+        birthYear,
+        retirementAge,
+        expectedMonthlyExpenses,
+        fireWithdrawalRate,
+        fireExpectedReturn,
+        expectedInflation,
+        expectedPublicPension,
+        publicPensionAge,
+        includeIlliquidInFire,
+    });
 
     // FIRE Target
     const annualExpenses = expectedMonthlyExpenses * 12;
-    const netAnnualExpenses = Math.max(0, annualExpenses - activeRealEstatePassiveIncome);
-    const grossFireTarget = annualExpenses / (Math.max(0.1, fireWithdrawalRate) / 100);
+    const currentRealEstatePassiveIncome = fireMetrics.realEstateAnnualIncomeNow;
+    const netAnnualExpenses = Math.max(0, annualExpenses - currentRealEstatePassiveIncome);
 
     // Starting capital
-    const startingCapital = includeIlliquidInFire ? currentNetWorth : currentLiquidAssets;
+    const startingCapital = fireMetrics.currentCapital;
 
     // Rendimento reale via equazione di Fisher esatta (tutto in euro odierni).
     // La precedente approssimazione `(nominal - inflation) / 100` sovrastimava
     // il tasso reale del ~3% (es. 4.00% vs 3.88% reale per 7% nominale / 3% inflazione),
     // anticipando erroneamente il momento FIRE. Vedi computeRealReturn() per dettagli.
     const realReturnDecimal = computeRealReturn(fireExpectedReturn, expectedInflation);
-    const coastFireInput = {
-        currentAge,
-        retirementAge,
-        publicPensionAge,
-        currentCapital: startingCapital,
-        monthlyExpenses: expectedMonthlyExpenses,
-        monthlyPublicPension: expectedPublicPension,
-        monthlyRealEstateIncome: activeRealEstatePassiveIncome / 12,
-        withdrawalRatePct: fireWithdrawalRate,
-        nominalReturnPct: fireExpectedReturn,
-        inflationPct: expectedInflation,
-    };
-    const coastFireAnalysis = computeCoastFireScenarios(coastFireInput);
-    const baseCoastScenario = coastFireAnalysis.scenarios.find((scenario) => scenario.scenario === "base") ?? coastFireAnalysis.scenarios[0];
-    const fireTarget = Math.max(0, baseCoastScenario?.fireTargetNet ?? grossFireTarget);
-    const coastFireTarget = Math.max(0, baseCoastScenario?.coastFireTarget ?? grossFireTarget);
+    const coastFireAnalysis = fireMetrics.coastFireAnalysis;
+    const coastFireInput = fireMetrics.coastFireInput;
+    const baseCoastScenario = coastFireAnalysis?.scenarios.find((scenario) => scenario.scenario === "base") ?? coastFireAnalysis?.scenarios[0];
+    const fireTarget = fireMetrics.fireTarget;
+    const coastFireTarget = fireMetrics.coastFireTarget;
     const coastFireReached = baseCoastScenario?.coastFireReached ?? (startingCapital >= coastFireTarget);
-    const futureIncomeAdjustment = Math.max(0, grossFireTarget - fireTarget);
+    const futureIncomeAdjustment = fireMetrics.futureIncomeAdjustment;
     const targetLineLabel = futureIncomeAdjustment > 0 ? "Obiettivo FIRE netto" : "Obiettivo FIRE";
     const monthlyPortfolioNeed = fireTarget * (fireWithdrawalRate / 100) / 12;
 
@@ -660,7 +653,12 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         if (isRetired) {
             const annualPublicPension = yAge >= publicPensionAge ? expectedPublicPension * 12 : 0;
-            stressCap -= Math.max(0, netAnnualExpenses - annualPublicPension - stressPensionAnnuity * 12);
+            let projectedAnnualPassiveIncome = 0;
+            for (let m = (i * 12); m < ((i + 1) * 12); m++) {
+                projectedAnnualPassiveIncome += getActiveRealEstatePassiveIncomeAtMonth(m) / 12;
+            }
+            const stressNetAnnualExpenses = Math.max(0, annualExpenses - projectedAnnualPassiveIncome);
+            stressCap -= Math.max(0, stressNetAnnualExpenses - annualPublicPension - stressPensionAnnuity * 12);
         } else {
             // Check dynamic savings for this year (average over the 12 months)
             let totalSavingsThisYear = 0;
@@ -754,7 +752,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                         <CardContent className="p-6">
                             <div className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Cash Buffer (Pre-FIRE)</div>
                             <div className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:text-blue-400 transition-colors">{formatEuro(startingCapital)}</div>
-                            <div className="text-xs text-slate-400 dark:text-slate-400 mt-1">{includeIlliquidInFire ? "Net Worth Totale" : "Asset Liquidi (Cuscinetto Crisi)"}</div>
+                            <div className="text-xs text-slate-400 dark:text-slate-400 mt-1">{includeIlliquidInFire ? "Capitale Esteso (senza immobili)" : "Asset Liquidi (Cuscinetto Crisi)"}</div>
                         </CardContent>
                     </Card>
 
@@ -767,9 +765,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-white border border-emerald-100 px-2 py-0.5 rounded-full lowercase font-bold shadow-sm">
                                         -{formatEuro(futureIncomeAdjustment)} supporti futuri
                                     </span>
-                                ) : activeRealEstatePassiveIncome > 0 && (
+                                ) : currentRealEstatePassiveIncome > 0 && (
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-white border border-emerald-100 px-2 py-0.5 rounded-full lowercase font-bold shadow-sm">
-                                        -{formatEuro(activeRealEstatePassiveIncome)}/Y affitti
+                                        -{formatEuro(currentRealEstatePassiveIncome)}/Y affitti
                                     </span>
                                 )}
                             </div>
@@ -1091,11 +1089,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                     </div>
 
                                     {/* Coast FIRE Scenarios with State Pension */}
-                                    <div className="mt-8">
-                                        <CoastFireScenarios
-                                            input={coastFireInput}
-                                        />
-                                    </div>
+                                    {coastFireInput && (
+                                        <div className="mt-8">
+                                            <CoastFireScenarios
+                                                input={coastFireInput}
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* Sensitivity Matrix: expenses × savings */}
                                     <div className="mt-8">

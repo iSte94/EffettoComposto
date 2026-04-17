@@ -215,8 +215,24 @@ model AssistantMessage {
   content   String   // testo messaggio
   toolTrace String?  // JSON AiToolTraceEntry[] (solo per assistant)
   createdAt DateTime @default(now())
+  attachments AssistantAttachment[]
 
   @@index([threadId, createdAt])
+}
+
+model AssistantAttachment {
+  id        String   @id @default(uuid())
+  messageId String
+  message   AssistantMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  kind      String   // "image" | "pdf"
+  mimeType  String
+  filename  String
+  size      Int
+  data      Bytes
+  createdAt DateTime @default(now())
+
+  @@index([messageId, createdAt])
 }
 
 model AssistantMemory {

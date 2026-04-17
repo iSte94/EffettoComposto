@@ -13,6 +13,12 @@ import { computeRealReturn } from "./fire-projection";
 
 export type CoastFireScenario = "bear" | "base" | "bull";
 
+export interface PassiveIncomeStream {
+    annualAmount: number;
+    startAge: number;
+    endAge?: number;
+}
+
 export interface CoastFireInput {
     currentAge: number;
     retirementAge: number;             // Età a cui si smette di lavorare
@@ -21,6 +27,7 @@ export interface CoastFireInput {
     monthlyExpenses: number;           // Spese mensili attese in pensione (oggi)
     monthlyPublicPension: number;      // Pensione INPS netta mensile (oggi)
     monthlyRealEstateIncome?: number;  // Eventuale rendita immobiliare netta
+    passiveIncomeStreams?: PassiveIncomeStream[]; // Rendite programmate (es. immobili futuri)
     withdrawalRatePct: number;         // SWR %
     nominalReturnPct: number;          // Rendimento nominale atteso base (es. 6%)
     inflationPct: number;              // Inflazione attesa (es. 2%)
@@ -64,7 +71,7 @@ const SCENARIO_LABELS: Record<CoastFireScenario, string> = {
  *   PV = CF * (1 - (1+r)^-duration) / r / (1+r)^deferredYears
  */
 function presentValueOfAnnuity(annualCashflow: number, realReturn: number, deferredYears: number, duration: number): number {
-    if (annualCashflow <= 0 || duration <= 0) return 0;
+    if (annualCashflow === 0 || duration <= 0) return 0;
     if (Math.abs(realReturn) < 1e-6) {
         return annualCashflow * duration;
     }
@@ -90,6 +97,7 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
         monthlyExpenses,
         monthlyPublicPension,
         monthlyRealEstateIncome = 0,
+        passiveIncomeStreams = [],
         withdrawalRatePct,
         nominalReturnPct,
         inflationPct,
@@ -98,11 +106,14 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
 
     const annualExpenses = monthlyExpenses * 12;
     const annualPension = Math.max(0, monthlyPublicPension * 12);
-    const annualPassive = Math.max(0, monthlyRealEstateIncome * 12);
     const yearsToRetire = Math.max(0, retirementAge - currentAge);
-    const retireYearsRemaining = Math.max(1, lifeExpectancy - retirementAge);
     const pensionDeferredYears = Math.max(0, publicPensionAge - retirementAge);
     const pensionDuration = Math.max(0, lifeExpectancy - Math.max(retirementAge, publicPensionAge));
+    const normalizedPassiveStreams = passiveIncomeStreams.length > 0
+        ? passiveIncomeStreams
+        : (monthlyRealEstateIncome === 0
+            ? []
+            : [{ annualAmount: monthlyRealEstateIncome * 12, startAge: retirementAge, endAge: lifeExpectancy }]);
 
     const swr = Math.max(0.1, withdrawalRatePct) / 100;
     const baseFireTarget = annualExpenses / swr;
@@ -121,8 +132,20 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
 
         // PV di pensione e rendita immobiliare al momento del retirement
         const pensionPV = presentValueOfAnnuity(annualPension, r, pensionDeferredYears, pensionDuration);
-        // La rendita immobiliare assumiamo parte subito al retirement per tutta la vita
-        const passivePV = presentValueOfAnnuity(annualPassive, r, 0, retireYearsRemaining);
+        const passivePV = normalizedPassiveStreams.reduce((acc, stream) => {
+            const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
+            if (annualAmount === 0) return acc;
+
+            const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
+            const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
+            const effectiveStartAge = Math.max(retirementAge, streamStartAge);
+            const effectiveEndAge = Math.min(lifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
+            const duration = Math.max(0, effectiveEndAge - effectiveStartAge);
+            const deferredYears = Math.max(0, effectiveStartAge - retirementAge);
+            if (duration <= 0) return acc;
+
+            return acc + presentValueOfAnnuity(annualAmount, r, deferredYears, duration);
+        }, 0);
 
         // FIRE target netto richiesto dal portafoglio al retirement
         const fireTargetNet = Math.max(0, baseFireTarget - pensionPV - passivePV);

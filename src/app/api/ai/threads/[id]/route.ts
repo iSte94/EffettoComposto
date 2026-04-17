@@ -11,7 +11,14 @@ export async function GET(_req: Request, { params }: Ctx) {
         const thread = await prisma.assistantThread.findFirst({
             where: { id, userId },
             include: {
-                messages: { orderBy: { createdAt: "asc" } },
+                messages: {
+                    orderBy: { createdAt: "asc" },
+                    include: {
+                        attachments: {
+                            orderBy: { createdAt: "asc" },
+                        },
+                    },
+                },
             },
         });
         if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -27,6 +34,14 @@ export async function GET(_req: Request, { params }: Ctx) {
                 role: m.role,
                 content: m.content,
                 toolTrace: m.toolTrace ? JSON.parse(m.toolTrace) : null,
+                attachments: m.attachments.map((attachment) => ({
+                    id: attachment.id,
+                    kind: attachment.kind,
+                    mimeType: attachment.mimeType,
+                    filename: attachment.filename,
+                    size: attachment.size,
+                    url: `/api/ai/attachments/${attachment.id}`,
+                })),
                 createdAt: m.createdAt.toISOString(),
             })),
         });
