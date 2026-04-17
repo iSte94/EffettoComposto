@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import {
@@ -18,6 +18,7 @@ export function CompoundInterestCalculator() {
     const [monthlyContribution, setMonthlyContribution] = useState(300);
     const [annualRate, setAnnualRate] = useState(7);
     const [years, setYears] = useState(20);
+    const [inflationRate, setInflationRate] = useState(2.5);
 
     const result = useMemo(() => {
         const monthlyRate = annualRate / 100 / 12;
@@ -25,6 +26,8 @@ export function CompoundInterestCalculator() {
 
         let balance = initialCapital;
         let totalDeposited = initialCapital;
+        // Prima annualita' in cui gli interessi maturati superano il capitale versato (effetto compounding).
+        let crossoverYear: number | null = null;
 
         chartData.push({
             anno: 0,
@@ -39,22 +42,32 @@ export function CompoundInterestCalculator() {
                 balance = balance * (1 + monthlyRate) + monthlyContribution;
                 totalDeposited += monthlyContribution;
             }
+            const interestAccrued = balance - totalDeposited;
+            if (crossoverYear === null && interestAccrued > totalDeposited) {
+                crossoverYear = year;
+            }
             chartData.push({
                 anno: year,
                 label: `Anno ${year}`,
                 Versato: Math.round(totalDeposited),
-                Interessi: Math.round(balance - totalDeposited),
+                Interessi: Math.round(interestAccrued),
                 Totale: Math.round(balance),
             });
         }
+
+        // Valore reale a potere d'acquisto odierno: deflaziona il nominale finale.
+        const inflationFactor = Math.pow(1 + inflationRate / 100, years);
+        const realFinalBalance = inflationFactor > 0 ? balance / inflationFactor : balance;
 
         return {
             finalBalance: balance,
             totalDeposited,
             totalInterest: balance - totalDeposited,
             chartData,
+            crossoverYear,
+            realFinalBalance,
         };
-    }, [initialCapital, monthlyContribution, annualRate, years]);
+    }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
     return (
         <div className="animate-in fade-in-50 space-y-8 duration-500">
@@ -119,6 +132,17 @@ export function CompoundInterestCalculator() {
                                 </div>
                                 <Slider value={[years]} min={1} max={50} step={1} onValueChange={(value) => setYears(value[0])} />
                             </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-end justify-between">
+                                    <Label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        Inflazione Annua (%)
+                                        <InfoTooltip iconClassName="w-3 h-3">Tasso medio di inflazione atteso. Usato per stimare il valore reale (potere d&apos;acquisto odierno) del capitale finale.</InfoTooltip>
+                                    </Label>
+                                    <span className="font-bold text-rose-600 dark:text-rose-400">{inflationRate.toFixed(1)}%</span>
+                                </div>
+                                <Slider value={[inflationRate]} min={0} max={10} step={0.1} onValueChange={(value) => setInflationRate(value[0])} />
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -146,6 +170,34 @@ export function CompoundInterestCalculator() {
                                 {(result.finalBalance > 0 ? (result.totalInterest / result.finalBalance) * 100 : 0).toFixed(0)}% da interessi composti
                             </span>
                             <InfoTooltip iconClassName="w-3 h-3">Quota del capitale finale generata esclusivamente dagli interessi sugli interessi (effetto compounding), non dai versamenti diretti.</InfoTooltip>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div className="rounded-3xl border border-border/70 bg-card/80 p-4 text-center backdrop-blur-xl">
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    <TrendingDown className="h-3 w-3" /> Valore Reale
+                                    <InfoTooltip iconClassName="w-3 h-3">Capitale finale espresso in potere d&apos;acquisto odierno, deflazionato al tasso di inflazione scelto. Risponde alla domanda: &quot;quanto vale davvero oggi la cifra che avro&apos; tra {years} anni?&quot;.</InfoTooltip>
+                                </div>
+                                <div className="text-xl font-extrabold text-rose-600 dark:text-rose-400">{formatEuro(result.realFinalBalance)}</div>
+                                <div className="mt-0.5 text-[10px] text-muted-foreground">al netto {inflationRate.toFixed(1)}% inflazione</div>
+                            </div>
+                            <div className="rounded-3xl border border-border/70 bg-card/80 p-4 text-center backdrop-blur-xl">
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                    <Sparkles className="h-3 w-3" /> Punto di Svolta
+                                    <InfoTooltip iconClassName="w-3 h-3">Primo anno in cui gli interessi maturati superano il totale dei versamenti. E&apos; il momento in cui il capitale &quot;lavora per te&quot; piu&apos; di quanto tu lo alimenti con i contributi.</InfoTooltip>
+                                </div>
+                                {result.crossoverYear !== null ? (
+                                    <>
+                                        <div className="text-xl font-extrabold text-amber-600 dark:text-amber-400">Anno {result.crossoverYear}</div>
+                                        <div className="mt-0.5 text-[10px] text-muted-foreground">interessi &gt; versamenti</div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="text-xl font-extrabold text-muted-foreground">&mdash;</div>
+                                        <div className="mt-0.5 text-[10px] text-muted-foreground">non raggiunto in {years} anni</div>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -201,14 +253,24 @@ export function CompoundInterestCalculator() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {result.chartData.filter((point) => point.anno > 0).map((point) => (
-                                            <tr key={point.anno} className="border-t border-border/60 hover:bg-muted/35">
-                                                <td className="px-3 py-2 font-bold text-foreground">{point.anno}</td>
+                                        {result.chartData.filter((point) => point.anno > 0).map((point) => {
+                                            const isCrossover = result.crossoverYear !== null && point.anno === result.crossoverYear;
+                                            return (
+                                            <tr
+                                                key={point.anno}
+                                                className={`border-t border-border/60 hover:bg-muted/35 ${isCrossover ? "bg-amber-50/60 dark:bg-amber-950/30" : ""}`}
+                                                title={isCrossover ? "Punto di svolta: gli interessi superano il capitale versato" : undefined}
+                                            >
+                                                <td className="px-3 py-2 font-bold text-foreground">
+                                                    {isCrossover && <Sparkles className="mr-1 inline h-3 w-3 text-amber-500" aria-hidden />}
+                                                    {point.anno}
+                                                </td>
                                                 <td className="px-3 py-2 text-right font-mono text-blue-600 dark:text-blue-400">{formatEuro(point.Versato)}</td>
                                                 <td className="px-3 py-2 text-right font-mono text-purple-600 dark:text-purple-400">{formatEuro(point.Interessi)}</td>
                                                 <td className="px-3 py-2 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatEuro(point.Totale)}</td>
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
