@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.3.0`
+**Versione corrente:** `v0.3.1`
 
 ---
 
@@ -111,6 +111,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.3.1 - 17 aprile 2026 (UX — Interesse Composto piu' educativo: punto di svolta + valore reale)
+
+- **Nuova metrica "Punto di Svolta" nel calcolatore Interesse Composto** — il simulatore ora identifica ed evidenzia il primo anno in cui gli interessi maturati superano il totale dei contributi versati, rendendo concretamente visibile il momento in cui il capitale "lavora piu' di quanto venga alimentato". Il numero appare in una card KPI dedicata (icona Sparkles, accento amber) e la riga corrispondente nella tabella di ammortamento viene evidenziata con uno sfondo ambra e un'icona inline, cosi' l'utente puo' collegare a colpo d'occhio la metrica riassuntiva con il dettaglio anno per anno. Se l'orizzonte scelto e' troppo breve perche' l'incrocio avvenga (o il capitale iniziale parte gia' elevato rispetto ai contributi), la card mostra "non raggiunto in N anni" invece di un valore fuorviante
+- **Nuovo slider Inflazione e KPI "Valore Reale"** — aggiunto un controllo dedicato all'inflazione attesa (0-10%, default 2.5%, step 0.1%) al pannello parametri. Il capitale finale viene deflazionato con fattore `(1 + i)^n` e mostrato in una nuova card KPI (icona TrendingDown, accento rose) come potere d'acquisto odierno, con sottotitolo esplicito "al netto X% inflazione". Prima dell'intervento il calcolatore comunicava solo valori nominali: un utente che simulava 30 anni con rendimento 7% vedeva cifre finali impressionanti ma senza alcun riferimento al loro reale potere d'acquisto, sottovalutando l'effetto erosivo dell'inflazione sulle proiezioni di lungo periodo. Ora il cruscotto restituisce contemporaneamente il dato nominale (capitale finale) e quello reale (valore reale), riallineando le aspettative a quanto davvero si potra' comprare con quel capitale
+- **Perche' migliora l'esperienza** — queste due metriche trasformano il calcolatore da semplice simulatore numerico a strumento educativo: il "Punto di Svolta" materializza l'effetto compounding in un singolo numero memorizzabile ("dal dodicesimo anno il mio capitale produce piu' di quanto verso"), mentre il "Valore Reale" evita la trappola psicologica delle cifre nominali gonfiate dall'inflazione. Entrambi i KPI usano i pattern di UI gia' consolidati (card arrotondate, InfoTooltip per la spiegazione, palette consistente con il resto dell'app) senza introdurre dipendenze nuove
+- **Compatibilita' totale** — nessun cambio alle API o ai tipi condivisi, la suite di 196 test unitari resta verde, calcoli derivati centralizzati in un singolo `useMemo` con dipendenze corrette incluso `inflationRate`
 
 ### v0.3.0 - 17 aprile 2026 (AI con allegati + FIRE coerente)
 
