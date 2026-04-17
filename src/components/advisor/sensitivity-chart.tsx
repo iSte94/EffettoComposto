@@ -8,7 +8,8 @@ import {
     CartesianGrid, Legend, ReferenceDot,
 } from "recharts";
 import { formatEuro } from "@/lib/format";
-import { projectFire } from "@/lib/finance/fire-projection";
+import { fireDelayMonths, projectFire } from "@/lib/finance/fire-projection";
+import { buildAdvisorFireBaseParams, buildAdvisorFireWithPurchaseParams, hasAdvisorFireContext } from "@/lib/finance/advisor-fire";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
 
 interface SensitivityChartProps {
@@ -35,29 +36,16 @@ export const SensitivityChart = memo(function SensitivityChart({
 }: SensitivityChartProps) {
     const [axis, setAxis] = useState<Axis>("downPayment");
 
-    const hasFireData = snapshot.currentAge !== null && snapshot.monthlySavings > 0;
-
-    const baseParams = {
-        startingCapital: snapshot.liquidAssets + snapshot.emergencyFund,
-        monthlySavings: snapshot.monthlySavings,
-        monthlyExpensesAtFire: snapshot.expectedMonthlyExpensesAtFire,
-        expectedReturnPct: snapshot.fireExpectedReturn,
-        inflationPct: snapshot.expectedInflation,
-        withdrawalRatePct: snapshot.fireWithdrawalRate,
-        currentAge: snapshot.currentAge ?? 30,
-        retirementAge: snapshot.retirementAge,
-    };
+    const hasFireData = hasAdvisorFireContext(snapshot);
+    const baseParams = buildAdvisorFireBaseParams(snapshot);
 
     const baseline = useMemo(
         () => hasFireData ? projectFire(baseParams) : null,
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [hasFireData, snapshot]
+        [baseParams, hasFireData]
     );
 
     const data = useMemo(() => {
-        const points: { x: number; label: string; rata: number; interessi: number; tco: number; fireDelay: number; isCurrent: boolean }[] = [];
-        const recurringMonths = (yrs: number) => yrs * 12;
-        const ongoingMonths = calculations.tcoYears * 12;
+        const points: { x: number; label: string; rata: number; interessi: number; tco: number; fireDelay: number | null; fireDelayText: string; isCurrent: boolean }[] = [];
 
         if (axis === "downPayment") {
             // Varia anticipo dal 0% al 50% in 11 step
@@ -67,17 +55,26 @@ export const SensitivityChart = memo(function SensitivityChart({
                 const rata = amortizationMonthly(P, sim.financingRate, sim.financingYears);
                 const interessi = rata * sim.financingYears * 12 - P;
                 const tco = sim.totalPrice + Math.max(0, interessi) + calculations.annualRecurringCosts * calculations.tcoYears;
-                let fireDelay = 0;
+                let fireDelay: number | null = 0;
+                let fireDelayText = "0.00 anni";
                 if (baseline && hasFireData) {
-                    const scen = projectFire({
-                        ...baseParams,
-                        oneTimeOutflow: dp,
-                        recurringMonthlyCost: rata,
-                        recurringMonths: recurringMonths(sim.financingYears),
-                        ongoingMonthlyCost: calculations.annualRecurringCosts / 12,
-                        ongoingMonths,
-                    });
-                    fireDelay = (scen.monthsToFire - baseline.monthsToFire) / 12;
+                    const scen = projectFire(buildAdvisorFireWithPurchaseParams(
+                        snapshot,
+                        { ...sim, isFinanced: true, downPayment: dp },
+                        {
+                            monthlyPayment: rata,
+                            annualRecurringCosts: calculations.annualRecurringCosts,
+                            tcoYears: calculations.tcoYears,
+                            cashOutlay: dp,
+                        },
+                    ));
+                    const delayMonths = fireDelayMonths(baseline, scen);
+                    fireDelay = Number.isFinite(delayMonths) ? Number((delayMonths / 12).toFixed(2)) : null;
+                    fireDelayText = Number.isFinite(delayMonths)
+                        ? `${(delayMonths / 12).toFixed(2)} anni`
+                        : delayMonths > 0
+                            ? "non raggiungibile"
+                            : "anticipa e sblocca FIRE";
                 }
                 const currentPct = Math.round((sim.downPayment / sim.totalPrice) * 100);
                 points.push({
@@ -86,7 +83,8 @@ export const SensitivityChart = memo(function SensitivityChart({
                     rata: Math.round(rata),
                     interessi: Math.round(Math.max(0, interessi)),
                     tco: Math.round(tco),
-                    fireDelay: Number(fireDelay.toFixed(2)),
+                    fireDelay,
+                    fireDelayText,
                     isCurrent: Math.abs(pct - currentPct) < 2.5,
                 });
             }
@@ -97,17 +95,26 @@ export const SensitivityChart = memo(function SensitivityChart({
                 const rata = amortizationMonthly(P, sim.financingRate, yrs);
                 const interessi = rata * yrs * 12 - P;
                 const tco = sim.totalPrice + Math.max(0, interessi) + calculations.annualRecurringCosts * calculations.tcoYears;
-                let fireDelay = 0;
+                let fireDelay: number | null = 0;
+                let fireDelayText = "0.00 anni";
                 if (baseline && hasFireData) {
-                    const scen = projectFire({
-                        ...baseParams,
-                        oneTimeOutflow: sim.downPayment,
-                        recurringMonthlyCost: rata,
-                        recurringMonths: yrs * 12,
-                        ongoingMonthlyCost: calculations.annualRecurringCosts / 12,
-                        ongoingMonths,
-                    });
-                    fireDelay = (scen.monthsToFire - baseline.monthsToFire) / 12;
+                    const scen = projectFire(buildAdvisorFireWithPurchaseParams(
+                        snapshot,
+                        { ...sim, isFinanced: true, financingYears: yrs },
+                        {
+                            monthlyPayment: rata,
+                            annualRecurringCosts: calculations.annualRecurringCosts,
+                            tcoYears: calculations.tcoYears,
+                            cashOutlay: sim.downPayment,
+                        },
+                    ));
+                    const delayMonths = fireDelayMonths(baseline, scen);
+                    fireDelay = Number.isFinite(delayMonths) ? Number((delayMonths / 12).toFixed(2)) : null;
+                    fireDelayText = Number.isFinite(delayMonths)
+                        ? `${(delayMonths / 12).toFixed(2)} anni`
+                        : delayMonths > 0
+                            ? "non raggiungibile"
+                            : "anticipa e sblocca FIRE";
                 }
                 points.push({
                     x: yrs,
@@ -115,13 +122,13 @@ export const SensitivityChart = memo(function SensitivityChart({
                     rata: Math.round(rata),
                     interessi: Math.round(Math.max(0, interessi)),
                     tco: Math.round(tco),
-                    fireDelay: Number(fireDelay.toFixed(2)),
+                    fireDelay,
+                    fireDelayText,
                     isCurrent: yrs === sim.financingYears,
                 });
             }
         }
         return points;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [axis, sim, snapshot, calculations, baseline, hasFireData]);
 
     const currentPoint = data.find(d => d.isCurrent);
@@ -195,7 +202,9 @@ export const SensitivityChart = memo(function SensitivityChart({
                                 }}
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 formatter={(value: any, name: any) => {
-                                    if (name === "Ritardo FIRE") return [`${Number(value).toFixed(2)} anni`, name];
+                                    if (name === "Ritardo FIRE") {
+                                        return [value == null ? "non raggiungibile" : `${Number(value).toFixed(2)} anni`, name];
+                                    }
                                     return [formatEuro(Number(value)), name];
                                 }}
                             />
@@ -222,7 +231,13 @@ export const SensitivityChart = memo(function SensitivityChart({
                     <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5 text-[11px] text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
                         <strong>La tua scelta attuale</strong> ({axis === "downPayment" ? `${currentPoint.x}% anticipo` : `${currentPoint.x} anni`}):
                         rata {formatEuro(currentPoint.rata)}/m, interessi {formatEuro(currentPoint.interessi)}, TCO {formatEuro(currentPoint.tco)}
-                        {currentPoint.fireDelay > 0 && `, ritardo FIRE ${currentPoint.fireDelay.toFixed(1)}a`}.
+                        {currentPoint.fireDelay == null
+                            ? ", FIRE non raggiungibile con questi parametri."
+                            : currentPoint.fireDelay > 0
+                                ? `, ritardo FIRE ${currentPoint.fireDelay.toFixed(1)}a.`
+                                : currentPoint.fireDelay < 0
+                                    ? `, anticipo FIRE ${Math.abs(currentPoint.fireDelay).toFixed(1)}a.`
+                                    : "."}
                     </div>
                 )}
             </CardContent>

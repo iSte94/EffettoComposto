@@ -3,7 +3,7 @@
 
 interface MonteCarloParams {
     startingCapital: number;
-    fireTarget: number;
+    fireTargetsByYear: number[];
     currentAge: number;
     retirementAge: number;
     simYears: number;
@@ -69,7 +69,7 @@ function randomNormal(mean: number, stdDev: number): number {
 self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
     const params = e.data;
     const {
-        startingCapital, fireTarget, currentAge, retirementAge,
+        startingCapital, fireTargetsByYear, currentAge, retirementAge,
         simYears, fireVolatility, realReturnDecimal, applyTaxStamp,
         annualExpenses, monthlySavings,
         publicPensionAge, expectedPublicPension,
@@ -98,9 +98,11 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
             for (let y = 0; y <= simYears; y++) {
                 allPaths[y].push(runCap);
 
-                // Target fisso in euro odierni (inflazione già sottratta dal rendimento reale)
+                // Target FIRE dinamico: se smettessi di lavorare a questa età,
+                // quanto capitale netto servirebbe in euro odierni.
                 const yAge = currentAge + y;
-                const isRetired = yAge >= retirementAge || runCap >= fireTarget;
+                const currentFireTarget = fireTargetsByYear[Math.min(y, fireTargetsByYear.length - 1)] ?? 0;
+                const isRetired = yAge >= retirementAge || runCap >= currentFireTarget;
 
                 const yearRealReturn = applyTaxStamp ? (realReturnDecimal - 0.002) : realReturnDecimal;
                 const randomYearReturn = randomNormal(yearRealReturn, stdDevDecimal);
@@ -171,16 +173,17 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
         // Calcola statistiche parziali
         const currentData = [];
         for (let y = 0; y <= simYears; y++) {
-            const sortedCol = [...allPaths[y]].sort((a, b) => a - b);
-            const maxIdx = runsCompleted - 1;
-            currentData.push({
-                age: currentAge + y,
-                p10: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.1), maxIdx)]),
-                p50: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.5), maxIdx)]),
-                p90: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.9), maxIdx)]),
-                Target: fireTarget
-            });
-        }
+                const sortedCol = [...allPaths[y]].sort((a, b) => a - b);
+                const maxIdx = runsCompleted - 1;
+                const currentFireTarget = fireTargetsByYear[Math.min(y, fireTargetsByYear.length - 1)] ?? 0;
+                currentData.push({
+                    age: currentAge + y,
+                    p10: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.1), maxIdx)]),
+                    p50: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.5), maxIdx)]),
+                    p90: Math.round(sortedCol[Math.min(Math.floor(runsCompleted * 0.9), maxIdx)]),
+                    Target: currentFireTarget
+                });
+            }
 
         const successRate = (totalMcSuccessVotes / runsCompleted) * 100;
         const progress = Math.round((runsCompleted / targetRuns) * 100);

@@ -56,6 +56,33 @@ export interface CoastFireResult {
     baseFireTarget: number;            // FIRE target lordo (senza pensione)
 }
 
+export interface FireTargetProjectionInput {
+    retirementAge: number;
+    publicPensionAge: number;
+    monthlyExpenses: number;
+    monthlyPublicPension: number;
+    monthlyRealEstateIncome?: number;
+    passiveIncomeStreams?: PassiveIncomeStream[];
+    withdrawalRatePct: number;
+    nominalReturnPct: number;
+    inflationPct: number;
+    lifeExpectancy?: number;
+}
+
+export interface FireTargetProjectionResult {
+    realReturnPct: number;
+    baseFireTarget: number;
+    fireTargetNet: number;
+    pensionPresentValue: number;
+    passiveIncomePresentValue: number;
+}
+
+export interface DynamicFireTargetScheduleInput extends Omit<FireTargetProjectionInput, "retirementAge"> {
+    currentAge: number;
+    maxYears: number;
+    scenario?: CoastFireScenario;
+}
+
 const DEFAULT_LIFE_EXPECTANCY = 90;
 
 const SCENARIO_LABELS: Record<CoastFireScenario, string> = {
@@ -88,6 +115,115 @@ function yearsToGrow(capital: number, target: number, realReturn: number): numbe
     return Math.log(target / capital) / Math.log(1 + realReturn);
 }
 
+function normalizePassiveIncomeStreams(
+    retirementAge: number,
+    lifeExpectancy: number,
+    monthlyRealEstateIncome: number,
+    passiveIncomeStreams: PassiveIncomeStream[],
+): PassiveIncomeStream[] {
+    if (passiveIncomeStreams.length > 0) return passiveIncomeStreams;
+    if (monthlyRealEstateIncome === 0) return [];
+
+    return [{
+        annualAmount: monthlyRealEstateIncome * 12,
+        startAge: retirementAge,
+        endAge: lifeExpectancy,
+    }];
+}
+
+function getScenarioRealReturn(
+    nominalReturnPct: number,
+    inflationPct: number,
+    scenario: CoastFireScenario,
+): number {
+    const baseReal = computeRealReturn(nominalReturnPct, inflationPct);
+
+    switch (scenario) {
+        case "bear":
+            return Math.max(0.001, baseReal - 0.02);
+        case "bull":
+            return baseReal + 0.02;
+        case "base":
+        default:
+            return baseReal;
+    }
+}
+
+export function computeFireTargetForRetirementAge(
+    input: FireTargetProjectionInput,
+    scenario: CoastFireScenario = "base",
+): FireTargetProjectionResult {
+    const {
+        retirementAge,
+        publicPensionAge,
+        monthlyExpenses,
+        monthlyPublicPension,
+        monthlyRealEstateIncome = 0,
+        passiveIncomeStreams = [],
+        withdrawalRatePct,
+        nominalReturnPct,
+        inflationPct,
+        lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
+    } = input;
+
+    const annualExpenses = monthlyExpenses * 12;
+    const annualPension = Math.max(0, monthlyPublicPension * 12);
+    const pensionDeferredYears = Math.max(0, publicPensionAge - retirementAge);
+    const pensionDuration = Math.max(0, lifeExpectancy - Math.max(retirementAge, publicPensionAge));
+    const normalizedPassiveStreams = normalizePassiveIncomeStreams(
+        retirementAge,
+        lifeExpectancy,
+        monthlyRealEstateIncome,
+        passiveIncomeStreams,
+    );
+
+    const swr = Math.max(0.1, withdrawalRatePct) / 100;
+    const baseFireTarget = annualExpenses / swr;
+    const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario);
+
+    const pensionPV = presentValueOfAnnuity(annualPension, realReturn, pensionDeferredYears, pensionDuration);
+    const passivePV = normalizedPassiveStreams.reduce((acc, stream) => {
+        const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
+        if (annualAmount === 0) return acc;
+
+        const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
+        const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
+        const effectiveStartAge = Math.max(retirementAge, streamStartAge);
+        const effectiveEndAge = Math.min(lifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
+        const duration = Math.max(0, effectiveEndAge - effectiveStartAge);
+        const deferredYears = Math.max(0, effectiveStartAge - retirementAge);
+        if (duration <= 0) return acc;
+
+        return acc + presentValueOfAnnuity(annualAmount, realReturn, deferredYears, duration);
+    }, 0);
+
+    return {
+        realReturnPct: realReturn * 100,
+        baseFireTarget,
+        fireTargetNet: Math.max(0, baseFireTarget - pensionPV - passivePV),
+        pensionPresentValue: pensionPV,
+        passiveIncomePresentValue: passivePV,
+    };
+}
+
+export function buildDynamicFireTargetSchedule(input: DynamicFireTargetScheduleInput): number[] {
+    const {
+        currentAge,
+        maxYears,
+        scenario = "base",
+        ...projectionInput
+    } = input;
+
+    return Array.from({ length: Math.max(0, maxYears) + 1 }, (_, year) => {
+        const result = computeFireTargetForRetirementAge({
+            ...projectionInput,
+            retirementAge: currentAge + year,
+        }, scenario);
+
+        return result.fireTargetNet;
+    });
+}
+
 export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResult {
     const {
         currentAge,
@@ -104,67 +240,52 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
         lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
     } = input;
 
-    const annualExpenses = monthlyExpenses * 12;
-    const annualPension = Math.max(0, monthlyPublicPension * 12);
     const yearsToRetire = Math.max(0, retirementAge - currentAge);
-    const pensionDeferredYears = Math.max(0, publicPensionAge - retirementAge);
-    const pensionDuration = Math.max(0, lifeExpectancy - Math.max(retirementAge, publicPensionAge));
-    const normalizedPassiveStreams = passiveIncomeStreams.length > 0
-        ? passiveIncomeStreams
-        : (monthlyRealEstateIncome === 0
-            ? []
-            : [{ annualAmount: monthlyRealEstateIncome * 12, startAge: retirementAge, endAge: lifeExpectancy }]);
-
-    const swr = Math.max(0.1, withdrawalRatePct) / 100;
-    const baseFireTarget = annualExpenses / swr;
-
-    // Base real return (scenario bull = +2%, bear = -2%)
-    const baseReal = computeRealReturn(nominalReturnPct, inflationPct);
-
-    const scenarioReturns: Record<CoastFireScenario, number> = {
-        bear: Math.max(0.001, baseReal - 0.02),
-        base: baseReal,
-        bull: baseReal + 0.02,
-    };
+    const baseTargetProjection = computeFireTargetForRetirementAge({
+        retirementAge,
+        publicPensionAge,
+        monthlyExpenses,
+        monthlyPublicPension,
+        monthlyRealEstateIncome,
+        passiveIncomeStreams,
+        withdrawalRatePct,
+        nominalReturnPct,
+        inflationPct,
+        lifeExpectancy,
+    });
 
     const scenarios: CoastFireScenarioResult[] = (["bear", "base", "bull"] as CoastFireScenario[]).map((s) => {
-        const r = scenarioReturns[s];
-
-        // PV di pensione e rendita immobiliare al momento del retirement
-        const pensionPV = presentValueOfAnnuity(annualPension, r, pensionDeferredYears, pensionDuration);
-        const passivePV = normalizedPassiveStreams.reduce((acc, stream) => {
-            const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
-            if (annualAmount === 0) return acc;
-
-            const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
-            const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
-            const effectiveStartAge = Math.max(retirementAge, streamStartAge);
-            const effectiveEndAge = Math.min(lifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
-            const duration = Math.max(0, effectiveEndAge - effectiveStartAge);
-            const deferredYears = Math.max(0, effectiveStartAge - retirementAge);
-            if (duration <= 0) return acc;
-
-            return acc + presentValueOfAnnuity(annualAmount, r, deferredYears, duration);
-        }, 0);
-
-        // FIRE target netto richiesto dal portafoglio al retirement
-        const fireTargetNet = Math.max(0, baseFireTarget - pensionPV - passivePV);
+        const targetProjection = s === "base"
+            ? baseTargetProjection
+            : computeFireTargetForRetirementAge({
+                retirementAge,
+                publicPensionAge,
+                monthlyExpenses,
+                monthlyPublicPension,
+                monthlyRealEstateIncome,
+                passiveIncomeStreams,
+                withdrawalRatePct,
+                nominalReturnPct,
+                inflationPct,
+                lifeExpectancy,
+            }, s);
+        const realReturn = targetProjection.realReturnPct / 100;
 
         // Coast FIRE target = FIRE target netto scontato a oggi
-        const coastFireTarget = fireTargetNet / Math.pow(1 + r, yearsToRetire);
+        const coastFireTarget = targetProjection.fireTargetNet / Math.pow(1 + realReturn, yearsToRetire);
 
         const coastFireReached = currentCapital >= coastFireTarget;
         const surplusOrGap = currentCapital - coastFireTarget;
-        const yearsToCoastFire = coastFireReached ? 0 : yearsToGrow(currentCapital, coastFireTarget, r);
+        const yearsToCoastFire = coastFireReached ? 0 : yearsToGrow(currentCapital, coastFireTarget, realReturn);
 
         return {
             scenario: s,
             label: SCENARIO_LABELS[s],
-            realReturnPct: r * 100,
+            realReturnPct: targetProjection.realReturnPct,
             coastFireTarget,
-            fireTargetNet,
-            pensionPresentValue: pensionPV,
-            passiveIncomePresentValue: passivePV,
+            fireTargetNet: targetProjection.fireTargetNet,
+            pensionPresentValue: targetProjection.pensionPresentValue,
+            passiveIncomePresentValue: targetProjection.passiveIncomePresentValue,
             coastFireReached,
             yearsToCoastFire,
             surplusOrGap,
@@ -177,6 +298,6 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
         publicPensionAge,
         currentCapital,
         scenarios,
-        baseFireTarget,
+        baseFireTarget: baseTargetProjection.baseFireTarget,
     };
 }

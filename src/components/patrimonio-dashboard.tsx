@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
 import {
@@ -43,7 +43,7 @@ import { formatEuro } from "@/lib/format";
 import { calculateRemainingDebt, getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { cn } from "@/lib/utils";
-import type { AssetOwner, AssetRecord, CustomStock, ExistingLoan, MonthlyExpense, RealEstateProperty } from "@/types";
+import type { AssetOwner, AssetRecord, CustomStock, ExistingLoan, MonthlyExpense, PensionFundAccrual, RealEstateProperty } from "@/types";
 
 type PatrimonioTab = "overview" | "asset" | "cashflow" | "history";
 type AssetSubTab = "realestate" | "investments" | "other";
@@ -207,6 +207,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const [bitcoinAmountP1, setBitcoinAmountP1] = useState<number>(0);
     const [bitcoinAmountP2, setBitcoinAmountP2] = useState<number>(0);
     const bitcoinAmount = bitcoinAmountP1 + bitcoinAmountP2;
+    const [pensionAccruals, setPensionAccruals] = useState<PensionFundAccrual[]>([]);
 
     const [person1Name, setPerson1Name] = useState<string>("Persona 1");
     const [person1Income, setPerson1Income] = useState<number>(2000);
@@ -231,6 +232,38 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [portfolioHistory, setPortfolioHistory] = useState<any[]>([]);
     const [isFetchingHistory, setIsFetchingHistory] = useState(false);
+    const cashflowPrefsHydratedRef = useRef(false);
+    const currentAccrualYear = format(new Date(), "yyyy");
+    const latestPensionAccrualMonth = pensionAccruals[0]?.accrualMonth ?? null;
+    const latestPensionAccrualTotals = useMemo(() => {
+        if (!latestPensionAccrualMonth) return { voluntaryAmount: 0, employerAmount: 0, tfrAmount: 0, totalAmount: 0 };
+        return pensionAccruals
+            .filter((accrual) => accrual.accrualMonth === latestPensionAccrualMonth)
+            .reduce((acc, accrual) => ({
+                voluntaryAmount: acc.voluntaryAmount + accrual.voluntaryAmount,
+                employerAmount: acc.employerAmount + accrual.employerAmount,
+                tfrAmount: acc.tfrAmount + accrual.tfrAmount,
+                totalAmount: acc.totalAmount + accrual.totalAmount,
+            }), { voluntaryAmount: 0, employerAmount: 0, tfrAmount: 0, totalAmount: 0 });
+    }, [latestPensionAccrualMonth, pensionAccruals]);
+    const ytdPensionAccrualTotals = useMemo(() => {
+        return pensionAccruals
+            .filter((accrual) => accrual.accrualMonth.startsWith(`${currentAccrualYear}-`))
+            .reduce((acc, accrual) => ({
+                voluntaryAmount: acc.voluntaryAmount + accrual.voluntaryAmount,
+                employerAmount: acc.employerAmount + accrual.employerAmount,
+                tfrAmount: acc.tfrAmount + accrual.tfrAmount,
+                totalAmount: acc.totalAmount + accrual.totalAmount,
+            }), { voluntaryAmount: 0, employerAmount: 0, tfrAmount: 0, totalAmount: 0 });
+    }, [currentAccrualYear, pensionAccruals]);
+    const totalPensionAccrualTotals = useMemo(() => {
+        return pensionAccruals.reduce((acc, accrual) => ({
+            voluntaryAmount: acc.voluntaryAmount + accrual.voluntaryAmount,
+            employerAmount: acc.employerAmount + accrual.employerAmount,
+            tfrAmount: acc.tfrAmount + accrual.tfrAmount,
+            totalAmount: acc.totalAmount + accrual.totalAmount,
+        }), { voluntaryAmount: 0, employerAmount: 0, tfrAmount: 0, totalAmount: 0 });
+    }, [pensionAccruals]);
 
     const handleSearchStocks = async (query: string, index: number) => {
         if (!query || query.length < 2) {
@@ -252,14 +285,17 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         }
     };
 
-    const savePreferences = async (newLoans: ExistingLoan[]) => {
+    const savePreferences = useCallback(async (newLoans?: ExistingLoan[]) => {
         if (!user) return;
+
+        const loansToPersist = newLoans ?? existingLoansList;
+
         try {
             const res = await fetch("/api/preferences", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    existingLoansList: JSON.stringify(newLoans),
+                    existingLoansList: JSON.stringify(loansToPersist),
                     netIncome,
                     person1Name,
                     person1Income,
@@ -275,7 +311,47 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         } catch (error) {
             console.error("Failed to save preferences", error);
         }
-    };
+    }, [
+        existingLoansList,
+        expensesList,
+        netIncome,
+        person1Income,
+        person1Name,
+        person2Income,
+        person2Name,
+        separateEmergencyFund,
+        user,
+    ]);
+
+    useEffect(() => {
+        if (!user) {
+            cashflowPrefsHydratedRef.current = false;
+            return;
+        }
+
+        if (loading) return;
+
+        if (!cashflowPrefsHydratedRef.current) {
+            cashflowPrefsHydratedRef.current = true;
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            void savePreferences();
+        }, 500);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [
+        user,
+        loading,
+        person1Name,
+        person1Income,
+        person2Name,
+        person2Income,
+        expensesList,
+        netIncome,
+        savePreferences,
+    ]);
 
     const handleToggleSeparateEmergencyFund = async (value: boolean) => {
         setSeparateEmergencyFund(value);
@@ -304,7 +380,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         const id = Math.random().toString(36).substr(2, 9);
         const updatedList = [...existingLoansList, { ...newLoan, id }];
         setExistingLoansList(updatedList);
-        savePreferences(updatedList);
+        void savePreferences(updatedList);
         setNewLoan(initialLoanState);
         setIsLoanModalOpen(false);
         toast.success("Prestito aggiunto");
@@ -314,7 +390,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         if (!editingLoan) return;
         const updatedList = existingLoansList.map((loan) => (loan.id === editingLoan.id ? editingLoan : loan));
         setExistingLoansList(updatedList);
-        savePreferences(updatedList);
+        void savePreferences(updatedList);
         setEditingLoan(null);
         toast.success("Prestito aggiornato");
     };
@@ -322,7 +398,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
     const handleRemoveLoan = (id: string) => {
         const updatedList = existingLoansList.filter((loan) => loan.id !== id);
         setExistingLoansList(updatedList);
-        savePreferences(updatedList);
+        void savePreferences(updatedList);
         setRealEstateList((prev) => prev.map((property) => (property.linkedLoanId === id ? { ...property, linkedLoanId: undefined } : property)));
         toast.success("Prestito rimosso");
     };
@@ -447,6 +523,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         try {
             const prefRes = await fetch("/api/preferences");
             const prefData = await prefRes.json();
+            const accrualRes = await fetch("/api/pension-accruals?limit=24");
             let loadedLoans: ExistingLoan[] = [];
 
             if (prefData.preferences) {
@@ -482,6 +559,11 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     }
                 }
                 if (prefData.preferences.separateEmergencyFund != null) setSeparateEmergencyFund(prefData.preferences.separateEmergencyFund);
+            }
+
+            if (accrualRes.ok) {
+                const accrualData = await accrualRes.json();
+                setPensionAccruals(accrualData.accruals || []);
             }
 
             const res = await fetch("/api/patrimonio");
@@ -1030,6 +1112,39 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                                                 <span className="text-sm font-extrabold text-indigo-600 dark:text-indigo-400">{formatEuro(pensionFund)}</span>
                                                             </div>
                                                         )}
+                                                        <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/30">
+                                                            <div className="flex items-center justify-between gap-3">
+                                                                <div>
+                                                                    <div className="text-[10px] font-bold uppercase tracking-[0.24em] text-emerald-700 dark:text-emerald-300">Accrediti automatici</div>
+                                                                    <div className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
+                                                                        {latestPensionAccrualMonth ? `Ultimo mese registrato: ${latestPensionAccrualMonth}` : "Nessun accredito automatico registrato ancora"}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <div className="text-[10px] uppercase tracking-wider text-emerald-700/70">Ultimo totale</div>
+                                                                    <div className="text-lg font-extrabold text-emerald-700 dark:text-emerald-300">{formatEuro(latestPensionAccrualTotals.totalAmount)}</div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                                <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-slate-900/40">
+                                                                    <div className="text-[10px] uppercase tracking-wider text-slate-500">Quota lavoratore</div>
+                                                                    <div className="mt-1 font-extrabold text-slate-900 dark:text-slate-100">{formatEuro(latestPensionAccrualTotals.voluntaryAmount)}</div>
+                                                                </div>
+                                                                <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-slate-900/40">
+                                                                    <div className="text-[10px] uppercase tracking-wider text-slate-500">Quota datore</div>
+                                                                    <div className="mt-1 font-extrabold text-slate-900 dark:text-slate-100">{formatEuro(latestPensionAccrualTotals.employerAmount)}</div>
+                                                                </div>
+                                                                <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-slate-900/40">
+                                                                    <div className="text-[10px] uppercase tracking-wider text-slate-500">TFR ultimo accredito</div>
+                                                                    <div className="mt-1 font-extrabold text-slate-900 dark:text-slate-100">{formatEuro(latestPensionAccrualTotals.tfrAmount)}</div>
+                                                                </div>
+                                                                <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2 text-sm dark:border-emerald-900 dark:bg-slate-900/40">
+                                                                    <div className="text-[10px] uppercase tracking-wider text-slate-500">YTD / cumulato</div>
+                                                                    <div className="mt-1 font-extrabold text-slate-900 dark:text-slate-100">{formatEuro(ytdPensionAccrualTotals.totalAmount)}</div>
+                                                                    <div className="text-[10px] text-slate-500">Totale storico {formatEuro(totalPensionAccrualTotals.totalAmount)}</div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </CardContent>
                                             </Card>

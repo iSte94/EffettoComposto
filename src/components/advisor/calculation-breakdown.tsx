@@ -58,7 +58,7 @@ function Block({ title, description, steps }: { title: string; description: stri
                         <div className="rounded-lg bg-indigo-50/50 px-2.5 py-1.5 font-mono text-[11px] text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300">
                             = {s.substituted}
                         </div>
-                        <div className="pl-2 font-mono text-[12px] font-bold text-emerald-600 dark:text-emerald-400">→ {s.result}</div>
+                        <div className="pl-2 font-mono text-[12px] font-bold text-emerald-600 dark:text-emerald-400">-&gt; {s.result}</div>
                     </div>
                 ))}
             </div>
@@ -71,11 +71,12 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
 }: CalculationBreakdownProps) {
     const monthlyRate = sim.financingRate / 100 / 12;
     const n = sim.financingYears * 12;
-    const fireTarget = (snapshot.expectedMonthlyExpensesAtFire * 12) / (snapshot.fireWithdrawalRate / 100);
+    const fireTarget = (snapshot.fireAdjustedMonthlyExpensesAtFire * 12) / (snapshot.fireWithdrawalRate / 100);
+    const baselineMonthlyCoverage = Math.max(snapshot.monthlyExpenses + snapshot.existingLoansMonthlyPayment, 1);
+    const hasFireAdjustment = Math.abs(snapshot.fireAdjustedMonthlyExpensesAtFire - snapshot.expectedMonthlyExpensesAtFire) > 0.01;
 
     const blocks: { title: string; description: string; steps: Step[] }[] = [];
 
-    // 1. Rata mensile (ammortamento francese)
     if (sim.isFinanced && c.loanAmount > 0) {
         blocks.push({
             title: "Rata mensile",
@@ -83,8 +84,8 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
             steps: [
                 {
                     label: "Capitale finanziato",
-                    formula: "C = prezzo − anticipo",
-                    substituted: `${formatEuro(sim.totalPrice)} − ${formatEuro(sim.downPayment)}`,
+                    formula: "C = prezzo - anticipo",
+                    substituted: `${formatEuro(sim.totalPrice)} - ${formatEuro(sim.downPayment)}`,
                     result: formatEuro(c.loanAmount),
                 },
                 {
@@ -95,27 +96,26 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
                 },
                 {
                     label: "Numero rate",
-                    formula: "n = anni × 12",
-                    substituted: `${sim.financingYears} × 12`,
+                    formula: "n = anni x 12",
+                    substituted: `${sim.financingYears} x 12`,
                     result: `${n} mesi`,
                 },
                 {
                     label: "Rata",
-                    formula: "R = C × i × (1+i)ⁿ / ((1+i)ⁿ − 1)",
-                    substituted: `${formatEuro(c.loanAmount)} × ${(monthlyRate * 100).toFixed(4)}% × …`,
+                    formula: "R = C x i x (1+i)^n / ((1+i)^n - 1)",
+                    substituted: `${formatEuro(c.loanAmount)} x ${(monthlyRate * 100).toFixed(4)}% x ...`,
                     result: `${formatEuro(c.monthlyPayment)}/mese`,
                 },
                 {
                     label: "Interessi totali",
-                    formula: "I = R × n − C",
-                    substituted: `${formatEuro(c.monthlyPayment)} × ${n} − ${formatEuro(c.loanAmount)}`,
+                    formula: "I = R x n - C",
+                    substituted: `${formatEuro(c.monthlyPayment)} x ${n} - ${formatEuro(c.loanAmount)}`,
                     result: formatEuro(c.totalInterest),
                 },
             ],
         });
     }
 
-    // 2. TCO
     blocks.push({
         title: "Costo Totale (TCO)",
         description: `Somma di tutte le uscite legate all'acquisto su ${c.tcoYears} anni`,
@@ -131,27 +131,26 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
             {
                 label: "Costi ricorrenti annui",
                 formula: sim.category === "auto"
-                    ? "assicurazione + manutenzione + carburante × 12"
+                    ? "assicurazione + manutenzione + carburante x 12"
                     : sim.category === "immobile"
-                        ? "(condominio + IMU) × 12"
+                        ? "(condominio + IMU) x 12"
                         : "n/a",
                 substituted: sim.category === "auto"
-                    ? `${formatEuro(sim.annualInsurance)} + ${formatEuro(sim.annualMaintenance)} + ${formatEuro(sim.monthlyFuel)} × 12`
+                    ? `${formatEuro(sim.annualInsurance)} + ${formatEuro(sim.annualMaintenance)} + ${formatEuro(sim.monthlyFuel)} x 12`
                     : sim.category === "immobile"
-                        ? `(${formatEuro(sim.condominiumFees)} + ${formatEuro(sim.imuTax)}) × 12`
-                        : "—",
+                        ? `(${formatEuro(sim.condominiumFees)} + ${formatEuro(sim.imuTax)}) x 12`
+                        : "-",
                 result: `${formatEuro(c.annualRecurringCosts)}/anno`,
             },
             {
                 label: "TCO finale",
-                formula: "costo acquisto + costi ricorrenti × anni",
-                substituted: `${formatEuro(c.totalCostOfPurchase)} + ${formatEuro(c.annualRecurringCosts)} × ${c.tcoYears}`,
+                formula: "costo acquisto + costi ricorrenti x anni",
+                substituted: `${formatEuro(c.totalCostOfPurchase)} + ${formatEuro(c.annualRecurringCosts)} x ${c.tcoYears}`,
                 result: formatEuro(c.totalTCO),
             },
         ],
     });
 
-    // 3. DTI
     if (sim.isFinanced) {
         blocks.push({
             title: "Debt-to-Income (DTI) post-acquisto",
@@ -159,7 +158,7 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
             steps: [
                 {
                     label: "DTI attuale (rate gia' in corso)",
-                    formula: "Σ rate esistenti / reddito",
+                    formula: "somma rate esistenti / reddito",
                     substituted: `${formatEuro(snapshot.existingLoansMonthlyPayment)} / ${formatEuro(snapshot.monthlyIncome)}`,
                     result: `${c.dtiPre.toFixed(1)}%`,
                 },
@@ -179,7 +178,6 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
         });
     }
 
-    // 4. Liquidita e fondo emergenza
     if (snapshot.monthlyIncome > 0) {
         blocks.push({
             title: "Liquidita e fondo emergenza",
@@ -199,69 +197,72 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
                 },
                 {
                     label: "Liquidita residua",
-                    formula: "liquidita − esborso",
-                    substituted: `${formatEuro(snapshot.liquidAssets + snapshot.emergencyFund)} − ${formatEuro(c.cashOutlay)}`,
+                    formula: "liquidita - esborso",
+                    substituted: `${formatEuro(snapshot.liquidAssets + snapshot.emergencyFund)} - ${formatEuro(c.cashOutlay)}`,
                     result: formatEuro(c.liquidityAfter),
                 },
                 {
                     label: "Mesi di copertura",
-                    formula: "liquidita residua / reddito mensile",
-                    substituted: `${formatEuro(Math.max(0, c.liquidityAfter))} / ${formatEuro(snapshot.monthlyIncome)}`,
+                    formula: "liquidita residua / spese mensili correnti",
+                    substituted: `${formatEuro(Math.max(0, c.liquidityAfter))} / ${formatEuro(baselineMonthlyCoverage)}`,
                     result: `${c.emergencyMonthsLeft.toFixed(1)} mesi`,
                 },
             ],
         });
     }
 
-    // 5. Costo opportunita
     blocks.push({
         title: "Costo opportunita",
         description: "Quanto produrrebbero quei soldi se investiti",
         steps: [
             {
                 label: "Rendimento reale (i tuoi parametri FIRE)",
-                formula: "rendimento nominale − inflazione",
-                substituted: `${snapshot.fireExpectedReturn}% − ${snapshot.expectedInflation}%`,
+                formula: "[(1 + nominale) / (1 + inflazione)] - 1",
+                substituted: `[(1 + ${snapshot.fireExpectedReturn}%) / (1 + ${snapshot.expectedInflation}%)] - 1`,
                 result: `${(c.realReturnForOpportunity * 100).toFixed(2)}% reale`,
             },
             {
                 label: "Valore futuro investimento",
-                formula: "capitale × (1 + r)^anni",
-                substituted: `${formatEuro(c.cashOutlay)} × (1 + ${(c.realReturnForOpportunity * 100).toFixed(2)}%)^${c.tcoYears}`,
+                formula: "capitale x (1 + r)^anni",
+                substituted: `${formatEuro(c.cashOutlay)} x (1 + ${(c.realReturnForOpportunity * 100).toFixed(2)}%)^${c.tcoYears}`,
                 result: formatEuro(c.cashOutlay + c.opportunityCost),
             },
             {
                 label: "Costo opportunita",
-                formula: "valore futuro − capitale",
-                substituted: `${formatEuro(c.cashOutlay + c.opportunityCost)} − ${formatEuro(c.cashOutlay)}`,
+                formula: "valore futuro - capitale",
+                substituted: `${formatEuro(c.cashOutlay + c.opportunityCost)} - ${formatEuro(c.cashOutlay)}`,
                 result: formatEuro(c.opportunityCost),
             },
         ],
     });
 
-    // 6. Target FIRE
     if (snapshot.expectedMonthlyExpensesAtFire > 0) {
         blocks.push({
             title: "Target FIRE (per riferimento)",
-            description: "Quanto capitale ti serve per la tua indipendenza finanziaria",
+            description: "Quanto capitale ti serve per la tua indipendenza finanziaria con i parametri FIRE attuali",
             steps: [
+                ...(hasFireAdjustment ? [{
+                    label: "Spesa mensile FIRE effettiva",
+                    formula: "spesa FIRE impostata - rendite/pensione future attese",
+                    substituted: `${formatEuro(snapshot.expectedMonthlyExpensesAtFire)} -> ${formatEuro(snapshot.fireAdjustedMonthlyExpensesAtFire)}`,
+                    result: formatEuro(snapshot.fireAdjustedMonthlyExpensesAtFire),
+                }] : []),
                 {
                     label: "Spesa annua attesa",
-                    formula: "spesa mensile × 12",
-                    substituted: `${formatEuro(snapshot.expectedMonthlyExpensesAtFire)} × 12`,
-                    result: formatEuro(snapshot.expectedMonthlyExpensesAtFire * 12),
+                    formula: "spesa mensile x 12",
+                    substituted: `${formatEuro(snapshot.fireAdjustedMonthlyExpensesAtFire)} x 12`,
+                    result: formatEuro(snapshot.fireAdjustedMonthlyExpensesAtFire * 12),
                 },
                 {
                     label: "Target FIRE (regola SWR)",
                     formula: "spesa annua / SWR",
-                    substituted: `${formatEuro(snapshot.expectedMonthlyExpensesAtFire * 12)} / ${snapshot.fireWithdrawalRate}%`,
+                    substituted: `${formatEuro(snapshot.fireAdjustedMonthlyExpensesAtFire * 12)} / ${snapshot.fireWithdrawalRate}%`,
                     result: formatEuro(fireTarget),
                 },
             ],
         });
     }
 
-    // 7. Impatto patrimoniale — misurato sul patrimonio INVESTIBILE (esclusi immobili)
     blocks.push({
         title: "Impatto patrimoniale (investibile)",
         description: "Quanto pesa l'impegno sul patrimonio davvero mobilizzabile (esclusi immobili)",
@@ -269,26 +270,26 @@ export const CalculationBreakdown = memo(function CalculationBreakdown({
             {
                 label: "Impegno finanziario totale",
                 formula: sim.isFinanced
-                    ? "prezzo + interessi + ricorrenti × anni"
-                    : "prezzo + ricorrenti × anni",
-                substituted: `${formatEuro(c.totalCostOfPurchase)} + ${formatEuro(c.annualRecurringCosts)} × ${c.tcoYears}`,
+                    ? "prezzo + interessi + ricorrenti x anni"
+                    : "prezzo + ricorrenti x anni",
+                substituted: `${formatEuro(c.totalCostOfPurchase)} + ${formatEuro(c.annualRecurringCosts)} x ${c.tcoYears}`,
                 result: formatEuro(c.totalFinancialCommitment),
             },
             {
                 label: "Patrimonio investibile (denominatore)",
-                formula: "asset totali − immobili − debiti",
-                substituted: `${formatEuro(snapshot.totalAssets)} − ${formatEuro(snapshot.realEstateValue)} − ${formatEuro(snapshot.totalDebts)}`,
+                formula: "asset totali - immobili - debiti",
+                substituted: `${formatEuro(snapshot.totalAssets)} - ${formatEuro(snapshot.realEstateValue)} - ${formatEuro(snapshot.totalDebts)}`,
                 result: formatEuro(snapshot.investableNetWorth),
             },
             {
                 label: "Peso sul patrimonio investibile",
-                formula: "impegno / investibile × 100",
+                formula: "impegno / investibile x 100",
                 substituted: `${formatEuro(c.totalFinancialCommitment)} / ${formatEuro(snapshot.investableNetWorth)}`,
                 result: `${c.wealthImpact.toFixed(1)}%`,
             },
             {
                 label: "Per riferimento: peso sul patrimonio totale",
-                formula: "impegno / patrimonio netto × 100",
+                formula: "impegno / patrimonio netto x 100",
                 substituted: `${formatEuro(c.totalFinancialCommitment)} / ${formatEuro(snapshot.netWorth)}`,
                 result: `${c.wealthImpactTotal.toFixed(1)}%`,
             },

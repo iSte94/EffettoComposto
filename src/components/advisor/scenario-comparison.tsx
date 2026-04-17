@@ -9,7 +9,8 @@ import {
 } from "recharts";
 import { formatEuro } from "@/lib/format";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
-import { projectFire } from "@/lib/finance/fire-projection";
+import { computeRealReturn, projectFire } from "@/lib/finance/fire-projection";
+import { buildAdvisorFireBaseParams, buildAdvisorFireWithPurchaseParams, getAdvisorOwnershipMonthlyDelta, hasAdvisorFireContext } from "@/lib/finance/advisor-fire";
 
 interface ScenarioComparisonProps {
     sim: PurchaseSimulation;
@@ -42,43 +43,39 @@ export const ScenarioComparison = memo(function ScenarioComparison({
 
     const scenarios = useMemo<Scenario[]>(() => {
         const horizon = Math.max(calculations.tcoYears, 5);
-        const hasFireData = snapshot.currentAge !== null && snapshot.monthlySavings > 0;
-
-        const baseParams = {
-            startingCapital: snapshot.liquidAssets + snapshot.emergencyFund,
-            monthlySavings: snapshot.monthlySavings,
-            monthlyExpensesAtFire: snapshot.expectedMonthlyExpensesAtFire,
-            expectedReturnPct: snapshot.fireExpectedReturn,
-            inflationPct: snapshot.expectedInflation,
-            withdrawalRatePct: snapshot.fireWithdrawalRate,
-            currentAge: snapshot.currentAge ?? 30,
-            retirementAge: snapshot.retirementAge,
-        };
+        const hasFireData = hasAdvisorFireContext(snapshot);
+        const baseParams = buildAdvisorFireBaseParams(snapshot);
 
         // SCENARIO 1: Cash (paghi tutto subito)
-        const cash = hasFireData ? projectFire({
-            ...baseParams,
-            oneTimeOutflow: sim.totalPrice,
-            ongoingMonthlyCost: calculations.annualRecurringCosts / 12,
-            ongoingMonths: calculations.tcoYears * 12,
-        }) : null;
+        const cash = hasFireData ? projectFire(buildAdvisorFireWithPurchaseParams(
+            snapshot,
+            { ...sim, isFinanced: false },
+            {
+                monthlyPayment: 0,
+                annualRecurringCosts: calculations.annualRecurringCosts,
+                tcoYears: calculations.tcoYears,
+                cashOutlay: sim.totalPrice,
+            },
+        )) : null;
 
         // SCENARIO 2: Finanziato (anticipo + rata)
-        const financed = hasFireData ? projectFire({
-            ...baseParams,
-            oneTimeOutflow: sim.downPayment,
-            recurringMonthlyCost: calculations.monthlyPayment,
-            recurringMonths: sim.financingYears * 12,
-            ongoingMonthlyCost: calculations.annualRecurringCosts / 12,
-            ongoingMonths: calculations.tcoYears * 12,
-        }) : null;
+        const financed = hasFireData ? projectFire(buildAdvisorFireWithPurchaseParams(
+            snapshot,
+            { ...sim, isFinanced: true },
+            {
+                monthlyPayment: calculations.monthlyPayment,
+                annualRecurringCosts: calculations.annualRecurringCosts,
+                tcoYears: calculations.tcoYears,
+                cashOutlay: sim.downPayment,
+            },
+        )) : null;
 
         // SCENARIO 3: Non comprare, investire (nessun esborso)
         const invest = hasFireData ? projectFire(baseParams) : null;
 
         // Se non abbiamo dati FIRE, calcola "wealth at end" con formula semplificata:
         // capital * (1+r)^n + savings accumulati - costi vari
-        const realRet = (snapshot.fireExpectedReturn - snapshot.expectedInflation) / 100;
+        const realRet = computeRealReturn(snapshot.fireExpectedReturn, snapshot.expectedInflation);
         const fv = (capital: number, years: number, monthlyContrib: number) => {
             const monthlyR = Math.pow(1 + realRet, 1 / 12) - 1;
             const months = years * 12;
@@ -89,20 +86,21 @@ export const ScenarioComparison = memo(function ScenarioComparison({
             return fvCapital + fvContrib;
         };
 
-        const startLiq = snapshot.liquidAssets + snapshot.emergencyFund;
-        const monthlyRecurring = calculations.annualRecurringCosts / 12;
+        const startFireCapital = snapshot.fireStartingCapital;
+        const startLiquidity = snapshot.liquidAssets + snapshot.emergencyFund;
+        const monthlyRecurring = getAdvisorOwnershipMonthlyDelta(sim, calculations);
 
         const cashWealth = cash
             ? cash.chartData[Math.min(horizon, cash.chartData.length - 1)]?.capital ?? 0
-            : fv(startLiq - sim.totalPrice, horizon, snapshot.monthlySavings - monthlyRecurring);
+            : fv(startFireCapital - sim.totalPrice, horizon, snapshot.monthlySavings - monthlyRecurring);
 
         const financedWealth = financed
             ? financed.chartData[Math.min(horizon, financed.chartData.length - 1)]?.capital ?? 0
-            : fv(startLiq - sim.downPayment, horizon, snapshot.monthlySavings - calculations.monthlyPayment - monthlyRecurring);
+            : fv(startFireCapital - sim.downPayment, horizon, snapshot.monthlySavings - calculations.monthlyPayment - monthlyRecurring);
 
         const investWealth = invest
             ? invest.chartData[Math.min(horizon, invest.chartData.length - 1)]?.capital ?? 0
-            : fv(startLiq, horizon, snapshot.monthlySavings);
+            : fv(startFireCapital, horizon, snapshot.monthlySavings);
 
         return [
             {
@@ -112,7 +110,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 color: "#6366f1",
                 description: "Paghi tutto subito, zero interessi",
                 wealthAtEnd: Math.max(0, cashWealth),
-                liquidityNow: Math.max(0, startLiq - sim.totalPrice),
+                liquidityNow: Math.max(0, startLiquidity - sim.totalPrice),
                 interestPaid: 0,
                 yearsToFire: cash?.yearsToFire ?? -1,
             },
@@ -123,7 +121,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 color: "#f59e0b",
                 description: `Anticipo + ${sim.financingYears}a di rate al ${sim.financingRate}%`,
                 wealthAtEnd: Math.max(0, financedWealth),
-                liquidityNow: Math.max(0, startLiq - sim.downPayment),
+                liquidityNow: Math.max(0, startLiquidity - sim.downPayment),
                 interestPaid: calculations.totalInterest,
                 yearsToFire: financed?.yearsToFire ?? -1,
             },
@@ -134,7 +132,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 color: "#10b981",
                 description: "Investi tutto, rinunci all'acquisto",
                 wealthAtEnd: Math.max(0, investWealth),
-                liquidityNow: startLiq,
+                liquidityNow: startLiquidity,
                 interestPaid: 0,
                 yearsToFire: invest?.yearsToFire ?? -1,
             },
@@ -253,7 +251,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 <div className="mt-3 text-[10px] italic text-slate-500 dark:text-slate-400">
                     * Lo scenario &quot;Finanziato&quot; e calcolato anche se al momento hai selezionato pagamento cash,
                     cosi puoi vedere l&apos;alternativa. Il patrimonio finale include il rendimento composto al
-                    {" "}{(snapshot.fireExpectedReturn - snapshot.expectedInflation).toFixed(1)}% reale.
+                    {" "}{(computeRealReturn(snapshot.fireExpectedReturn, snapshot.expectedInflation) * 100).toFixed(1)}% reale.
                 </div>
             </CardContent>
         </Card>

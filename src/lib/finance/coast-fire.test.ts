@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeCoastFireScenarios } from "./coast-fire";
+import {
+    buildDynamicFireTargetSchedule,
+    computeCoastFireScenarios,
+    computeFireTargetForRetirementAge,
+} from "./coast-fire";
 
 describe("computeCoastFireScenarios", () => {
     const baseInput = {
@@ -124,5 +128,63 @@ describe("computeCoastFireScenarios", () => {
         expect(baseWithNegative).toBeDefined();
         expect(baseWithNegative!.fireTargetNet).toBeGreaterThan(baseWithout!.fireTargetNet);
         expect(baseWithNegative!.passiveIncomePresentValue).toBeLessThan(0);
+    });
+
+    it("richiede più capitale se vuoi smettere oggi invece che all'età pensionabile pianificata", () => {
+        const retireToday = computeFireTargetForRetirementAge({
+            retirementAge: baseInput.currentAge,
+            publicPensionAge: baseInput.publicPensionAge,
+            monthlyExpenses: baseInput.monthlyExpenses,
+            monthlyPublicPension: 1_200,
+            withdrawalRatePct: baseInput.withdrawalRatePct,
+            nominalReturnPct: baseInput.nominalReturnPct,
+            inflationPct: baseInput.inflationPct,
+        });
+        const retireAtPlan = computeFireTargetForRetirementAge({
+            retirementAge: baseInput.retirementAge,
+            publicPensionAge: baseInput.publicPensionAge,
+            monthlyExpenses: baseInput.monthlyExpenses,
+            monthlyPublicPension: 1_200,
+            withdrawalRatePct: baseInput.withdrawalRatePct,
+            nominalReturnPct: baseInput.nominalReturnPct,
+            inflationPct: baseInput.inflationPct,
+        });
+
+        expect(retireToday.fireTargetNet).toBeGreaterThan(retireAtPlan.fireTargetNet);
+    });
+
+    it("la schedule dinamica parte dal target retire-now e converge al target pianificato", () => {
+        const schedule = buildDynamicFireTargetSchedule({
+            currentAge: baseInput.currentAge,
+            maxYears: baseInput.retirementAge - baseInput.currentAge,
+            publicPensionAge: baseInput.publicPensionAge,
+            monthlyExpenses: baseInput.monthlyExpenses,
+            monthlyPublicPension: 1_200,
+            withdrawalRatePct: baseInput.withdrawalRatePct,
+            nominalReturnPct: baseInput.nominalReturnPct,
+            inflationPct: baseInput.inflationPct,
+        });
+        const retireToday = computeFireTargetForRetirementAge({
+            retirementAge: baseInput.currentAge,
+            publicPensionAge: baseInput.publicPensionAge,
+            monthlyExpenses: baseInput.monthlyExpenses,
+            monthlyPublicPension: 1_200,
+            withdrawalRatePct: baseInput.withdrawalRatePct,
+            nominalReturnPct: baseInput.nominalReturnPct,
+            inflationPct: baseInput.inflationPct,
+        });
+        const retireAtPlan = computeFireTargetForRetirementAge({
+            retirementAge: baseInput.retirementAge,
+            publicPensionAge: baseInput.publicPensionAge,
+            monthlyExpenses: baseInput.monthlyExpenses,
+            monthlyPublicPension: 1_200,
+            withdrawalRatePct: baseInput.withdrawalRatePct,
+            nominalReturnPct: baseInput.nominalReturnPct,
+            inflationPct: baseInput.inflationPct,
+        });
+
+        expect(schedule[0]).toBeCloseTo(retireToday.fireTargetNet, 6);
+        expect(schedule.at(-1)).toBeCloseTo(retireAtPlan.fireTargetNet, 6);
+        expect(schedule[0]).toBeGreaterThan(schedule.at(-1)!);
     });
 });

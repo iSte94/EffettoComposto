@@ -49,9 +49,9 @@ export interface FireProjectionParams {
     maxYears?: number;                // Default 60
     // Scenario modificatori (per confronto "con acquisto")
     oneTimeOutflow?: number;          // Esborso immediato (anticipo)
-    recurringMonthlyCost?: number;    // Rata finanziamento
+    recurringMonthlyCost?: number;    // Delta mensile temporaneo (+ costo, - entrata)
     recurringMonths?: number;         // Durata rata (mesi)
-    ongoingMonthlyCost?: number;      // Costi ricorrenti permanenti (es. condominio)
+    ongoingMonthlyCost?: number;      // Delta mensile continuativo (+ costo, - entrata)
     ongoingMonths?: number;           // Durata costi ongoing (mesi) — 0/undefined = tutta la vita utile
 }
 
@@ -79,7 +79,8 @@ export interface FireProjectionResult {
  *   - realReturn = (1 + nominal) / (1 + inflation) - 1   (Fisher esatto, euro odierni)
  *   - monthlyRate = (1 + realReturn) ^ (1/12) - 1
  *   - capital[m+1] = capital[m] * (1 + monthlyRate) + netSaving[m]
- *   - netSaving[m] = monthlySavings - recurring (se m < recurringMonths) - ongoing (se m < ongoingMonths)
+ *   - netSaving[m] = monthlySavings - recurringDelta - ongoingDelta
+ *     dove i delta possono essere anche negativi (es. affitto netto positivo).
  */
 export function projectFire(params: FireProjectionParams): FireProjectionResult {
     const {
@@ -129,10 +130,10 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
             cashflow = -monthlyExpensesAtFire;
         } else {
             let net = monthlySavings;
-            if (recurringMonths > 0 && m <= recurringMonths) {
+            if (recurringMonths > 0 && m <= recurringMonths && recurringMonthlyCost !== 0) {
                 net -= recurringMonthlyCost;
             }
-            if (ongoingMonthlyCost > 0) {
+            if (ongoingMonthlyCost !== 0) {
                 const limit = ongoingMonths > 0 ? ongoingMonths : totalMonths;
                 if (m <= limit) net -= ongoingMonthlyCost;
             }

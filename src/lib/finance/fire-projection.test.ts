@@ -153,6 +153,17 @@ describe('projectFire', () => {
         }
     });
 
+    it('ongoingMonthlyCost negativo aumenta il cashflow e anticipa FIRE', () => {
+        const base = projectFire(baseParams);
+        const withPositiveCashflow = projectFire({
+            ...baseParams,
+            ongoingMonthlyCost: -500,
+        });
+        if (base.monthsToFire >= 0 && withPositiveCashflow.monthsToFire >= 0) {
+            expect(withPositiveCashflow.monthsToFire).toBeLessThan(base.monthsToFire);
+        }
+    });
+
     it('chartData contiene il punto iniziale e almeno un punto per anno simulato', () => {
         const result = projectFire({ ...baseParams, maxYears: 10 });
         expect(result.chartData[0].year).toBe(0);

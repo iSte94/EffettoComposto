@@ -8,20 +8,22 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    ReferenceLine, Area, ComposedChart, Bar, Cell
+    Area, ComposedChart, Bar, Cell
 } from "recharts";
 import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Loader2, CheckCircle, CreditCard, Map, Flag, Check, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { calculateIrpef } from "@/lib/finance/irpef";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { computePensionBreakdown } from "@/lib/finance/pension-optimizer";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
+import { buildDynamicFireTargetSchedule } from "@/lib/finance/coast-fire";
 import {
     calculatePropertyAnnualNetIncome,
 } from "@/lib/finance/real-estate";
 import { liquidatePensionFund, shouldLiquidatePensionFund } from "@/lib/finance/pension-fund";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { addFinancialDataChangedListener, broadcastFinancialDataChanged } from "@/lib/client-data-events";
-import type { AssetRecord, ExistingLoan, AcceptedPurchase } from "@/types";
+import { DEFAULT_PENSION_CONFIG, parsePensionConfig, stringifyPensionConfig } from "@/lib/pension-config";
+import type { AssetRecord, ExistingLoan, AcceptedPurchase, MonthlyExpense, PensionConfig, RealEstateProperty } from "@/types";
 import { formatEuro } from "@/lib/format";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
 import { CoastFireScenarios } from "@/components/fire/coast-fire-scenarios";
@@ -45,11 +47,71 @@ const LOST_DECADE_RETURNS = [
     26.5   // 2009
 ];
 
+function parseJsonArray<T>(raw: unknown): T[] {
+    if (typeof raw !== "string" || raw.trim() === "") return [];
+
+    try {
+        const parsed = JSON.parse(raw) as unknown;
+        return Array.isArray(parsed) ? parsed as T[] : [];
+    } catch {
+        return [];
+    }
+}
+
+function getManualMonthlyExpenses(expenses: MonthlyExpense[]): number {
+    return expenses.reduce(
+        (acc, expense) => acc + ((Number(expense.amount) || 0) / (expense.isAnnual ? 12 : 1)),
+        0,
+    );
+}
+
+function getMonthlySubscriptions(raw: unknown): number {
+    const subscriptions = parseJsonArray<{ amount?: number; frequency?: string }>(raw);
+
+    return subscriptions.reduce((acc, subscription) => {
+        const amount = Number(subscription.amount) || 0;
+        return acc + (subscription.frequency === "annuale" ? amount / 12 : amount);
+    }, 0);
+}
+
+function getCurrentMonthlyLoanPayments(loans: ExistingLoan[], atDate: Date = new Date()): number {
+    return loans.reduce((acc, loan) => {
+        if (!loan.startDate || !loan.endDate) return acc;
+
+        const start = new Date(`${loan.startDate}-01`);
+        const end = new Date(`${loan.endDate}-01`);
+        if (atDate < start || atDate >= end) return acc;
+
+        const totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        const currentMonthsPassed = (atDate.getFullYear() - start.getFullYear()) * 12 + (atDate.getMonth() - start.getMonth());
+
+        return acc + getInstallmentAmountForMonth(loan, currentMonthsPassed, totalMonths, currentMonthsPassed);
+    }, 0);
+}
+
+function getMonthlyRealEstateCosts(snapshot: AssetRecord | null): number {
+    if (!snapshot) return 0;
+
+    const properties = parseJsonArray<RealEstateProperty>(snapshot.realEstateList);
+    if (properties.length > 0) {
+        const annualCosts = properties.reduce((acc, property) => {
+            const baseCosts = Number(property.costs) || 0;
+            const imu = property.isPrimaryResidence ? 0 : (Number(property.imu) || 0);
+            return acc + baseCosts + imu;
+        }, 0);
+
+        return annualCosts / 12;
+    }
+
+    return Math.max(0, Number(snapshot.realEstateCosts) || 0) / 12;
+}
+
 export function FireDashboard({ user }: FireDashboardProps) {
     const [, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [hasPendingSave, setHasPendingSave] = useState(false);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
+    const [remoteSyncToken, setRemoteSyncToken] = useState(0);
 
     // Current Financial State (Fetched from Patrimonio)
     const [latestSnapshot, setLatestSnapshot] = useState<AssetRecord | null>(null);
@@ -66,7 +128,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [fireExpectedReturn, setFireExpectedReturn] = useState<number>(6.0);
     const [fireVolatility, setFireVolatility] = useState<number>(15.0); // Monte Carlo Volatility
     const [expectedInflation, setExpectedInflation] = useState<number>(2.0); // For dynamic target
-    const [monthlySavings, setMonthlySavings] = useState<number>(1000);
+    const [monthlyPacBudget, setMonthlyPacBudget] = useState<number>(1000);
 
     // NEW: Public Pension & Taxes
     const [expectedPublicPension, setExpectedPublicPension] = useState<number>(1000); // In today's euros
@@ -75,15 +137,12 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
     // Pension Optimizer States
     const [enablePensionOptimizer, setEnablePensionOptimizer] = useState<boolean>(false);
-    const [grossIncome, setGrossIncome] = useState<number>(35000);
-    const [pensionContribution, setPensionContribution] = useState<number>(5164);
+    const [pensionConfig, setPensionConfig] = useState<PensionConfig>(DEFAULT_PENSION_CONFIG);
     // Pension Fund Separate Pot
     const [currentPensionFundValue, setCurrentPensionFundValue] = useState<number>(0);
     const [pensionFundAccessAge, setPensionFundAccessAge] = useState<number>(62);
     const [pensionFundExitTaxRate, setPensionFundExitTaxRate] = useState<number>(15);
     const [pensionExitMode, setPensionExitMode] = useState<"annuity" | "hybrid">("hybrid");
-    const [employerContributionType, setEmployerContributionType] = useState<"percent" | "fixed">("percent");
-    const [employerContributionValue, setEmployerContributionValue] = useState<number>(1.5);
     // Monte Carlo Animation States
     const [mcIsCalculating, setMcIsCalculating] = useState(false);
     const [mcProgress, setMcProgress] = useState(0); // 0 to 100
@@ -95,58 +154,77 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [realEstateListStr, setRealEstateListStr] = useState<string>("");
 
     const [includeIlliquidInFire, setIncludeIlliquidInFire] = useState<boolean>(false);
+    const [person1Name, setPerson1Name] = useState("Persona 1");
+    const [person2Name, setPerson2Name] = useState("Persona 2");
     const firePrefsHydratedRef = useRef(false);
+    const lastAppliedRemoteSyncRef = useRef(0);
+    const isDerivedFireExpenseRef = useRef(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
             const prefRes = await fetch('/api/preferences');
             const prefData = await prefRes.json();
+            const preferences = prefData.preferences ?? null;
+            let parsedLoans: ExistingLoan[] = [];
+            let derivedMonthlyExpenses = 0;
 
-            if (prefData.preferences) {
-                const p = prefData.preferences;
+            const patRes = await fetch('/api/patrimonio');
+            const patData = await patRes.json();
+
+            let lastSnapshot: AssetRecord | null = null;
+            if (patData.history && patData.history.length > 0) {
+                lastSnapshot = patData.history[patData.history.length - 1] as AssetRecord;
+            }
+
+            if (preferences) {
+                const p = preferences;
+                parsedLoans = parseJsonArray<ExistingLoan>(p.existingLoansList);
+                const manualExpenses = getManualMonthlyExpenses(parseJsonArray<MonthlyExpense>(p.expensesList));
+                const subscriptions = getMonthlySubscriptions(p.subscriptionsList);
+                const loans = getCurrentMonthlyLoanPayments(parsedLoans);
+                const realEstateCosts = getMonthlyRealEstateCosts(lastSnapshot);
+                derivedMonthlyExpenses = Math.round((manualExpenses + subscriptions + loans + realEstateCosts) * 100) / 100;
+
+                setRemoteSyncToken((token) => token + 1);
+
                 if (p.birthYear != null) setBirthYear(p.birthYear);
                 if (p.retirementAge != null) setRetirementAge(p.retirementAge);
-                if (p.expectedMonthlyExpenses != null) setExpectedMonthlyExpenses(p.expectedMonthlyExpenses);
-                if (p.monthlySavings != null) setMonthlySavings(p.monthlySavings);
+                if (p.expectedMonthlyExpenses != null) {
+                    isDerivedFireExpenseRef.current = false;
+                    setExpectedMonthlyExpenses(p.expectedMonthlyExpenses);
+                } else if (derivedMonthlyExpenses > 0) {
+                    isDerivedFireExpenseRef.current = true;
+                    setExpectedMonthlyExpenses(derivedMonthlyExpenses);
+                }
+                if (p.monthlyPacBudget != null) setMonthlyPacBudget(p.monthlyPacBudget);
+                else if (p.monthlySavings != null) setMonthlyPacBudget(p.monthlySavings);
                 if (p.fireWithdrawalRate != null) setFireWithdrawalRate(p.fireWithdrawalRate);
                 if (p.fireExpectedReturn != null) setFireExpectedReturn(p.fireExpectedReturn);
                 if (p.fireVolatility != null) setFireVolatility(p.fireVolatility);
                 if (p.expectedInflation !== undefined) setExpectedInflation(p.expectedInflation);
                 if (p.includeIlliquidInFire !== undefined) setIncludeIlliquidInFire(p.includeIlliquidInFire);
                 if (p.enablePensionOptimizer !== undefined) setEnablePensionOptimizer(p.enablePensionOptimizer);
-                if (p.grossIncome != null) setGrossIncome(p.grossIncome);
-                if (p.pensionContribution != null) setPensionContribution(p.pensionContribution);
+                setPensionConfig(parsePensionConfig(p.pensionConfig, p));
                 if (p.pensionFundAccessAge != null) setPensionFundAccessAge(p.pensionFundAccessAge);
                 if (p.pensionFundExitTaxRate != null) setPensionFundExitTaxRate(p.pensionFundExitTaxRate);
                 if (p.pensionExitMode) setPensionExitMode(p.pensionExitMode);
-                if (p.employerContributionType) setEmployerContributionType(p.employerContributionType);
-                if (p.employerContributionValue !== undefined) setEmployerContributionValue(p.employerContributionValue);
+                if (p.person1Name) setPerson1Name(p.person1Name);
+                if (p.person2Name) setPerson2Name(p.person2Name);
 
                 if (p.expectedPublicPension != null) setExpectedPublicPension(p.expectedPublicPension);
                 if (p.publicPensionAge != null) setPublicPensionAge(p.publicPensionAge);
                 if (p.applyTaxStamp !== undefined) setApplyTaxStamp(p.applyTaxStamp);
-
-                if (p.existingLoansList) {
-                    try {
-                        setExistingLoansList(JSON.parse(p.existingLoansList));
-                    } catch (e) {
-                        console.error("Failed to parse existing loans", e);
-                    }
-                }
+                setExistingLoansList(parsedLoans);
                 if (p.acceptedPurchases) {
                     try { setAcceptedPurchases(JSON.parse(p.acceptedPurchases)); } catch { /* empty */ }
                 }
             }
 
-            const patRes = await fetch('/api/patrimonio');
-            const patData = await patRes.json();
-
-            if (patData.history && patData.history.length > 0) {
-                const last: AssetRecord = patData.history[patData.history.length - 1];
-                setLatestSnapshot(last);
-                setCurrentPensionFundValue(last.pensionFund || 0);
-                setRealEstateListStr(last.realEstateList || "");
+            if (lastSnapshot) {
+                setLatestSnapshot(lastSnapshot);
+                setCurrentPensionFundValue(lastSnapshot.pensionFund || 0);
+                setRealEstateListStr(lastSnapshot.realEstateList || "");
             } else {
                 setLatestSnapshot(null);
                 setCurrentPensionFundValue(0);
@@ -171,6 +249,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     useEffect(() => {
         if (!user) {
             firePrefsHydratedRef.current = false;
+            lastAppliedRemoteSyncRef.current = 0;
             setHasPendingSave(false);
         }
     }, [user]);
@@ -194,21 +273,18 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 body: JSON.stringify({
                     birthYear,
                     retirementAge,
-                    expectedMonthlyExpenses,
-                    monthlySavings,
+                    ...(isDerivedFireExpenseRef.current ? {} : { expectedMonthlyExpenses }),
+                    monthlyPacBudget,
                     fireWithdrawalRate,
                     fireExpectedReturn,
                     fireVolatility,
                     expectedInflation,
                     includeIlliquidInFire,
                     enablePensionOptimizer,
-                    grossIncome,
-                    pensionContribution,
+                    pensionConfig: stringifyPensionConfig(pensionConfig),
                     pensionFundAccessAge,
                     pensionFundExitTaxRate,
                     pensionExitMode,
-                    employerContributionType,
-                    employerContributionValue,
                     expectedPublicPension,
                     publicPensionAge,
                     applyTaxStamp
@@ -230,11 +306,10 @@ export function FireDashboard({ user }: FireDashboardProps) {
         }
     }, [
         user,
-        birthYear, retirementAge, expectedMonthlyExpenses, monthlySavings, fireWithdrawalRate,
+        birthYear, retirementAge, expectedMonthlyExpenses, monthlyPacBudget, fireWithdrawalRate,
         fireExpectedReturn, fireVolatility, expectedInflation, enablePensionOptimizer,
-        grossIncome, pensionContribution, pensionFundAccessAge,
-        pensionFundExitTaxRate, pensionExitMode, employerContributionType,
-        employerContributionValue, expectedPublicPension, publicPensionAge, applyTaxStamp,
+        pensionConfig, pensionFundAccessAge,
+        pensionFundExitTaxRate, pensionExitMode, expectedPublicPension, publicPensionAge, applyTaxStamp,
         includeIlliquidInFire,
     ]);
 
@@ -245,6 +320,12 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         if (!firePrefsHydratedRef.current) {
             firePrefsHydratedRef.current = true;
+            lastAppliedRemoteSyncRef.current = remoteSyncToken;
+            return;
+        }
+
+        if (remoteSyncToken !== lastAppliedRemoteSyncRef.current) {
+            lastAppliedRemoteSyncRef.current = remoteSyncToken;
             return;
         }
 
@@ -256,12 +337,11 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         return () => clearTimeout(timeoutId);
     }, [
-        birthYear, retirementAge, expectedMonthlyExpenses, monthlySavings,
+        birthYear, retirementAge, expectedMonthlyExpenses, monthlyPacBudget,
         fireWithdrawalRate, fireExpectedReturn, fireVolatility,
-        expectedInflation, enablePensionOptimizer, grossIncome, pensionContribution,
+        expectedInflation, enablePensionOptimizer, pensionConfig,
         pensionFundAccessAge, pensionFundExitTaxRate, pensionExitMode,
-        employerContributionType, employerContributionValue,
-        expectedPublicPension, publicPensionAge, applyTaxStamp, includeIlliquidInFire,
+        expectedPublicPension, publicPensionAge, applyTaxStamp, includeIlliquidInFire, remoteSyncToken,
         user, isLoadingUser, handleSavePreferences
     ]);
 
@@ -357,11 +437,30 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const coastFireAnalysis = fireMetrics.coastFireAnalysis;
     const coastFireInput = fireMetrics.coastFireInput;
     const baseCoastScenario = coastFireAnalysis?.scenarios.find((scenario) => scenario.scenario === "base") ?? coastFireAnalysis?.scenarios[0];
-    const fireTarget = fireMetrics.fireTarget;
+    const plannedFireTarget = fireMetrics.fireTarget;
     const coastFireTarget = fireMetrics.coastFireTarget;
+    const maxYearsSim = 100;
+    const fireTargetsByYear = coastFireInput
+        ? buildDynamicFireTargetSchedule({
+            currentAge,
+            maxYears: maxYearsSim,
+            publicPensionAge,
+            monthlyExpenses: expectedMonthlyExpenses,
+            monthlyPublicPension: expectedPublicPension,
+            passiveIncomeStreams: coastFireInput.passiveIncomeStreams,
+            withdrawalRatePct: fireWithdrawalRate,
+            nominalReturnPct: fireExpectedReturn,
+            inflationPct: expectedInflation,
+        })
+        : Array.from({ length: maxYearsSim + 1 }, () => plannedFireTarget);
+    const fireTarget = fireTargetsByYear[0] ?? plannedFireTarget;
     const coastFireReached = baseCoastScenario?.coastFireReached ?? (startingCapital >= coastFireTarget);
-    const futureIncomeAdjustment = fireMetrics.futureIncomeAdjustment;
-    const targetLineLabel = futureIncomeAdjustment > 0 ? "Obiettivo FIRE netto" : "Obiettivo FIRE";
+    const currentFutureIncomeAdjustment = Math.max(0, fireMetrics.grossFireTarget - fireTarget);
+    const targetLineLabel = fireTarget > plannedFireTarget + 1
+        ? "Target FIRE se smetti ora"
+        : currentFutureIncomeAdjustment > 0
+            ? "Obiettivo FIRE netto"
+            : "Obiettivo FIRE";
     const monthlyPortfolioNeed = fireTarget * (fireWithdrawalRate / 100) / 12;
 
     // Helper to calculate total active installments at a given month in the future
@@ -415,29 +514,15 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
     // Calculate baseline (current) total installment so we only ADD the "freed up" cash flow
     const baseInstallmentNow = getActiveDebtAtMonth(0);
-
-    // --- PENSION OPTIMIZER CALCULATION (Exact IRPEF 2024 brackets) ---
-    const calculateTaxRefund = () => {
-        if (!enablePensionOptimizer || pensionContribution <= 0) return 0;
-
-        const amountToDeduct = Math.min(pensionContribution, 5164.57); // Max limit in Italy
-        const taxWithoutPfp = calculateIrpef(grossIncome);
-        const taxWithPfp = calculateIrpef(grossIncome, amountToDeduct);
-
-        return taxWithoutPfp - taxWithPfp;
+    const effectivePensionConfig = enablePensionOptimizer
+        ? pensionConfig
+        : {
+            person1: { ...pensionConfig.person1, active: false },
+            person2: { ...pensionConfig.person2, active: false },
     };
-
-    const annualTaxRefund = calculateTaxRefund();
-
-    // --- PENSION FUND CONTRIBUTION CALCULATION ---
-    const voluntaryContribution = enablePensionOptimizer ? Math.min(pensionContribution, 5164.57) : 0;
-    // TFR automatico quando il FP è attivo (~6.91% RAL)
-    const tfrContribution = enablePensionOptimizer ? grossIncome * 0.0691 : 0;
-    // Contributo datore di lavoro
-    const employerContribution = enablePensionOptimizer
-        ? (employerContributionType === "percent" ? grossIncome * (employerContributionValue / 100) : employerContributionValue)
-        : 0;
-    const totalAnnualPensionContribution = voluntaryContribution + tfrContribution + employerContribution;
+    const pensionSummary = computePensionBreakdown(effectivePensionConfig);
+    const annualTaxRefund = pensionSummary.annualTaxRefund;
+    const totalAnnualPensionContribution = pensionSummary.totalAnnualContribution;
 
     // Pension fund return: same real return but NO bollo (0.2%) — FP is exempt
     const pensionFundRealReturn = realReturnDecimal; // No bollo deduction
@@ -451,8 +536,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     let pensionCap = currentPensionFundValue; // Separate pot for pension fund
     let pensionAnnuity = 0; // Monthly annuity from pension fund (activated at access age)
     let pensionFundAccessed = false; // Idempotent flag: liquidation must happen at most once
-    let yearsToFire = 0;
-    const maxYearsSim = 100;
+    let yearsToFire = startingCapital >= fireTarget ? 0 : -1;
     const chartData = [];
 
     // Adjust return for Bollo tax (0.2%) — applied on real return
@@ -462,14 +546,19 @@ export function FireDashboard({ user }: FireDashboardProps) {
     for (let m = 0; m <= maxYearsSim * 12; m++) {
         const currentY = Math.floor(m / 12);
         const yAge = currentAge + currentY;
+        const currentFireTarget = fireTargetsByYear[Math.min(currentY, fireTargetsByYear.length - 1)] ?? fireTarget;
+
+        if (yearsToFire < 0 && tempCap >= currentFireTarget) {
+            yearsToFire = m / 12;
+        }
 
         // Calculate dynamic savings rate for this specific month
         const activeDebtThisMonth = getActiveDebtAtMonth(m);
         const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth; // Money no longer going to the bank
-        const currentMonthlySavings = monthlySavings + Math.max(0, freedUpCashFlow);
+        const currentMonthlySavings = monthlyPacBudget + Math.max(0, freedUpCashFlow);
 
         // Target fisso in euro odierni (inflazione già sottratta dal rendimento)
-        const isRetired = yAge >= retirementAge || tempCap >= fireTarget;
+        const isRetired = yAge >= retirementAge || tempCap >= currentFireTarget;
 
         // Public Pension logic: if reached pension age, reduce expenses
         const monthlyPublicPension = yAge >= publicPensionAge ? expectedPublicPension : 0;
@@ -483,12 +572,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 age: currentAge + currentY,
                 Capital: tempCap,
                 PensionFund: pensionCap,
-                Target: fireTarget,
+                Target: currentFireTarget,
                 ActiveDebtAnnual: activeDebtThisMonth * 12 // Annualized burden for the chart area
             });
-            if (tempCap >= fireTarget && yearsToFire === 0) {
-                yearsToFire = currentY + (m % 12) / 12;
-            }
         }
         // Inject Pension Fund IRPEF Tax Refund in July (Month 6)
         if (m % 12 === 6 && enablePensionOptimizer && currentY <= maxYearsSim && !isRetired) {
@@ -535,17 +621,20 @@ export function FireDashboard({ user }: FireDashboardProps) {
         }
 
         if (tempCap < 0) tempCap = 0;
+        if (yearsToFire < 0 && tempCap >= currentFireTarget) {
+            yearsToFire = (m + 1) / 12;
+        }
     }
     // Store the pension annuity for display
     const calculatedPensionAnnuity = pensionAnnuity;
-    const displayYears = yearsToFire > 0 ? Math.min(Math.ceil(yearsToFire) + 5, 50) : 50;
+    const displayYears = yearsToFire >= 0 ? Math.min(Math.ceil(yearsToFire) + 5, 50) : 50;
     const displayChartData = chartData.slice(0, displayYears + 1);
     const isFireAlready = startingCapital >= fireTarget;
 
     // 2. MONTE CARLO SIMULATION (Web Worker)
     // NB: mcWorkerRef e il relativo cleanup useEffect sono dichiarati piu' in
     // alto, prima degli early-return, per rispettare le Rules of Hooks.
-    const mcSimYears = Math.max(displayYears, 30);
+    const mcSimYears = Math.max(1, lifeExpectancy - currentAge);
 
     const runMonteCarloSimulation = () => {
         if (mcIsCalculating) return;
@@ -598,7 +687,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         worker.postMessage({
             startingCapital,
-            fireTarget,
+            fireTargetsByYear,
             currentAge,
             retirementAge,
             simYears: mcSimYears,
@@ -606,7 +695,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
             realReturnDecimal,
             applyTaxStamp,
             annualExpenses,
-            monthlySavings,
+            monthlySavings: monthlyPacBudget,
             publicPensionAge,
             expectedPublicPension,
             enablePensionOptimizer,
@@ -636,6 +725,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
     for (let i = 0; i < LOST_DECADE_RETURNS.length; i++) {
         const yAge = currentAge + i;
+        const currentFireTarget = fireTargetsByYear[Math.min(i, fireTargetsByYear.length - 1)] ?? fireTarget;
         stressData.push({
             year: 2000 + i, // "Anno fittizio" per mostrare la sequenza
             age: yAge,
@@ -644,7 +734,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
             ReturnValue: LOST_DECADE_RETURNS[i]
         });
 
-        const isRetired = yAge >= retirementAge || stressCap >= fireTarget;
+        const isRetired = yAge >= retirementAge || stressCap >= currentFireTarget;
 
         // Adjust return for Bollo if active
         const yearRealReturn = applyTaxStamp ? (LOST_DECADE_RETURNS[i] / 100 - 0.002) : (LOST_DECADE_RETURNS[i] / 100);
@@ -665,7 +755,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
             for (let m = (i * 12); m < ((i + 1) * 12); m++) {
                 const activeDebtThisMonth = getActiveDebtAtMonth(m);
                 const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth;
-                totalSavingsThisYear += (monthlySavings + Math.max(0, freedUpCashFlow));
+                totalSavingsThisYear += (monthlyPacBudget + Math.max(0, freedUpCashFlow));
             }
             stressCap += totalSavingsThisYear;
         }
@@ -760,10 +850,10 @@ export function FireDashboard({ user }: FireDashboardProps) {
                         <div className="absolute top-0 left-0 w-full h-1 bg-orange-400 group-hover:bg-orange-500 transition-colors" />
                         <CardContent className="p-6">
                             <div className="text-xs font-bold text-orange-600 uppercase tracking-widest mb-1 flex justify-between">
-                                <span>Il Tuo Obiettivo FIRE</span>
-                                {futureIncomeAdjustment > 0 ? (
+                                <span>Obiettivo FIRE Oggi</span>
+                                {currentFutureIncomeAdjustment > 0 ? (
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-white border border-emerald-100 px-2 py-0.5 rounded-full lowercase font-bold shadow-sm">
-                                        -{formatEuro(futureIncomeAdjustment)} supporti futuri
+                                        -{formatEuro(currentFutureIncomeAdjustment)} supporti futuri
                                     </span>
                                 ) : currentRealEstatePassiveIncome > 0 && (
                                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-white border border-emerald-100 px-2 py-0.5 rounded-full lowercase font-bold shadow-sm">
@@ -773,7 +863,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                             </div>
                             <div className="text-2xl font-extrabold text-orange-600 group-hover:scale-105 origin-left transition-transform">{formatEuro(fireTarget)}</div>
                             <div className="text-xs text-orange-600/70 mt-1">
-                                {futureIncomeAdjustment > 0
+                                {fireTarget > plannedFireTarget + 1
+                                    ? `Se smettessi oggi ti servirebbero ${formatEuro(fireTarget)}. Continuando fino a ${retirementAge} anni il target scende a ${formatEuro(plannedFireTarget)}.`
+                                    : currentFutureIncomeAdjustment > 0
                                     ? `Target netto di portafoglio: ${formatEuro(monthlyPortfolioNeed)}/mese al ${fireWithdrawalRate}% annuo`
                                     : `Con incassi di ${formatEuro(netAnnualExpenses / 12)}/mese al ${fireWithdrawalRate}% annuo`}
                             </div>
@@ -882,9 +974,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     { id: 'shield', label: 'Scudo Bollette', target: billShieldTarget, desc: 'Il 30% delle tue spese coperte. Le bollette sono pagate dagli assett passivi.' },
                     { id: 'coast', label: 'Coast FIRE', target: coastFireTarget, desc: 'Potresti pure smettere di risparmiare e il compound ti porterebbe a obiettivo.' },
                     { id: 'half', label: 'Mezzo Cammino', target: halfFireTarget, desc: 'Sei esattamente al 50% matematico dell\'Indipendenza.' },
-                    { id: 'lean', label: 'Lean FIRE', target: leanFireTarget, desc: 'Copertura al 70%. Stile vita frugale e minimale garantito a vita.' },
+                    { id: 'lean', label: 'Lean FIRE', target: leanFireTarget, desc: 'Stima euristica al 70% del target base: utile come milestone frugale, non come piano autonomo.' },
                     { id: 'fire', label: 'Target FIRE', target: fireTarget, desc: 'Copertura al 100%. Libertà Totale.' },
-                    { id: 'fat', label: 'Fat FIRE', target: fatFireTarget, desc: 'Al 150%. Zero imprevisti, opzioni extra luxury attive.' },
+                    { id: 'fat', label: 'Fat FIRE', target: fatFireTarget, desc: 'Stima euristica al 150% del target base: margine extra, non garanzia contro ogni scenario.' },
                 ].filter(m => m.target > 0).sort((a, b) => a.target - b.target);
 
                 // Reduce overlapping targets to keep UI clean
@@ -902,7 +994,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                             <div className="p-2 bg-indigo-100 dark:bg-indigo-900 rounded-xl"><Map className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /></div>
                             <div>
                                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">La Mappa del tuo Viaggio</h3>
-                                <p className="text-sm text-slate-500">I traguardi matematici della tua evoluzione patrimoniale</p>
+                                <p className="text-sm text-slate-500">Traguardi e milestone: Lean/Fat sono moltiplicatori euristici del target base.</p>
                             </div>
                         </div>
                         <div className="w-full pb-12 pt-12 px-2 md:px-6">
@@ -970,44 +1062,40 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     birthYear={birthYear}
                     retirementAge={retirementAge}
                     expectedMonthlyExpenses={expectedMonthlyExpenses}
-                    monthlySavings={monthlySavings}
+                    monthlySavings={monthlyPacBudget}
                     fireWithdrawalRate={fireWithdrawalRate}
                     expectedInflation={expectedInflation}
                     fireExpectedReturn={fireExpectedReturn}
                     fireVolatility={fireVolatility}
                     enablePensionOptimizer={enablePensionOptimizer}
-                    grossIncome={grossIncome}
-                    pensionContribution={pensionContribution}
-                    annualTaxRefund={annualTaxRefund}
+                    pensionConfig={pensionConfig}
+                    pensionSummary={pensionSummary}
                     pensionFundAccessAge={pensionFundAccessAge}
                     pensionFundExitTaxRate={pensionFundExitTaxRate}
                     pensionExitMode={pensionExitMode}
-                    employerContributionType={employerContributionType}
-                    employerContributionValue={employerContributionValue}
-                    tfrContribution={tfrContribution}
-                    employerContribution={employerContribution}
-                    totalAnnualPensionContribution={totalAnnualPensionContribution}
                     calculatedPensionAnnuity={calculatedPensionAnnuity}
                     applyTaxStamp={applyTaxStamp}
                     expectedPublicPension={expectedPublicPension}
                     publicPensionAge={publicPensionAge}
+                    person1Name={person1Name}
+                    person2Name={person2Name}
                     onIncludeIlliquidChange={setIncludeIlliquidInFire}
                     onBirthYearChange={setBirthYear}
                     onRetirementAgeChange={setRetirementAge}
-                    onExpectedMonthlyExpensesChange={setExpectedMonthlyExpenses}
-                    onMonthlySavingsChange={setMonthlySavings}
+                    onExpectedMonthlyExpensesChange={(value) => {
+                        isDerivedFireExpenseRef.current = false;
+                        setExpectedMonthlyExpenses(value);
+                    }}
+                    onMonthlySavingsChange={setMonthlyPacBudget}
                     onFireWithdrawalRateChange={setFireWithdrawalRate}
                     onExpectedInflationChange={setExpectedInflation}
                     onFireExpectedReturnChange={setFireExpectedReturn}
                     onFireVolatilityChange={setFireVolatility}
                     onEnablePensionOptimizerChange={setEnablePensionOptimizer}
-                    onGrossIncomeChange={setGrossIncome}
-                    onPensionContributionChange={setPensionContribution}
+                    onPensionConfigChange={setPensionConfig}
                     onPensionFundAccessAgeChange={setPensionFundAccessAge}
                     onPensionFundExitTaxRateChange={setPensionFundExitTaxRate}
                     onPensionExitModeChange={setPensionExitMode}
-                    onEmployerContributionTypeChange={setEmployerContributionType}
-                    onEmployerContributionValueChange={setEmployerContributionValue}
                     onApplyTaxStampChange={setApplyTaxStamp}
                     onExpectedPublicPensionChange={setExpectedPublicPension}
                     onPublicPensionAgeChange={setPublicPensionAge}
@@ -1083,7 +1171,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                         </h4>
                                         <p className={`text-sm leading-relaxed font-medium ${coastFireReached ? 'text-teal-800/80' : 'text-slate-600 dark:text-slate-400'}`}>
                                             {coastFireReached
-                                                ? `Complimenti! Hai superato la soglia di ${formatEuro(coastFireTarget)}. Significa che potresti smettere di risparmiare oggi e, grazie all'interesse composto di ${fireExpectedReturn}% reale annuo, arrivare a ${retirementAge} anni con il capitale netto richiesto dal tuo piano FIRE (${formatEuro(fireTarget)}).`
+                                                ? `Complimenti! Hai superato la soglia di ${formatEuro(coastFireTarget)}. Significa che potresti smettere di risparmiare oggi e, grazie all'interesse composto di ${fireExpectedReturn}% reale annuo, arrivare a ${retirementAge} anni con il capitale netto richiesto dal tuo piano FIRE (${formatEuro(plannedFireTarget)}).`
                                                 : `Il Coast FIRE è il traguardo intermedio. Ti mancano ${formatEuro(coastFireTarget - startingCapital)} per raggiungere i ${formatEuro(coastFireTarget)}. Una volta raggiunto, il mercato potrà completare il percorso verso il tuo obiettivo FIRE netto entro i ${retirementAge} anni.`}
                                         </p>
                                     </div>
@@ -1105,7 +1193,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                 currentAge,
                                                 retirementAge,
                                                 monthlyExpensesBaseline: expectedMonthlyExpenses,
-                                                monthlySavingsBaseline: monthlySavings,
+                                                monthlySavingsBaseline: monthlyPacBudget,
                                                 nominalReturnPct: fireExpectedReturn,
                                                 inflationPct: expectedInflation,
                                                 withdrawalRatePct: fireWithdrawalRate,
@@ -1167,7 +1255,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                             <Tooltip
                                                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any, name: any) => {
-                                                                    const labelMap: Record<string, string> = { 'p90': 'Caso Favorevole (10% Top)', 'p50': 'Mediana (Caso Medio)', 'p10': 'Scenario Pessimista (Bottom 10%)' };
+                                                                    const labelMap: Record<string, string> = { 'p90': 'Caso Favorevole (10% Top)', 'p50': 'Mediana (Caso Medio)', 'p10': 'Scenario Pessimista (Bottom 10%)', 'Target': targetLineLabel };
                                                                     return [formatEuro(Number(value)), labelMap[name] || name];
                                                                 }}
                                                                 labelFormatter={(label) => `Età: ${label} anni`}
@@ -1175,10 +1263,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                                 labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
                                                             />
                                                         )}
-                                                        <ReferenceLine y={fireTarget} stroke="#f97316" strokeDasharray="5 5" strokeWidth={1} label={{ position: 'top', value: targetLineLabel, fill: '#f97316', fontSize: 10 }} />
-
                                                         {mcData.length > 0 && (
                                                             <>
+                                                                <Line type="monotone" dataKey="Target" stroke="#f97316" strokeDasharray="5 5" strokeWidth={2} dot={false} isAnimationActive={false} />
                                                                 <Line type="monotone" dataKey="p90" stroke="#d8b4fe" strokeWidth={2} dot={false} isAnimationActive={false} />
                                                                 <Line type="monotone" dataKey="p10" stroke="#f43f5e" strokeWidth={2} dot={false} isAnimationActive={false} />
                                                                 <Area type="monotone" dataKey="p50" stroke="#9333ea" strokeWidth={4} fillOpacity={1} fill="url(#mcMedian)" activeDot={!mcIsCalculating ? { r: 8, strokeWidth: 0, fill: '#9333ea', style: { filter: 'drop-shadow(0px 0px 10px rgba(147,51,234,0.8))' } } : false} isAnimationActive={false} />

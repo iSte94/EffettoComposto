@@ -19,10 +19,30 @@ export interface AssetRecord {
     bitcoinPrice: number;
     realEstateList?: string;
     customStocksList?: string;
+    otherAssetsOwnership?: string;
     totalNetWorth?: number; // Calcolato lato client
 }
 
 export type AssetOwner = "person1" | "person2";
+
+export type PensionContributionMode = "percent" | "fixed";
+
+export interface PensionContributionConfig {
+    mode: PensionContributionMode;
+    value: number;
+}
+
+export interface PersonPensionConfig {
+    active: boolean;
+    grossAnnualSalary: number;
+    voluntaryContribution: PensionContributionConfig;
+    employerContribution: PensionContributionConfig;
+}
+
+export interface PensionConfig {
+    person1: PersonPensionConfig;
+    person2: PersonPensionConfig;
+}
 
 export interface RealEstateProperty {
     id: string;
@@ -48,6 +68,56 @@ export interface CustomStock {
     annualDividend?: number;
     isLoading?: boolean;
     owner?: AssetOwner;
+}
+
+export type PacCadence = "weekly" | "monthly" | "quarterly" | "semiannual" | "annual";
+
+export interface PacTimingConfig {
+    weekday?: number;
+    dayOfMonth?: number;
+    useLastDay?: boolean;
+    anchorMonth?: number;
+    month?: number;
+}
+
+export interface AssetPacSchedule {
+    id: string;
+    assetKey: string;
+    assetTicker: string;
+    amountEur: number;
+    cadence: PacCadence;
+    timingConfig: PacTimingConfig;
+    active: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+export type AssetPacExecutionStatus = "executed" | "skipped" | "failed";
+
+export interface AssetPacExecution {
+    id: string;
+    scheduleId: string;
+    assetKey: string;
+    assetTicker: string;
+    executionDate: string;
+    priceUsed?: number | null;
+    sharesBought?: number;
+    amountEur: number;
+    status: AssetPacExecutionStatus;
+    reason?: string | null;
+    createdAt?: string;
+}
+
+export interface PensionFundAccrual {
+    id: string;
+    personKey: AssetOwner;
+    accrualMonth: string;
+    voluntaryAmount: number;
+    employerAmount: number;
+    tfrAmount: number;
+    totalAmount: number;
+    appliedDate?: string | null;
+    createdAt?: string;
 }
 
 export interface MonthlyExpense {
@@ -79,6 +149,8 @@ export interface FinancialSnapshot {
     currentAge: number | null;
     retirementAge: number;
     expectedMonthlyExpensesAtFire: number;
+    fireStartingCapital: number;
+    fireAdjustedMonthlyExpensesAtFire: number;
     fireWithdrawalRate: number;       // %
     fireExpectedReturn: number;       // %
     expectedInflation: number;        // %

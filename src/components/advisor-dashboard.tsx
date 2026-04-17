@@ -20,7 +20,9 @@ import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
 import { Button } from "@/components/ui/button";
 import { Trash2, Calendar } from "lucide-react";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
-import { projectFire, computeRealReturn } from "@/lib/finance/fire-projection";
+import { computeRealReturn } from "@/lib/finance/fire-projection";
+import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
+import { computeAdvisorFireComparison } from "@/lib/finance/advisor-fire";
 import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { toast } from "sonner";
 
@@ -63,6 +65,8 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     existingLoansCount: 0,
     birthYear: null, currentAge: null, retirementAge: 60,
     expectedMonthlyExpensesAtFire: 2500,
+    fireStartingCapital: 0,
+    fireAdjustedMonthlyExpensesAtFire: 2500,
     fireWithdrawalRate: 3.25, fireExpectedReturn: 6, expectedInflation: 2,
   });
   const [sim, setSim] = useState<PurchaseSimulation>(defaultSimulation);
@@ -95,8 +99,8 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         let totalAssets = 0;
 
         const history = patrimonioData.history || patrimonioData.records || [];
-        if (history.length > 0) {
-          const latest = history[history.length - 1];
+        const latest = history.length > 0 ? history[history.length - 1] : null;
+        if (latest) {
           liquidAssets = (latest.liquidStockValue || 0) + (latest.stocksSnapshotValue || 0) + (latest.bitcoinAmount || 0) * (latest.bitcoinPrice || 0);
           emergencyFund = latest.emergencyFund || 0;
           realEstateValue = latest.realEstateValue || 0;
@@ -152,6 +156,17 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         const fireWithdrawalRate = Number(p.fireWithdrawalRate) || 3.25;
         const fireExpectedReturn = Number(p.fireExpectedReturn) || 6;
         const expectedInflation = p.expectedInflation !== undefined ? Number(p.expectedInflation) : 2;
+        const fireMetrics = computeFireMetricsFromSnapshot(latest, {
+          ...p,
+          expectedMonthlyExpenses: expectedMonthlyExpensesAtFire,
+          fireWithdrawalRate,
+          fireExpectedReturn,
+          expectedInflation,
+        });
+        const fireStartingCapital = fireMetrics.currentCapital;
+        const fireAdjustedMonthlyExpensesAtFire = fireMetrics.fireTarget > 0 && fireWithdrawalRate > 0
+          ? (fireMetrics.fireTarget * (fireWithdrawalRate / 100)) / 12
+          : expectedMonthlyExpensesAtFire;
 
         const investableAssets = Math.max(0, totalAssets - realEstateValue);
         const investableNetWorth = investableAssets - totalDebts;
@@ -175,6 +190,8 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
           currentAge,
           retirementAge,
           expectedMonthlyExpensesAtFire,
+          fireStartingCapital,
+          fireAdjustedMonthlyExpensesAtFire,
           fireWithdrawalRate,
           fireExpectedReturn,
           expectedInflation,
@@ -378,33 +395,13 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     const netRentYield = sim.totalPrice > 0 ? ((annualRentIncome - annualRecurringCosts) / sim.totalPrice) * 100 : 0;
 
     // Ritardo FIRE (mesi) — calcolato qui per alimentare il verdetto numerico
-    let fireDelayMonthsValue = 0;
-    const hasFireCtx = snapshot.currentAge !== null &&
-      (snapshot.monthlySavings > 0 || (snapshot.liquidAssets + snapshot.emergencyFund) > 0);
-    if (hasFireCtx) {
-      const baseParams = {
-        startingCapital: snapshot.liquidAssets + snapshot.emergencyFund,
-        monthlySavings: snapshot.monthlySavings,
-        monthlyExpensesAtFire: snapshot.expectedMonthlyExpensesAtFire,
-        expectedReturnPct: snapshot.fireExpectedReturn,
-        inflationPct: snapshot.expectedInflation,
-        withdrawalRatePct: snapshot.fireWithdrawalRate,
-        currentAge: snapshot.currentAge ?? 30,
-        retirementAge: snapshot.retirementAge,
-      };
-      const base = projectFire(baseParams);
-      const withBuy = projectFire({
-        ...baseParams,
-        oneTimeOutflow: cashOutlay,
-        recurringMonthlyCost: sim.isFinanced ? monthlyPayment : 0,
-        recurringMonths: sim.isFinanced ? sim.financingYears * 12 : 0,
-        ongoingMonthlyCost: annualRecurringCosts / 12,
-        ongoingMonths: tcoYears * 12,
-      });
-      if (base.monthsToFire >= 0 && withBuy.monthsToFire >= 0) {
-        fireDelayMonthsValue = withBuy.monthsToFire - base.monthsToFire;
-      }
-    }
+    const fireComparison = computeAdvisorFireComparison(snapshot, sim, {
+      monthlyPayment,
+      annualRecurringCosts,
+      tcoYears,
+      cashOutlay,
+    });
+    const fireDelayMonthsValue = fireComparison?.delayMonths ?? 0;
 
     return {
       loanAmount, monthlyPayment, totalInterest, totalCostOfPurchase,
@@ -610,7 +607,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       list.push({
         type: "info",
         title: "Costo Opportunita dell'Investimento Alternativo",
-        message: `Se investissi i ${formatEuro(c.cashOutlay)} al ${realRetPct}% reale (${snapshot.fireExpectedReturn}% nominale - ${snapshot.expectedInflation}% inflazione) per ${c.tcoYears} anni, genereresti circa ${formatEuro(c.opportunityCost)} di rendimento in euro odierni. Non significa "non comprare", ma ti aiuta a capire il vero costo della scelta in termini di crescita patrimoniale mancata.`,
+        message: `Se investissi i ${formatEuro(c.cashOutlay)} al ${realRetPct}% reale (${snapshot.fireExpectedReturn}% nominale, ${snapshot.expectedInflation}% inflazione) per ${c.tcoYears} anni, genereresti circa ${formatEuro(c.opportunityCost)} di rendimento in euro odierni. Non significa "non comprare", ma ti aiuta a capire il vero costo della scelta in termini di crescita patrimoniale mancata.`,
         icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
       });
     }
@@ -623,9 +620,15 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
 
     // Costruzione frase numerica condivisa
     const fireDelay = c.fireDelayMonthsValue;
-    const delayPhrase = fireDelay > 1
-      ? ` e sposta il tuo FIRE di circa ${Math.round(fireDelay)} mes${Math.round(fireDelay) === 1 ? "e" : "i"}`
-      : "";
+    const delayPhrase = !Number.isFinite(fireDelay)
+      ? (fireDelay > 0
+        ? " e rende il tuo FIRE non raggiungibile con i parametri attuali"
+        : " e rende il FIRE raggiungibile rispetto allo scenario attuale")
+      : fireDelay >= 1
+        ? ` e sposta il tuo FIRE di circa ${Math.round(fireDelay)} mes${Math.round(fireDelay) === 1 ? "e" : "i"}`
+        : fireDelay <= -1
+          ? ` e anticipa il tuo FIRE di circa ${Math.round(Math.abs(fireDelay))} mes${Math.round(Math.abs(fireDelay)) === 1 ? "e" : "i"}`
+          : "";
     const costPhrase = `ti costa ${formatEuro(c.totalFinancialCommitment)} totali in ${c.tcoYears} anni${c.opportunityCost > 500 ? ` (inclusi ${formatEuro(c.opportunityCost)} di mancato rendimento)` : ""}`;
 
     if (dangers > 0) {

@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.3.1`
+**Versione corrente:** `v0.4.0`
 
 ---
 
@@ -111,6 +111,19 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.4.0 - 17 aprile 2026 (Fondo pensione strutturato + PAC automatici)
+
+- **FIRE meno ottimistico per ritiri anticipati** - il target FIRE usato da simulazione standard, stress test e Monte Carlo ora viene ricalcolato in base all'eta' effettiva di ritiro/soglia raggiunta, non solo sull'eta' pensionabile pianificata. Le pensioni pubbliche e le rendite future vengono quindi valorizzate solo quando partono davvero, evitando sottostime del capitale necessario per FIRE molto anticipati
+- **Monte Carlo fino a fine vita utile** - il success rate non si ferma piu' a 30 anni o poco oltre: l'orizzonte della simulazione arriva fino alla `lifeExpectancy`, cosi' un FIRE a 40-45 anni viene stressato su tutta la durata prevista del piano
+- **Cashflow FIRE separato dal risparmio familiare** - introdotto `monthlyPacBudget`: il campo FIRE diventa "PAC mensile extra al fondo pensione" e non viene piu' sovrascritto dal risparmio netto calcolato in Patrimonio. `monthlySavings` resta una metrica derivata del profilo familiare, mentre il budget investibile FIRE e' una preferenza dedicata
+- **Fondo pensione per persona** - la configurazione del fondo pensione e' ora distinta per Persona 1 e Persona 2, con RAL annua dedicata, contributo volontario percentuale o fisso, contributo datore percentuale o fisso, TFR automatico e rimborso IRPEF calcolato per persona con cap deducibile separato
+- **Accrediti automatici del fondo pensione in Patrimonio** - lo scheduler notturno applica il giorno 1 del mese gli accrediti dovuti di lavoratore, datore e TFR dentro `Altri Asset`, con ledger idempotente `PensionFundAccrual` e riepilogo di ultimo accredito, YTD e cumulato. Le modifiche manuali del saldo restano possibili e gli accrediti futuri si sommano al nuovo valore corrente
+- **PAC automatici per singolo strumento** - ogni ETF/azione in Patrimonio ha un pulsante PAC con modal dedicata per creare, modificare, pausare o eliminare regole. Sono supportate cadenze settimanali, mensili, trimestrali, semestrali e annuali; piu' giorni sullo stesso asset si modellano con piu' regole
+- **Motore PAC notturno idempotente** - lo scheduler controlla ogni notte le regole dovute, usa l'ultimo prezzo di chiusura disponibile dai provider gia' presenti, calcola quote frazionarie, aggiorna `customStocksList`/`stocksSnapshotValue` e registra ogni esecuzione come `executed`, `skipped` o `failed`
+- **Export/import dati v2** - l'export utente include ora `monthlyPacBudget`, `pensionConfig`, regole PAC, esecuzioni PAC e accrual del fondo pensione. L'import v2 ripristina anche queste nuove entita' mantenendo compatibilita' con le chiavi legacy `patrimonio` e `obiettivi`
+- **Milestone FIRE piu' trasparenti** - Lean/Fat FIRE vengono esplicitati come moltiplicatori euristici del target base, non come calcoli autonomi o garanzie di sostenibilita'
+- **Copertura test ampliata** - aggiunti test su calcolo fondo pensione per persona, cap fiscale, TFR e scheduling PAC; suite aggiornata a 211 test passati
 
 ### v0.3.1 - 17 aprile 2026 (UX — Interesse Composto piu' educativo: punto di svolta + valore reale)
 

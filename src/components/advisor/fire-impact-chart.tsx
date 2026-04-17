@@ -8,7 +8,8 @@ import {
     CartesianGrid, ReferenceLine, Legend,
 } from "recharts";
 import { formatEuro } from "@/lib/format";
-import { projectFire, fireDelayMonths, formatDelay, type FireProjectionParams } from "@/lib/finance/fire-projection";
+import { formatDelay } from "@/lib/finance/fire-projection";
+import { computeAdvisorFireComparison, getAdvisorOwnershipMonthlyDelta, hasAdvisorFireContext } from "@/lib/finance/advisor-fire";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
 
 interface FireImpactChartProps {
@@ -26,11 +27,9 @@ export const FireImpactChart = memo(function FireImpactChart({
     sim, calculations, snapshot,
 }: FireImpactChartProps) {
 
-    const { baseline, withPurchase, delay, data, hasFireData, isCoastMode } = useMemo(() => {
-        // Coast FIRE: basta avere eta' + (capitale > 0 OR risparmio > 0)
-        const startingCapital = snapshot.liquidAssets + snapshot.emergencyFund;
-        const hasFireData = snapshot.currentAge !== null && (snapshot.monthlySavings > 0 || startingCapital > 0);
-        const isCoastMode = snapshot.monthlySavings <= 0 && startingCapital > 0;
+    const { baseline, withPurchase, delay, data, hasFireData, isCoastMode, ownershipMonthlyDelta } = useMemo(() => {
+        const hasFireData = hasAdvisorFireContext(snapshot);
+        const isCoastMode = snapshot.monthlySavings <= 0 && snapshot.fireStartingCapital > 0;
         if (!hasFireData) {
             return {
                 baseline: null,
@@ -39,35 +38,25 @@ export const FireImpactChart = memo(function FireImpactChart({
                 data: [] as { year: number; age: number; senza: number; con: number; target: number }[],
                 hasFireData: false,
                 isCoastMode: false,
+                ownershipMonthlyDelta: 0,
             };
         }
 
-        const baseParams: FireProjectionParams = {
-            startingCapital: snapshot.liquidAssets + snapshot.emergencyFund,
-            monthlySavings: snapshot.monthlySavings,
-            monthlyExpensesAtFire: snapshot.expectedMonthlyExpensesAtFire,
-            expectedReturnPct: snapshot.fireExpectedReturn,
-            inflationPct: snapshot.expectedInflation,
-            withdrawalRatePct: snapshot.fireWithdrawalRate,
-            currentAge: snapshot.currentAge!,
-            retirementAge: snapshot.retirementAge,
-        };
+        const comparison = computeAdvisorFireComparison(snapshot, sim, calculations);
+        if (!comparison) {
+            return {
+                baseline: null,
+                withPurchase: null,
+                delay: 0,
+                data: [] as { year: number; age: number; senza: number; con: number; target: number }[],
+                hasFireData: false,
+                isCoastMode: false,
+                ownershipMonthlyDelta: 0,
+            };
+        }
 
-        const baseline = projectFire(baseParams);
-
-        // Con acquisto: esborso anticipo + rata * durata finanziamento + costi ricorrenti
-        // I costi ricorrenti restano attivi per tutta la vita utile (tcoYears)
-        const recurringMonths = sim.isFinanced ? sim.financingYears * 12 : 0;
-        const withPurchase = projectFire({
-            ...baseParams,
-            oneTimeOutflow: calculations.cashOutlay,
-            recurringMonthlyCost: sim.isFinanced ? calculations.monthlyPayment : 0,
-            recurringMonths,
-            ongoingMonthlyCost: calculations.annualRecurringCosts / 12,
-            ongoingMonths: calculations.tcoYears * 12,
-        });
-
-        const delay = fireDelayMonths(baseline, withPurchase);
+        const { baseline, withPurchase, delayMonths: delay } = comparison;
+        const ownershipMonthlyDelta = getAdvisorOwnershipMonthlyDelta(sim, calculations);
 
         // Merge delle serie per il chart (allineate per anno)
         const maxLen = Math.max(baseline.chartData.length, withPurchase.chartData.length);
@@ -83,7 +72,7 @@ export const FireImpactChart = memo(function FireImpactChart({
             };
         });
 
-        return { baseline, withPurchase, delay, data, hasFireData: true, isCoastMode };
+        return { baseline, withPurchase, delay, data, hasFireData: true, isCoastMode, ownershipMonthlyDelta };
     }, [sim, calculations, snapshot]);
 
     if (!hasFireData || !baseline || !withPurchase) {
@@ -110,8 +99,9 @@ export const FireImpactChart = memo(function FireImpactChart({
         : delay > 0 ? "bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-900"
             : "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900";
 
-    const fireAgeBase = baseline.ageAtFire > 0 ? baseline.ageAtFire.toFixed(1) : ">60a";
-    const fireAgeWith = withPurchase.ageAtFire > 0 ? withPurchase.ageAtFire.toFixed(1) : ">60a";
+    const fireAgeBase = baseline.ageAtFire > 0 ? `${baseline.ageAtFire.toFixed(1)} anni` : "non raggiunto";
+    const fireAgeWith = withPurchase.ageAtFire > 0 ? `${withPurchase.ageAtFire.toFixed(1)} anni` : "non raggiunto";
+    const hasDynamicTargetChange = Math.abs(withPurchase.fireTarget - baseline.fireTarget) > 1;
 
     return (
         <Card className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
@@ -143,18 +133,24 @@ export const FireImpactChart = memo(function FireImpactChart({
                 <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
                         <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">FIRE senza</div>
-                        <div className="text-base font-bold text-emerald-600 dark:text-emerald-400">{fireAgeBase} anni</div>
-                        <div className="text-[10px] text-slate-500">{baseline.yearsToFire > 0 ? `fra ${baseline.yearsToFire.toFixed(1)}a` : "gia' raggiunto"}</div>
+                        <div className="text-base font-bold text-emerald-600 dark:text-emerald-400">{fireAgeBase}</div>
+                        <div className="text-[10px] text-slate-500">
+                            {baseline.yearsToFire > 0 ? `fra ${baseline.yearsToFire.toFixed(1)}a` : baseline.alreadyFire ? "gia' raggiunto" : "non raggiunto"}
+                        </div>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
                         <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">FIRE con</div>
-                        <div className="text-base font-bold text-indigo-600 dark:text-indigo-400">{fireAgeWith} anni</div>
-                        <div className="text-[10px] text-slate-500">{withPurchase.yearsToFire > 0 ? `fra ${withPurchase.yearsToFire.toFixed(1)}a` : "--"}</div>
+                        <div className="text-base font-bold text-indigo-600 dark:text-indigo-400">{fireAgeWith}</div>
+                        <div className="text-[10px] text-slate-500">
+                            {withPurchase.yearsToFire > 0 ? `fra ${withPurchase.yearsToFire.toFixed(1)}a` : withPurchase.alreadyFire ? "gia' raggiunto" : "non raggiunto"}
+                        </div>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Target FIRE</div>
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Target FIRE base</div>
                         <div className="text-base font-bold text-slate-900 dark:text-slate-100">{formatEuro(baseline.fireTarget)}</div>
-                        <div className="text-[10px] text-slate-500">SWR {snapshot.fireWithdrawalRate}%</div>
+                        <div className="text-[10px] text-slate-500">
+                            {hasDynamicTargetChange ? `con acquisto ${formatEuro(withPurchase.fireTarget)}` : `SWR ${snapshot.fireWithdrawalRate}%`}
+                        </div>
                     </div>
                     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
                         <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Risparmio usato</div>
@@ -204,8 +200,16 @@ export const FireImpactChart = memo(function FireImpactChart({
                                 y={baseline.fireTarget}
                                 stroke="#f59e0b"
                                 strokeDasharray="5 5"
-                                label={{ value: "Target FIRE", fontSize: 10, fill: "#f59e0b", position: "right" }}
+                                label={{ value: "Target base", fontSize: 10, fill: "#f59e0b", position: "right" }}
                             />
+                            {hasDynamicTargetChange && (
+                                <ReferenceLine
+                                    y={withPurchase.fireTarget}
+                                    stroke="#6366f1"
+                                    strokeDasharray="3 4"
+                                    label={{ value: "Target con acquisto", fontSize: 10, fill: "#6366f1", position: "insideTopRight" }}
+                                />
+                            )}
                             <Area type="monotone" dataKey="senza" name="Senza acquisto" stroke="#10b981" fill="url(#gradFireSenza)" strokeWidth={2.5} />
                             <Area type="monotone" dataKey="con" name="Con acquisto" stroke="#6366f1" fill="url(#gradFireCon)" strokeWidth={2.5} />
                             {baseline.yearsToFire > 0 && (
@@ -238,8 +242,10 @@ export const FireImpactChart = memo(function FireImpactChart({
                         La proiezione usa i <strong>tuoi parametri FIRE</strong> (rendimento {snapshot.fireExpectedReturn}%,
                         inflazione {snapshot.expectedInflation}%, SWR {snapshot.fireWithdrawalRate}%, risparmio
                         {" "}{formatEuro(snapshot.monthlySavings)}/mese). Lo scenario &quot;con acquisto&quot; sottrae
-                        l&apos;anticipo dal capitale iniziale e riduce il risparmio mensile per la rata
-                        {sim.isFinanced ? ` e ${sim.financingYears} anni di finanziamento` : ""}.
+                        l&apos;esborso iniziale dal capitale FIRE, applica la rata
+                        {sim.isFinanced ? ` per ${sim.financingYears} anni` : ""}
+                        {" "}e considera un delta mensile netto di {formatEuro(Math.abs(ownershipMonthlyDelta))}/mese
+                        {" "}{ownershipMonthlyDelta >= 0 ? "di costi" : "di cashflow positivo"}.
                     </span>
                 </div>
             </CardContent>

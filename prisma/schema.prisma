@@ -22,6 +22,9 @@ model User {
   savingsGoals       SavingsGoal[]
   budgetTransactions BudgetTransaction[]
   dividends          DividendRecord[]
+  pacSchedules       AssetPacSchedule[]
+  pacExecutions      AssetPacExecution[]
+  pensionAccruals    PensionFundAccrual[]
   aiThreads          AssistantThread[]
   aiMemory           AssistantMemory[]
 }
@@ -65,6 +68,7 @@ model Preference {
   retirementAge            Int?
   expectedMonthlyExpenses  Float?
   monthlySavings           Float    @default(1000)
+  monthlyPacBudget         Float    @default(1000)
   fireWithdrawalRate       Float    @default(3.25)
   fireExpectedReturn       Float    @default(6.0)
   fireVolatility           Float    @default(15.0)
@@ -78,6 +82,7 @@ model Preference {
   enablePensionOptimizer   Boolean  @default(false)
   grossIncome              Float    @default(35000)
   pensionContribution      Float    @default(5164)
+  pensionConfig            String   @default("{}") // JSON strutturato per persona
   pensionFundAccessAge     Int      @default(62)    // Eta accesso RITA
   pensionFundExitTaxRate   Float    @default(15)    // 9-15% in base ad anzianita
   pensionExitMode          String   @default("hybrid") // "annuity" = 100% rendita, "hybrid" = 50/50
@@ -293,4 +298,64 @@ model DividendRecord {
   @@index([userId, paymentDate])
   @@index([userId, assetTicker])
   @@unique([userId, assetTicker, exDate, dividendType])
+}
+
+model AssetPacSchedule {
+  id           String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assetKey      String
+  assetTicker   String
+  amountEur     Float
+  cadence       String
+  timingConfig  String   @default("{}")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  executions    AssetPacExecution[]
+
+  @@index([userId, assetKey])
+  @@index([userId, active])
+}
+
+model AssetPacExecution {
+  id            String   @id @default(uuid())
+  scheduleId     String
+  schedule       AssetPacSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  assetKey       String
+  assetTicker    String
+  executionDate  String
+  priceUsed      Float?
+  sharesBought   Float    @default(0)
+  amountEur      Float
+  status         String
+  reason         String?
+  createdAt      DateTime @default(now())
+
+  @@unique([scheduleId, executionDate])
+  @@index([userId, executionDate])
+  @@index([assetKey])
+}
+
+model PensionFundAccrual {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  personKey        String
+  accrualMonth     String
+  voluntaryAmount  Float    @default(0)
+  employerAmount   Float    @default(0)
+  tfrAmount        Float    @default(0)
+  totalAmount      Float    @default(0)
+  appliedDate      String?
+  createdAt        DateTime @default(now())
+
+  @@unique([userId, personKey, accrualMonth])
+  @@index([userId, accrualMonth])
 }

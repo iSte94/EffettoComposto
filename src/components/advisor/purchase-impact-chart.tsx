@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { BarChart3 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
+import { computeRealReturn } from "@/lib/finance/fire-projection";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
     BarChart, Bar, Cell,
@@ -72,8 +73,12 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
         if (calculations.annualRecurringCosts > 0) {
             items.push({ name: `Costi Ricorrenti (${calculations.tcoYears}a)`, valore: calculations.annualRecurringCosts * calculations.tcoYears, color: "#f59e0b" });
         }
-        const realRet = Math.max(0, ((snapshot.fireExpectedReturn - snapshot.expectedInflation) / 100));
-        items.push({ name: "Costo Opportunita", valore: sim.totalPrice * Math.pow(1 + realRet, calculations.tcoYears) - sim.totalPrice, color: "#8b5cf6" });
+        const realRet = Math.max(0, computeRealReturn(snapshot.fireExpectedReturn, snapshot.expectedInflation));
+        items.push({
+            name: "Costo Opportunita",
+            valore: calculations.cashOutlay * Math.pow(1 + realRet, calculations.tcoYears) - calculations.cashOutlay,
+            color: "#8b5cf6",
+        });
         return items;
     }, [sim, calculations, snapshot]);
 
