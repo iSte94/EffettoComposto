@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock } from "lucide-react";
+import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank } from "lucide-react";
+import { formatEuro } from "@/lib/format";
 
 export interface FinancialData {
     netWorth?: number;
@@ -9,6 +10,7 @@ export interface FinancialData {
     monthlyInstallment?: number;
     emergencyFund?: number;
     monthlyExpenses?: number;
+    monthlySavings?: number;
     savingsGoals?: { name: string; currentAmount: number; targetAmount: number; deadline: string | null }[];
     fireTarget?: number;
     fireProgress?: number;
@@ -25,7 +27,7 @@ interface Alert {
 export function useFinancialAlerts(data: FinancialData): Alert[] {
     return useMemo(() => {
         const alerts: Alert[] = [];
-        const { netWorth, monthlyIncome, monthlyInstallment, emergencyFund, monthlyExpenses, savingsGoals, fireTarget, fireProgress } = data;
+        const { netWorth, monthlyIncome, monthlyInstallment, emergencyFund, monthlyExpenses, monthlySavings, savingsGoals, fireTarget, fireProgress } = data;
 
         if (monthlyIncome && monthlyIncome > 0 && monthlyInstallment && monthlyInstallment > 0) {
             const dti = monthlyInstallment / monthlyIncome;
@@ -92,7 +94,7 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                         severity: "danger",
                         icon: <Target className="w-4 h-4" />,
                         title: `Obiettivo "${goal.name}" scaduto`,
-                        message: `Mancano ancora €${remaining.toLocaleString("it-IT")} (${progress.toFixed(0)}% completato).`,
+                        message: `Mancano ancora ${formatEuro(remaining)} (${progress.toFixed(0)}% completato).`,
                     });
                 } else if (monthsLeft <= 3) {
                     alerts.push({
@@ -100,7 +102,7 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                         severity: "warning",
                         icon: <Clock className="w-4 h-4" />,
                         title: `Obiettivo "${goal.name}" in scadenza`,
-                        message: `${monthsLeft} mesi rimanenti, serve €${Math.round(remaining / monthsLeft).toLocaleString("it-IT")}/mese per raggiungerlo.`,
+                        message: `${monthsLeft} mesi rimanenti, serve ${formatEuro(Math.round(remaining / monthsLeft))}/mese per raggiungerlo.`,
                     });
                 }
             }
@@ -122,6 +124,35 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                     icon: <Flame className="w-4 h-4" />,
                     title: `FIRE al ${fireProgress.toFixed(0)}%`,
                     message: "Sei sulla buona strada! Manca poco al traguardo.",
+                });
+            }
+        }
+
+        if (monthlyIncome && monthlyIncome > 0 && monthlySavings !== undefined) {
+            const savingsRate = (monthlySavings / monthlyIncome) * 100;
+            if (monthlySavings < 0) {
+                alerts.push({
+                    id: "savings-negative",
+                    severity: "danger",
+                    icon: <PiggyBank className="w-4 h-4" />,
+                    title: "Flusso di cassa negativo",
+                    message: `Spendi ${formatEuro(Math.abs(monthlySavings))} in piu' di quanto guadagni ogni mese. Riduci le spese o aumenta il reddito per evitare di erodere il patrimonio.`,
+                });
+            } else if (savingsRate < 10) {
+                alerts.push({
+                    id: "savings-low",
+                    severity: "warning",
+                    icon: <PiggyBank className="w-4 h-4" />,
+                    title: "Tasso di risparmio basso",
+                    message: `Risparmi il ${savingsRate.toFixed(0)}% del reddito. Punta almeno al 20% per costruire patrimonio in modo solido.`,
+                });
+            } else if (savingsRate >= 50) {
+                alerts.push({
+                    id: "savings-excellent",
+                    severity: "success",
+                    icon: <PiggyBank className="w-4 h-4" />,
+                    title: "Tasso di risparmio da FIRE",
+                    message: `Stai risparmiando il ${savingsRate.toFixed(0)}% del reddito (${formatEuro(monthlySavings)}/mese). A questo ritmo acceleri fortemente il percorso verso l'indipendenza finanziaria.`,
                 });
             }
         }

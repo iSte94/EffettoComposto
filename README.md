@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.1.0`
+**Versione corrente:** `v1.1.1`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.1.1 - 18 aprile 2026 (UX — alert tasso di risparmio nel Riepilogo)
+
+- **Nuovo alert "Tasso di risparmio"** nel pannello `FinancialAlerts` del tab Riepilogo: sfrutta il `netIncome` gia' calcolato in Patrimonio (risparmio mensile al netto di spese, mutuo, affitti e subscription) e lo rapporta al reddito lordo familiare per esporre tre scenari concreti — cashflow negativo (danger), tasso di risparmio < 10% (warning) e tasso >= 50% da FIRE (success). Prima del cambio, l'utente vedeva solo il numero `netIncome` nella card "Risparmio Netto" senza un riferimento percentuale ne' un feedback qualitativo: ora il Riepilogo segnala esplicitamente quando il flusso di cassa sta erodendo il patrimonio, quando il risparmio e' troppo esile per costruire capitale, e quando si e' gia' a un ritmo da indipendenza finanziaria
+- **Formattazione valutaria coerente** negli alert su obiettivi di risparmio: sostituito `€${x.toLocaleString('it-IT')}` con `formatEuro()` da `@/lib/format`, cosi' i messaggi rispettano la stessa regola (simbolo unicode, zero decimali, separatore italiano) usata ovunque nell'app e restano allineati se il formatter cambiera' in futuro
+- **Perche' migliora l'esperienza** — il tasso di risparmio e' il KPI piu' predittivo del tempo di raggiungimento del FIRE, ma finora l'app lo mostrava solo come valore assoluto in euro. Renderlo percentuale con soglie chiare trasforma un dato osservativo in un nudge comportamentale, senza introdurre API esterne, senza nuovi componenti e senza toccare il flusso dati esistente (il valore `monthlySavings` era gia' disponibile in `overview-dashboard`, viene semplicemente passato al componente alert)
+- **Zero regressioni** — suite di 211 test unitari verde, lint pulito, nessun cambio ai tipi condivisi o allo schema Prisma
 
 ### v1.1.0 - 18 aprile 2026 (import spese Telegram completo + Coast FIRE piu' realistico)
 
