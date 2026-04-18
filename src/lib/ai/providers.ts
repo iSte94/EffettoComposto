@@ -3,7 +3,7 @@ import {
     formatBytes,
     type AiAttachmentInput,
 } from "@/lib/ai/attachments";
-import type { AiToolDef } from "@/lib/ai/tools";
+import type { AiToolDef } from "@/lib/ai/tool-types";
 
 export type AiProvider = "openrouter" | "gemini";
 

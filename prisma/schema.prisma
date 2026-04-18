@@ -27,6 +27,8 @@ model User {
   pensionAccruals    PensionFundAccrual[]
   aiThreads          AssistantThread[]
   aiMemory           AssistantMemory[]
+  pendingActions     AssistantPendingAction[]
+  telegramBotConnection TelegramBotConnection?
 }
 
 model Preference {
@@ -202,13 +204,17 @@ model AssistantThread {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  channel   String   @default("web")
   title     String   @default("Nuova conversazione")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   messages  AssistantMessage[]
+  pendingActions AssistantPendingAction[]
+  telegramCurrentConnections TelegramBotConnection[] @relation("TelegramCurrentThread")
 
   @@index([userId, updatedAt])
+  @@index([userId, channel, updatedAt])
 }
 
 model AssistantMessage {
@@ -221,6 +227,7 @@ model AssistantMessage {
   toolTrace String?  // JSON AiToolTraceEntry[] (solo per assistant)
   createdAt DateTime @default(now())
   attachments AssistantAttachment[]
+  pendingActions AssistantPendingAction[]
 
   @@index([threadId, createdAt])
 }
@@ -254,6 +261,63 @@ model AssistantMemory {
 
   @@index([userId, category])
   @@index([userId, pinned])
+}
+
+model AssistantPendingAction {
+  id                 String            @id @default(uuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threadId           String
+  thread             AssistantThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  assistantMessageId String?
+  assistantMessage   AssistantMessage? @relation(fields: [assistantMessageId], references: [id], onDelete: SetNull)
+
+  channel            String            @default("web")
+  kind               String
+  status             String            @default("pending")
+  title              String
+  previewText        String
+  payload            String
+  resultSummary      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  executedAt         DateTime?
+
+  @@index([userId, status, createdAt])
+  @@index([threadId, status, createdAt])
+  @@index([assistantMessageId])
+}
+
+model TelegramBotConnection {
+  id                String           @id @default(uuid())
+  userId            String           @unique
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  botTokenEnc       String
+  botId             String?
+  botUsername       String?
+  botFirstName      String?
+  webhookSecret     String
+  botStatus         String           @default("configured")
+  linkStatus        String           @default("pending")
+  linkCode          String?
+  linkCodeExpiresAt DateTime?
+  telegramUserId    String?
+  telegramChatId    String?
+  telegramUsername  String?
+  linkedAt          DateTime?
+  currentThreadId   String?
+  currentThread     AssistantThread? @relation("TelegramCurrentThread", fields: [currentThreadId], references: [id], onDelete: SetNull)
+  lastWebhookAt     DateTime?
+  lastError         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([botStatus])
+  @@index([linkStatus])
+  @@index([telegramUserId])
 }
 
 model DividendRecord {

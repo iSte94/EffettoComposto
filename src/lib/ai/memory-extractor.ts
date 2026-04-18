@@ -9,10 +9,12 @@
  * Fallisce silenziosamente (non blocca la chat).
  */
 
+import prisma from "@/lib/prisma";
 import { chat } from "@/lib/ai/providers";
 import type { AiChatMessage, AiProvider } from "@/lib/ai/providers";
 
 export interface ExtractMemoryArgs {
+    userId: string;
     provider: AiProvider;
     apiKey: string;
     model: string;
@@ -49,7 +51,7 @@ interface ExtractedFact {
 }
 
 export async function extractAndPersistMemory(args: ExtractMemoryArgs): Promise<ExtractedFact[]> {
-    const { provider, apiKey, model, userMessage, assistantMessage } = args;
+    const { userId, provider, apiKey, model, userMessage, assistantMessage } = args;
     if (!userMessage.trim() || !assistantMessage.trim()) return [];
 
     const messages: AiChatMessage[] = [
@@ -95,17 +97,32 @@ export async function extractAndPersistMemory(args: ExtractMemoryArgs): Promise<
     await Promise.all(
         facts.slice(0, 8).map(async (f) => {
             try {
-                const res = await fetch("/api/ai/memory", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({
+                const existing = await prisma.assistantMemory.findFirst({
+                    where: {
+                        userId,
                         category: f.category,
                         fact: f.fact.slice(0, 500),
-                        source: "auto",
-                    }),
+                    },
                 });
-                if (res.ok) persisted.push(f);
+                if (existing) {
+                    await prisma.assistantMemory.update({
+                        where: { id: existing.id },
+                        data: {
+                            updatedAt: new Date(),
+                            source: "auto",
+                        },
+                    });
+                } else {
+                    await prisma.assistantMemory.create({
+                        data: {
+                            userId,
+                            category: f.category,
+                            fact: f.fact.slice(0, 500),
+                            source: "auto",
+                        },
+                    });
+                }
+                persisted.push(f);
             } catch {
                 /* noop */
             }

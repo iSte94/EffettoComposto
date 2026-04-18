@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
 import { preferencesSchema } from '@/lib/validations/preferences';
+import { sanitizePreferenceForClient } from '@/lib/user-data';
 
 export async function GET() {
     try {
@@ -11,7 +12,7 @@ export async function GET() {
             where: { userId }
         });
 
-        return NextResponse.json({ preferences: preferences || null });
+        return NextResponse.json({ preferences: sanitizePreferenceForClient(preferences) });
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
         console.error('Failed to get preferences:', error);

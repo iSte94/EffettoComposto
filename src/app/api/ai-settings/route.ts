@@ -1,31 +1,13 @@
 import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
 import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from "@/lib/api-auth";
 import { aiSettingsSchema } from "@/lib/validations/ai-settings";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { clearStoredAiSettings, getStoredAiConfigStatus, saveStoredAiSettings } from "@/lib/ai/server-config";
 
 export async function GET() {
     try {
         const userId = await getAuthenticatedUserId();
-        const pref = await prisma.preference.findUnique({
-            where: { userId },
-            select: { aiRememberKeys: true, aiProvider: true, aiModel: true, aiApiKeyEnc: true },
-        });
-
-        if (!pref || !pref.aiRememberKeys || !pref.aiApiKeyEnc || !pref.aiProvider || !pref.aiModel) {
-            return NextResponse.json({ settings: null });
-        }
-
-        let apiKey: string;
-        try {
-            apiKey = decrypt(pref.aiApiKeyEnc);
-        } catch (err) {
-            console.error("AI key decrypt failed:", err);
-            return NextResponse.json({ settings: null, error: "decrypt_failed" });
-        }
-
         return NextResponse.json({
-            settings: { provider: pref.aiProvider, model: pref.aiModel, apiKey },
+            settings: await getStoredAiConfigStatus(userId),
         });
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
@@ -47,33 +29,15 @@ export async function POST(req: Request) {
         }
 
         const { provider, apiKey, model } = parsed.data;
-        let encrypted: string;
         try {
-            encrypted = encrypt(apiKey);
+            await saveStoredAiSettings({ userId, provider, model, apiKey });
         } catch (err) {
-            console.error("AI key encrypt failed:", err);
+            console.error("AI settings save failed:", err);
             return NextResponse.json(
-                { error: "ENCRYPTION_KEY non configurata sul server" },
+                { error: (err as Error).message || "ENCRYPTION_KEY non configurata sul server" },
                 { status: 500 },
             );
         }
-
-        await prisma.preference.upsert({
-            where: { userId },
-            update: {
-                aiRememberKeys: true,
-                aiProvider: provider,
-                aiModel: model,
-                aiApiKeyEnc: encrypted,
-            },
-            create: {
-                userId,
-                aiRememberKeys: true,
-                aiProvider: provider,
-                aiModel: model,
-                aiApiKeyEnc: encrypted,
-            },
-        });
 
         return NextResponse.json({ ok: true });
     } catch (error) {
@@ -86,15 +50,7 @@ export async function POST(req: Request) {
 export async function DELETE() {
     try {
         const userId = await getAuthenticatedUserId();
-        await prisma.preference.updateMany({
-            where: { userId },
-            data: {
-                aiRememberKeys: false,
-                aiProvider: null,
-                aiModel: null,
-                aiApiKeyEnc: null,
-            },
-        });
+        await clearStoredAiSettings(userId);
         return NextResponse.json({ ok: true });
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();

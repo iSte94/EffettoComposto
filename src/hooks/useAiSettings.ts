@@ -1,122 +1,85 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import type { AiProvider } from "@/lib/ai/providers";
 
-export interface AiSettings {
-    provider: AiProvider;
-    apiKey: string;
-    model: string;
-    rememberOnAccount: boolean;
+export interface AiSettingsState {
+    provider: AiProvider | null;
+    model: string | null;
+    hasStoredKey: boolean;
 }
 
-const STORAGE_KEY = "ec:ai-settings";
-const CHANGE_EVENT = "ec:ai-settings-change";
-const DEFAULT: AiSettings = { provider: "gemini", apiKey: "", model: "", rememberOnAccount: false };
-
-function subscribe(cb: () => void) {
-    window.addEventListener("storage", cb);
-    window.addEventListener(CHANGE_EVENT, cb);
-    return () => {
-        window.removeEventListener("storage", cb);
-        window.removeEventListener(CHANGE_EVENT, cb);
-    };
-}
-
-function getSnapshot(): string {
-    try {
-        return localStorage.getItem(STORAGE_KEY) ?? "";
-    } catch {
-        return "";
-    }
-}
-
-function getServerSnapshot(): string {
-    return "";
-}
-
-function parse(raw: string): AiSettings {
-    if (!raw) return DEFAULT;
-    try {
-        return { ...DEFAULT, ...JSON.parse(raw) };
-    } catch {
-        return DEFAULT;
-    }
-}
-
-function writeLocal(next: AiSettings) {
-    try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch { /* noop */ }
-    window.dispatchEvent(new Event(CHANGE_EVENT));
-}
-
-function wipeLocal() {
-    try {
-        localStorage.removeItem(STORAGE_KEY);
-    } catch { /* noop */ }
-    window.dispatchEvent(new Event(CHANGE_EVENT));
-}
+const DEFAULT: AiSettingsState = {
+    provider: null,
+    model: null,
+    hasStoredKey: false,
+};
 
 export function useAiSettings() {
-    const raw = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-    const settings = useMemo(() => parse(raw), [raw]);
-    const loaded = typeof window !== "undefined";
     const { user } = useAuth();
-    const syncedUserRef = useRef<string | null>(null);
+    const [settings, setSettings] = useState<AiSettingsState>(DEFAULT);
+    const [loaded, setLoaded] = useState(false);
 
-    // Su login: se l'utente ha una chiave salvata lato server, idratala in locale.
-    useEffect(() => {
-        if (!user || syncedUserRef.current === user.username) return;
-        syncedUserRef.current = user.username;
-        (async () => {
-            try {
-                const res = await fetch("/api/ai-settings");
-                if (!res.ok) return;
-                const json = await res.json();
-                if (json.settings) {
-                    writeLocal({
-                        provider: json.settings.provider,
-                        apiKey: json.settings.apiKey,
-                        model: json.settings.model,
-                        rememberOnAccount: true,
-                    });
-                }
-            } catch { /* noop */ }
-        })();
-    }, [user]);
-
-    // Su logout: resetta la sentinella di sync.
-    useEffect(() => {
-        if (!user) syncedUserRef.current = null;
-    }, [user]);
-
-    const save = useCallback(async (next: AiSettings): Promise<void> => {
-        writeLocal(next);
-        if (next.rememberOnAccount) {
-            const res = await fetch("/api/ai-settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    provider: next.provider,
-                    apiKey: next.apiKey,
-                    model: next.model,
-                }),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.error || "Errore nel salvataggio lato server");
-            }
-        } else {
-            // Se c'era una chiave sul server, rimuovila.
-            await fetch("/api/ai-settings", { method: "DELETE" }).catch(() => {});
+    const refresh = useCallback(async () => {
+        if (!user) {
+            setSettings(DEFAULT);
+            setLoaded(true);
+            return;
         }
-    }, []);
+
+        setLoaded(false);
+        try {
+            const res = await fetch("/api/ai-settings", { credentials: "include" });
+            if (!res.ok) {
+                setSettings(DEFAULT);
+                return;
+            }
+            const json = await res.json();
+            setSettings({
+                provider: json.settings?.provider ?? null,
+                model: json.settings?.model ?? null,
+                hasStoredKey: !!json.settings?.hasStoredKey,
+            });
+        } catch {
+            setSettings(DEFAULT);
+        } finally {
+            setLoaded(true);
+        }
+    }, [user]);
+
+    useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    const save = useCallback(async (next: {
+        provider: AiProvider;
+        model: string;
+        apiKey?: string;
+    }): Promise<void> => {
+        const res = await fetch("/api/ai-settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(next),
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Errore nel salvataggio lato server");
+        }
+        await refresh();
+    }, [refresh]);
 
     const clear = useCallback(async (): Promise<void> => {
-        wipeLocal();
-        await fetch("/api/ai-settings", { method: "DELETE" }).catch(() => {});
-    }, []);
+        const res = await fetch("/api/ai-settings", {
+            method: "DELETE",
+            credentials: "include",
+        });
+        if (!res.ok) {
+            throw new Error("Errore nella rimozione");
+        }
+        await refresh();
+    }, [refresh]);
 
-    return { settings, save, clear, loaded };
+    return { settings, save, clear, refresh, loaded };
 }

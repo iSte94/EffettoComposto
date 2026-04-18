@@ -426,7 +426,7 @@ export function LoanCalculator() {
                                         tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
                                     />
                                     <Tooltip
-                                        formatter={(value: number | string | undefined, name: string) => [formatEuro(Number(value ?? 0)), name]}
+                                        formatter={(value: number | string | undefined, name?: string) => [formatEuro(Number(value ?? 0)), name ?? "Valore"]}
                                         contentStyle={{
                                             borderRadius: "16px",
                                             border: "1px solid var(--border)",

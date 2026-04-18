@@ -1,6 +1,7 @@
 "use client";
+
 import { useEffect, useState } from "react";
-import { Bot, RefreshCw, Trash2 } from "lucide-react";
+import { Bot, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,10 +21,9 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { useAiSettings } from "@/hooks/useAiSettings";
-import { useAuth } from "@/contexts/auth-context";
-import { listModels, type AiModel, type AiProvider } from "@/lib/ai/providers";
+import type { AiModel, AiProvider } from "@/lib/ai/providers";
+import { listModels } from "@/lib/ai/providers";
 
 interface Props {
     trigger: React.ReactNode;
@@ -33,7 +33,6 @@ interface Props {
 
 export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }: Props) {
     const { settings, save, clear, loaded } = useAiSettings();
-    const { user } = useAuth();
     const [internalOpen, setInternalOpen] = useState(false);
     const open = controlledOpen ?? internalOpen;
     const setOpen = onOpenChange ?? setInternalOpen;
@@ -41,28 +40,29 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
     const [provider, setProvider] = useState<AiProvider>("gemini");
     const [apiKey, setApiKey] = useState("");
     const [model, setModel] = useState("");
-    const [rememberOnAccount, setRememberOnAccount] = useState(false);
     const [models, setModels] = useState<AiModel[]>([]);
     const [loadingModels, setLoadingModels] = useState(false);
     const [saving, setSaving] = useState(false);
 
+    const hasStoredKey = settings.hasStoredKey;
+
     useEffect(() => {
         if (loaded && open) {
-            setProvider(settings.provider);
-            setApiKey(settings.apiKey);
-            setModel(settings.model);
-            setRememberOnAccount(settings.rememberOnAccount && !!user);
+            setProvider(settings.provider ?? "gemini");
+            setModel(settings.model ?? "");
+            setApiKey("");
+            setModels([]);
         }
-    }, [loaded, open, settings, user]);
+    }, [loaded, open, settings]);
 
     const fetchModels = async () => {
-        if (!apiKey) {
-            toast.error("Inserisci prima una API key");
+        if (!apiKey.trim()) {
+            toast.error("Inserisci prima una API key per caricare l'elenco dei modelli");
             return;
         }
         setLoadingModels(true);
         try {
-            const list = await listModels(provider, apiKey);
+            const list = await listModels(provider, apiKey.trim());
             setModels(list);
             toast.success(`${list.length} modelli disponibili`);
         } catch (e) {
@@ -73,15 +73,26 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
     };
 
     const handleSave = async () => {
-        if (!apiKey) return toast.error("Inserisci una API key");
-        if (!model) return toast.error("Seleziona o digita un modello");
+        if (!model.trim()) {
+            toast.error("Seleziona o digita un modello");
+            return;
+        }
+        if (!hasStoredKey && !apiKey.trim()) {
+            toast.error("Inserisci una API key da salvare sul server");
+            return;
+        }
+
         setSaving(true);
         try {
-            await save({ provider, apiKey, model, rememberOnAccount: rememberOnAccount && !!user });
+            await save({
+                provider,
+                model: model.trim(),
+                apiKey: apiKey.trim() || undefined,
+            });
             toast.success(
-                rememberOnAccount && user
-                    ? "Impostazioni AI salvate sul tuo account"
-                    : "Impostazioni AI salvate in locale",
+                hasStoredKey && !apiKey.trim()
+                    ? "Provider e modello aggiornati"
+                    : "Configurazione AI salvata sul tuo account",
             );
             setOpen(false);
         } catch (e) {
@@ -97,10 +108,9 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
             setApiKey("");
             setModel("");
             setModels([]);
-            setRememberOnAccount(false);
-            toast.success("Impostazioni AI rimosse");
-        } catch {
-            toast.error("Errore nella rimozione");
+            toast.success("Configurazione AI rimossa");
+        } catch (e) {
+            toast.error((e as Error).message || "Errore nella rimozione");
         }
     };
 
@@ -114,34 +124,33 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                     </DialogTitle>
                     <DialogDescription className="space-y-2 text-muted-foreground">
                         <span className="block">
-                            La chiave è memorizzata nel browser. Puoi opzionalmente salvarla anche sul
-                            tuo account, cifrata con <strong>AES-256-GCM</strong> sul server, per
-                            ritrovarla da altri dispositivi. Le richieste al modello partono sempre
-                            direttamente dal browser al provider — non passano dai nostri server.
+                            La chat AI web e il bot Telegram usano lo stesso motore server-side. Per questo la chiave deve essere salvata sul tuo account, cifrata con <strong>AES-256-GCM</strong>.
                         </span>
                         <span className="block text-xs">
-                            Il codice è{" "}
-                            <a
-                                href="https://github.com/iSte94/EffettoComposto"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="underline hover:text-foreground"
-                            >
-                                open source
-                            </a>
-                            : puoi verificare che la chiave non venga mai loggata né usata per altro. Il
-                            server la decifra solo per restituirtela quando accedi.
+                            Il browser non riceve più la chiave salvata. Se vuoi sostituirla, inseriscine una nuova qui sotto e il server aggiornerà quella esistente.
                         </span>
                     </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-4 pt-2">
+                    <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-emerald-700 dark:text-emerald-300">
+                        <div className="flex items-center gap-2 font-medium">
+                            <ShieldCheck className="size-4" />
+                            Stato chiave: {hasStoredKey ? "presente sul server" : "non configurata"}
+                        </div>
+                        <p className="mt-1 text-[11px] opacity-90">
+                            {hasStoredKey
+                                ? "Puoi lasciare vuoto il campo API key per mantenere quella attuale."
+                                : "Serve una chiave valida per attivare sia la tab AI sia Telegram."}
+                        </p>
+                    </div>
+
                     <div className="space-y-2">
                         <Label>Provider</Label>
                         <Select
                             value={provider}
-                            onValueChange={(v) => {
-                                setProvider(v as AiProvider);
+                            onValueChange={(value) => {
+                                setProvider(value as AiProvider);
                                 setModels([]);
                                 setModel("");
                             }}
@@ -157,7 +166,9 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="ai-api-key">API key</Label>
+                        <Label htmlFor="ai-api-key">
+                            API key {hasStoredKey ? "(opzionale se non vuoi cambiarla)" : ""}
+                        </Label>
                         <Input
                             id="ai-api-key"
                             type="password"
@@ -183,9 +194,7 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                                 onClick={fetchModels}
                                 disabled={loadingModels}
                             >
-                                <RefreshCw
-                                    className={`size-3 mr-1 ${loadingModels ? "animate-spin" : ""}`}
-                                />
+                                <RefreshCw className={`mr-1 size-3 ${loadingModels ? "animate-spin" : ""}`} />
                                 Carica elenco
                             </Button>
                         </div>
@@ -195,9 +204,9 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                                     <SelectValue placeholder="Seleziona un modello" />
                                 </SelectTrigger>
                                 <SelectContent className="max-h-80">
-                                    {models.map((m) => (
-                                        <SelectItem key={m.id} value={m.id}>
-                                            {m.name}
+                                    {models.map((item) => (
+                                        <SelectItem key={item.id} value={item.id}>
+                                            {item.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -206,37 +215,13 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                             <Input
                                 value={model}
                                 onChange={(e) => setModel(e.target.value)}
-                                placeholder={
-                                    provider === "gemini"
-                                        ? "es: gemini-2.5-flash"
-                                        : "es: openai/gpt-4o-mini"
-                                }
+                                placeholder={provider === "gemini" ? "es: gemini-2.5-flash" : "es: openai/gpt-4o-mini"}
                                 className="min-h-11"
                             />
                         )}
                         <p className="text-xs text-muted-foreground">
-                            Clicca &quot;Carica elenco&quot; per vedere tutti i modelli disponibili con la tua
-                            chiave, oppure digita manualmente l&apos;id.
+                            L&apos;elenco modelli si carica usando la chiave che stai inserendo ora. Se lasci il campo vuoto, puoi comunque digitare manualmente l&apos;id del modello.
                         </p>
-                    </div>
-
-                    <div className="flex items-start justify-between gap-3 rounded-2xl border border-border/50 bg-muted/30 p-3">
-                        <div className="space-y-1">
-                            <Label htmlFor="ai-remember" className="text-sm font-medium">
-                                Ricorda su questo account
-                            </Label>
-                            <p className="text-xs text-muted-foreground">
-                                {user
-                                    ? "Salva la chiave anche sul server (cifrata AES-256-GCM) per recuperarla da altri dispositivi."
-                                    : "Disponibile solo dopo aver effettuato l'accesso."}
-                            </p>
-                        </div>
-                        <Switch
-                            id="ai-remember"
-                            checked={rememberOnAccount}
-                            onCheckedChange={setRememberOnAccount}
-                            disabled={!user}
-                        />
                     </div>
 
                     <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-between">
@@ -246,7 +231,7 @@ export function AiSettingsModal({ trigger, open: controlledOpen, onOpenChange }:
                             onClick={handleClear}
                             className="text-red-600 hover:text-red-700"
                         >
-                            <Trash2 className="size-4 mr-2" /> Rimuovi
+                            <Trash2 className="mr-2 size-4" /> Rimuovi
                         </Button>
                         <div className="flex gap-2">
                             <Button variant="ghost" onClick={() => setOpen(false)}>

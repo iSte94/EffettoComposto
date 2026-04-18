@@ -11,6 +11,7 @@ export async function GET() {
             select: {
                 id: true,
                 title: true,
+                channel: true,
                 createdAt: true,
                 updatedAt: true,
                 _count: { select: { messages: true } },
@@ -20,6 +21,7 @@ export async function GET() {
             threads: threads.map((t) => ({
                 id: t.id,
                 title: t.title,
+                channel: t.channel,
                 createdAt: t.createdAt.toISOString(),
                 updatedAt: t.updatedAt.toISOString(),
                 messageCount: t._count.messages,
@@ -39,14 +41,16 @@ export async function POST(req: Request) {
         const title = typeof body.title === "string" && body.title.trim()
             ? body.title.trim().slice(0, 140)
             : "Nuova conversazione";
+        const channel = body.channel === "telegram" ? "telegram" : "web";
 
         const thread = await prisma.assistantThread.create({
-            data: { userId, title },
+            data: { userId, title, channel },
         });
         return NextResponse.json({
             thread: {
                 id: thread.id,
                 title: thread.title,
+                channel: thread.channel,
                 createdAt: thread.createdAt.toISOString(),
                 updatedAt: thread.updatedAt.toISOString(),
                 messageCount: 0,

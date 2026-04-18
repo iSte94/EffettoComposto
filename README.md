@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.4.1`
+**Versione corrente:** `v1.0.0`
 
 ---
 
@@ -112,6 +112,19 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.0.0 - 18 aprile 2026 (AI unificata server-side + bot Telegram personale)
+
+- **Release 1.0 ufficiale** - Effetto Composto entra nella fase `1.0.0` con un'architettura AI stabile e pronta per l'uso reale: il motore conversazionale non vive piu' nel browser ma in un runtime server-side unico, riusato dalla tab AI web, dall'analisi performance e dal nuovo canale Telegram
+- **Nuovo runtime AI server-side unificato** - introdotti un contesto utente derivato privacy-first, prompt builder centrale, registry tool lato server e persistenza completa di thread, messaggi, allegati e memoria. Il browser non chiama piu' direttamente Gemini/OpenRouter per la chat principale: provider, modello e chiave vengono salvati sul server in forma cifrata e riusati in tutti i canali
+- **Bot Telegram personale per ogni utente** - ogni account puo' configurare il proprio token BotFather, registrare automaticamente il webhook e collegarsi tramite deep link `/start <codice>`. Il bot gira sullo stesso modello della tab AI, vede gli stessi dati utente e supporta `/help`, `/new`, `/status`, `/unlink`, piu' dialogo libero in linguaggio naturale
+- **AI consulente + calcolatore professionista** - Telegram e web condividono tutti i tool analitici principali della piattaforma: lettura patrimonio, budget, obiettivi, dividendi, preferenze e simulazioni di scenario. Aggiunti anche tool ad alto livello per simulazione mutuo e simulazione FIRE con override testuali, cosi' il bot puo' rispondere a domande tipo "se compro casa a 300k con mutuo 20 anni?" usando i dati reali del profilo
+- **Azioni scrivibili con conferma esplicita** - introdotto il lifecycle `AssistantPendingAction`: l'AI puo' preparare operazioni su budget, obiettivi e memoria, ma ogni scrittura resta in stato pending finche' l'utente non conferma da web o da Telegram. Questo evita side effect silenziosi e rende il bot davvero utilizzabile su dati personali sensibili
+- **Cronologia unica multi-canale** - i thread AI ora hanno metadato `channel` (`web` o `telegram`), badge dedicato nella sidebar e persistenza unificata. Una conversazione Telegram non e' piu' separata dal resto dell'assistente: entra nello stesso storico dell'utente con i messaggi e gli eventuali esiti delle conferme
+- **Secret ripuliti dai payload client/LLM** - `aiApiKeyEnc`, token Telegram e webhook secret non compaiono piu' nelle API browser e non entrano nel contesto inviato al modello. Le preferenze esposte al frontend vengono sanificate, e l'export utente AI usa un bundle derivato controllato
+- **Analisi performance migrata sul backend** - anche il dialog "Analizza con AI" del tab performance usa ora il motore server-side, mantenendo lo stesso provider/modello dell'assistente principale e togliendo un altro punto di contatto diretto browser-provider
+- **Fondamenta deploy-ready per il live** - aggiunta la migration `20260418153000_add_telegram_ai_runtime`, introdotta `APP_BASE_URL` per webhook e deep link e aggiornato il percorso di deploy per gestire in modo sicuro la nuova major senza toccare i dati utente esistenti
+- **Qualita' di release verificata** - suite confermata verde con `eslint`, `next build` e **211 test passati**
 
 ### v0.4.1 - 18 aprile 2026 (Calcolatore finanziamento + DTI prestiti)
 
