@@ -135,9 +135,10 @@ describe('sumRealEstateAnnualNetIncome', () => {
 });
 
 describe('buildRealEstatePassiveIncomeStreams', () => {
-    it('fa partire lo stream dal retirement se la rendita matura prima', () => {
+    it('mantiene la vera eta di partenza se la rendita matura prima del retirement', () => {
         const streams = buildRealEstatePassiveIncomeStreams([
             {
+                name: 'Bilocale',
                 rent: 12000,
                 costs: 2000,
                 imu: 1000,
@@ -151,8 +152,9 @@ describe('buildRealEstatePassiveIncomeStreams', () => {
         });
 
         expect(streams).toHaveLength(1);
+        expect(streams[0].label).toBe('Bilocale');
         expect(streams[0].annualAmount).toBe(9000);
-        expect(streams[0].startAge).toBe(60);
+        expect(streams[0].startAge).toBe(42);
     });
 
     it('non usa mai il valore dell immobile e ignora proprieta senza rendita pianificata', () => {
@@ -177,7 +179,7 @@ describe('buildRealEstatePassiveIncomeStreams', () => {
 
         expect(streams).toHaveLength(1);
         expect(streams[0].annualAmount).toBe(7000);
-        expect(streams[0].startAge).toBe(55);
+        expect(streams[0].startAge).toBe(35);
     });
 
     it('posticipa lo stream oltre il retirement se la rendita parte piu tardi', () => {

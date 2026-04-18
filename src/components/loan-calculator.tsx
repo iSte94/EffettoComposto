@@ -31,6 +31,38 @@ interface AmortizationResult {
     chartData: { label: string; Capitale: number; Interessi: number; "Debito Residuo": number }[];
 }
 
+const DTI_SCALE_MAX = 50;
+const DTI_WARNING_THRESHOLD = 40;
+
+function getDtiPosition(value: number) {
+    return `${(value / DTI_SCALE_MAX) * 100}%`;
+}
+
+const DTI_MARKERS = [
+    { value: 0, label: "0%", labelClassName: "text-muted-foreground", style: { left: "0%", transform: "translateX(0)" } },
+    { value: 33, label: "33%", labelClassName: "font-medium text-emerald-600", style: { left: getDtiPosition(33), transform: "translateX(-50%)" } },
+    { value: DTI_WARNING_THRESHOLD, label: "40%", labelClassName: "font-medium text-amber-500", style: { left: getDtiPosition(DTI_WARNING_THRESHOLD), transform: "translateX(-50%)" } },
+    { value: 50, label: "50%", labelClassName: "text-muted-foreground", style: { left: "100%", transform: "translateX(-100%)" } },
+] as const;
+
+const DTI_TRACK_SEGMENTS = [
+    {
+        start: 0,
+        end: 33,
+        className: "bg-emerald-100/90 dark:bg-emerald-950/40",
+    },
+    {
+        start: 33,
+        end: DTI_WARNING_THRESHOLD,
+        className: "bg-amber-100/90 dark:bg-amber-950/35",
+    },
+    {
+        start: DTI_WARNING_THRESHOLD,
+        end: DTI_SCALE_MAX,
+        className: "bg-red-100/90 dark:bg-red-950/35",
+    },
+] as const;
+
 function computeAmortization(principal: number, annualRatePct: number, months: number): AmortizationResult {
     const empty: AmortizationResult = { installment: 0, totalPaid: 0, totalInterest: 0, schedule: [], chartData: [] };
     if (principal <= 0 || months <= 0) return empty;
@@ -143,12 +175,38 @@ export function LoanCalculator() {
             dti,
             dtiPct: dti * 100,
             isOk: dti > 0 && dti <= DTI_THRESHOLD,
-            isWarning: dti > DTI_THRESHOLD && dti <= 0.4,
-            isDanger: dti > 0.4,
+            isWarning: dti > DTI_THRESHOLD && dti <= DTI_WARNING_THRESHOLD / 100,
+            isDanger: dti > DTI_WARNING_THRESHOLD / 100,
             hasIncome: income > 0,
             maxNewInstallment,
         };
     }, [existingLoans, intestatario, preferences.person1Income, preferences.person2Income, result.installment]);
+
+    const dtiProgressPct = Math.min(100, (dtiData.dtiPct / DTI_SCALE_MAX) * 100);
+    const dtiIndicatorValue = Math.min(DTI_SCALE_MAX, Math.max(0, dtiData.dtiPct));
+    const dtiIndicatorTransform =
+        dtiIndicatorValue <= 4
+            ? "translateX(0)"
+            : dtiIndicatorValue >= DTI_SCALE_MAX - 4
+            ? "translateX(-100%)"
+            : "translateX(-50%)";
+    const dtiAccentClasses = dtiData.isOk
+        ? {
+            badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/80 dark:bg-emerald-950/60 dark:text-emerald-300",
+            fill: "bg-emerald-500",
+            marker: "bg-emerald-500 ring-emerald-500/25",
+        }
+        : dtiData.isWarning
+        ? {
+            badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/80 dark:bg-amber-950/60 dark:text-amber-300",
+            fill: "bg-amber-500",
+            marker: "bg-amber-500 ring-amber-500/25",
+        }
+        : {
+            badge: "border-red-200 bg-red-50 text-red-700 dark:border-red-900/80 dark:bg-red-950/60 dark:text-red-300",
+            fill: "bg-red-500",
+            marker: "bg-red-500 ring-red-500/25",
+        };
 
     return (
         <div className="space-y-6">
@@ -333,19 +391,62 @@ export function LoanCalculator() {
                                     {dtiData.dtiPct.toFixed(1)}% su max 33%
                                 </span>
                             </div>
-                            <div className="relative h-3 overflow-hidden rounded-full bg-muted">
-                                <div className="absolute inset-y-0 left-0 w-px bg-emerald-500/60" style={{ left: "66%" }} />
-                                <div className="absolute inset-y-0 left-0 w-px bg-amber-500/60" style={{ left: "80%" }} />
+                            <div className="relative pt-7">
                                 <div
-                                    className={`h-full rounded-full transition-all duration-300 ${dtiData.isOk ? "bg-emerald-500" : dtiData.isWarning ? "bg-amber-500" : "bg-red-500"}`}
-                                    style={{ width: `${Math.min(100, (dtiData.dtiPct / 50) * 100)}%` }}
-                                />
+                                    className="absolute top-0 z-30"
+                                    style={{ left: getDtiPosition(dtiIndicatorValue), transform: dtiIndicatorTransform }}
+                                >
+                                    <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold shadow-sm ${dtiAccentClasses.badge}`}>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                        {dtiData.dtiPct.toFixed(1)}%
+                                    </div>
+                                </div>
+                                <div className="relative h-4 overflow-hidden rounded-full bg-muted/60 shadow-inner ring-1 ring-black/5 dark:ring-white/10">
+                                    {DTI_TRACK_SEGMENTS.map((segment) => (
+                                        <div
+                                            key={`${segment.start}-${segment.end}`}
+                                            className={`absolute inset-y-0 ${segment.className}`}
+                                            style={{
+                                                left: getDtiPosition(segment.start),
+                                                width: `${((segment.end - segment.start) / DTI_SCALE_MAX) * 100}%`,
+                                            }}
+                                        />
+                                    ))}
+                                    {DTI_MARKERS.filter((marker) => marker.value > 0 && marker.value < DTI_SCALE_MAX).map((marker) => (
+                                        <div
+                                            key={marker.value}
+                                            className={`absolute inset-y-0 z-20 w-px ${marker.value === 33 ? "bg-emerald-500/80" : "bg-amber-500/80"}`}
+                                            style={{ left: getDtiPosition(marker.value) }}
+                                        />
+                                    ))}
+                                    <div
+                                        className={`relative z-10 h-full rounded-full transition-all duration-300 ${dtiAccentClasses.fill}`}
+                                        style={{ width: `${dtiProgressPct}%` }}
+                                    />
+                                    <div
+                                        className={`absolute top-1/2 z-30 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-background shadow-sm ring-4 ${dtiAccentClasses.marker}`}
+                                        style={{ left: getDtiPosition(dtiIndicatorValue), transform: "translate(-50%, -50%)" }}
+                                    />
+                                </div>
                             </div>
-                            <div className="flex justify-between text-[10px] text-muted-foreground">
-                                <span>0%</span>
-                                <span className="text-emerald-600 font-medium">33%</span>
-                                <span className="text-amber-500 font-medium">40%</span>
-                                <span>50%</span>
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                <span>Area comfort</span>
+                                <span>Attenzione</span>
+                                <span>Critica</span>
+                            </div>
+                            <div className="relative h-4 text-[10px]">
+                                <div
+                                    className="absolute inset-x-0 top-1/2 border-t border-dashed border-border/70"
+                                />
+                                {DTI_MARKERS.map((marker) => (
+                                    <span
+                                        key={marker.value}
+                                        className={`absolute top-0 z-10 rounded-full bg-card px-1 ${marker.labelClassName}`}
+                                        style={marker.style}
+                                    >
+                                        {marker.label}
+                                    </span>
+                                ))}
                             </div>
                         </div>
 

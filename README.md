@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.0.1`
+**Versione corrente:** `v1.1.0`
 
 ---
 
@@ -107,12 +107,25 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 - **Fonte di verita'** - il numero versione del software vive in `package.json` (`version`) ed e' la base sia del repo sia del frontend
 - **Regola di release** - ogni deploy applicativo su VPS deve includere bump versione + nuova voce nel changelog con lo stesso numero
 - **Bump rapido** - per i prossimi rilasci puoi usare `npm run release:patch`, `npm run release:minor` oppure `npm run release:major`
+- **CI prima del deploy** - non deployare commit con badge GitHub rosso: il workflow `.github/workflows/ci.yml` deve restare in grado di fare `npm ci`, `prisma generate`, type-check, test e build, con `DATABASE_URL=file:./ci-test.db` disponibile gia' a livello job
 - **UI discreta** - la versione corrente viene mostrata in piccolo sotto il brand nell'header, in grigio tenue, cosi' resta sempre verificabile senza sporcare la dashboard
 
 ---
 
 ## Changelog
 
+### v1.1.0 - 18 aprile 2026 (import spese Telegram completo + Coast FIRE piu' realistico)
+
+- **Import spese Telegram davvero operativo end-to-end** - il bot personale ora gestisce il flusso `/spesa` con screenshot singoli, PDF e album multi-immagine (`media_group_id`) nello stesso thread AI, mantenendo il ciclo corretto "capisco -> ti mostro -> tu correggi -> confermi -> salvo". Gli allegati vengono scaricati da Telegram, passati direttamente al provider multimodale e trasformati in un batch di transazioni da confermare, senza fallback OCR e senza scritture silenziose sul database
+- **Batch import budget revisionabile prima del salvataggio** - aggiunti tool server-side per leggere il batch pending, correggerlo in linguaggio naturale prima della conferma, salvare regole merchant permanenti e rimuoverle. L'assistente puo' quindi modificare importi, categorie, date, righe da ignorare e note dopo un feedback discorsivo dell'utente, invece di costringere a rifare tutto da capo
+- **Deduplica, audit e apprendimento merchant** - le transazioni budget ora memorizzano `merchantNormalized`, `movementType`, `importConfidence` e `importBatchId`; sono stati introdotti `BudgetImportBatch` e `BudgetMerchantRule` per tenere audit degli import, rollback dell'ultimo batch, regole "merchant -> categoria" o "ignora sempre" e deduplica piu' robusta su descrizioni bancarie sporche, date vicine e importi uguali
+- **Nuovi comandi Telegram per il budget** - oltre a `/spesa`, il bot supporta `/ultimespese`, `/annullaultimoimport`, `/categorie` e `/ricategorizza`, cosi' l'utente puo' consultare gli ultimi movimenti, annullare l'ultimo import Telegram, vedere categorie/regole apprese e riapplicare le regole automatiche direttamente dalla chat
+- **Backup/export budget portati a v3** - l'export/import dati utente include ora anche batch di import budget e regole merchant, mantenendo la storia degli import AI e la logica di categorizzazione tra device, backup e restore. La serializzazione resta compatibile con i dati esistenti ma aggiunge il nuovo livello audit
+- **Coast FIRE piu' fedele alla vita reale** - il motore FIRE ora riconosce le rendite immobiliari che partono prima del retirement, permette di decidere quanta rendita pre-FIRE reinvestire (percentuale o quota fissa), propaga questa scelta nella simulazione Monte Carlo e nel Coast FIRE target, e rende piu' trasparente la UI con varianti prudenziali, breakdown delle rendite e copy piu' accurata sul significato del Coast FIRE
+- **Rendite immobiliari future trattate meglio** - gli stream immobiliari mantengono la loro vera eta' di partenza invece di essere forzati al retirement, cosi' una casa che inizia a rendere a 42 anni pesa davvero nel percorso FIRE e non solo nel giorno del ritiro. I test di regressione coprono ora sia la partenza anticipata sia l'effetto della quota reinvestita sul Coast FIRE
+- **Calcolatore finanziamento con DTI piu' leggibile** - il tool prestiti mostra ora una barra DTI molto piu' chiara, con zone comfort/attenzione/critica, marker 33% e 40%, indicatore visivo sulla soglia e badge coerenti con il livello di rischio. L'obiettivo e' trasformare il DTI da numero secco a segnale leggibile anche a colpo d'occhio
+- **GitHub Actions riportata su binari puliti** - la CI non deve piu' andare in rosso per motivi cosmeticamente brutti ma evitabili: il workflow ora riceve `DATABASE_URL` a livello job anche per `prisma generate`, e i test provider importano esplicitamente `describe/it/expect` da Vitest, cosi' il tipo-check non rompe il badge su push validi
+- **Qualita' di release verificata** - confermati verdi `eslint`, `vitest`, `next build`, sync Prisma locale e runtime Prisma rigenerato correttamente anche su Windows dopo il lock del DLL
 ### v1.0.1 - 18 aprile 2026 (fix finanziario critico: `projectFire` ignorava l'esborso immediato nel flag `alreadyFire`)
 
 - **Bug critico nel motore FIRE deterministico (`src/lib/finance/fire-projection.ts`)** — il flag `alreadyFire` e il conseguente azzeramento di `monthsToFire`/`yearsToFire` erano calcolati con `startingCapital >= fireTarget`, ignorando completamente `oneTimeOutflow`. Quando un utente gia' FIRE simulava un acquisto che lo portava SOTTO la soglia (es. patrimonio 2M, casa 1.7M, target 600k → capitale effettivo 300k), il loop individuava correttamente i mesi necessari per tornare a FIRE ma poi li sovrascriveva a 0, dando all'Advisor la falsa certezza che "l'acquisto non ritarda il FIRE". Conseguenza: `fireDelayMonths(baseline, withPurchase)` ritornava 0 anche per esborsi molto significativi, silenziando il principale indicatore comparativo dell'Advisor

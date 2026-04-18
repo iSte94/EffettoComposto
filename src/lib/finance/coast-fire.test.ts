@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+    buildPassiveIncomeBreakdown,
     buildDynamicFireTargetSchedule,
     computeCoastFireScenarios,
     computeFireTargetForRetirementAge,
@@ -73,6 +74,22 @@ describe("computeCoastFireScenarios", () => {
         expect(base!.coastFireTarget).toBe(0);
     });
 
+    it("il bollo abbassa il rendimento reale netto e alza il Coast FIRE richiesto", () => {
+        const withoutTaxStamp = computeCoastFireScenarios(baseInput);
+        const withTaxStamp = computeCoastFireScenarios({
+            ...baseInput,
+            applyTaxStamp: true,
+        });
+
+        const baseWithout = withoutTaxStamp.scenarios.find((s) => s.scenario === "base");
+        const baseWith = withTaxStamp.scenarios.find((s) => s.scenario === "base");
+
+        expect(baseWithout).toBeDefined();
+        expect(baseWith).toBeDefined();
+        expect(baseWith!.realReturnPct).toBeCloseTo(baseWithout!.realReturnPct - 0.2, 6);
+        expect(baseWith!.coastFireTarget).toBeGreaterThan(baseWithout!.coastFireTarget);
+    });
+
     it("anticipare l'eta pensionabile abbassa il capitale richiesto", () => {
         const latePension = computeCoastFireScenarios({
             ...baseInput,
@@ -112,6 +129,76 @@ describe("computeCoastFireScenarios", () => {
         expect(baseWithFuturePassive!.passiveIncomePresentValue).toBeGreaterThan(0);
     });
 
+    it("una rendita che parte prima del retirement abbassa ulteriormente il Coast FIRE se la reinvesti", () => {
+        const atRetirement = computeCoastFireScenarios({
+            ...baseInput,
+            passiveIncomeStreams: [
+                { annualAmount: 12_000, startAge: 60, endAge: 90 },
+            ],
+            preRetirementPassiveIncomeSavingsPct: 100,
+        });
+        const beforeRetirement = computeCoastFireScenarios({
+            ...baseInput,
+            passiveIncomeStreams: [
+                { annualAmount: 12_000, startAge: 45, endAge: 90 },
+            ],
+            preRetirementPassiveIncomeSavingsPct: 100,
+        });
+
+        const baseAtRetirement = atRetirement.scenarios.find((s) => s.scenario === "base");
+        const baseBeforeRetirement = beforeRetirement.scenarios.find((s) => s.scenario === "base");
+
+        expect(baseAtRetirement).toBeDefined();
+        expect(baseBeforeRetirement).toBeDefined();
+        expect(baseBeforeRetirement!.fireTargetNet).toBeCloseTo(baseAtRetirement!.fireTargetNet, 6);
+        expect(baseBeforeRetirement!.coastFireTarget).toBeLessThan(baseAtRetirement!.coastFireTarget);
+    });
+
+    it("se spendi tutta la rendita pre-retirement il Coast FIRE non riceve accelerazione extra", () => {
+        const atRetirement = computeCoastFireScenarios({
+            ...baseInput,
+            passiveIncomeStreams: [
+                { annualAmount: 12_000, startAge: 60, endAge: 90 },
+            ],
+            preRetirementPassiveIncomeSavingsPct: 0,
+        });
+        const beforeRetirementSpent = computeCoastFireScenarios({
+            ...baseInput,
+            passiveIncomeStreams: [
+                { annualAmount: 12_000, startAge: 45, endAge: 90 },
+            ],
+            preRetirementPassiveIncomeSavingsPct: 0,
+        });
+
+        const baseAtRetirement = atRetirement.scenarios.find((s) => s.scenario === "base");
+        const baseBeforeRetirementSpent = beforeRetirementSpent.scenarios.find((s) => s.scenario === "base");
+
+        expect(baseAtRetirement).toBeDefined();
+        expect(baseBeforeRetirementSpent).toBeDefined();
+        expect(baseBeforeRetirementSpent!.coastFireTarget).toBeCloseTo(baseAtRetirement!.coastFireTarget, 6);
+    });
+
+    it("espone un breakdown delle rendite future in euro reali di oggi", () => {
+        const breakdown = buildPassiveIncomeBreakdown({
+            ...baseInput,
+            currentAge: 32,
+            retirementAge: 50,
+            nominalReturnPct: 6.5,
+            inflationPct: 2,
+            passiveIncomeStreams: [
+                { label: "Via al Golf 29", annualAmount: 3_000, startAge: 50, endAge: 90 },
+                { label: "Via G. Mazzini 26", annualAmount: 13_000, startAge: 50, endAge: 90 },
+            ],
+        });
+
+        expect(breakdown).toHaveLength(2);
+        expect(breakdown[0].label).toBe("Via al Golf 29");
+        expect(breakdown[0].presentValueAtRetirement).toBeCloseTo(55_907.07, 2);
+        expect(breakdown[1].presentValueAtRetirement).toBeCloseTo(242_263.98, 2);
+        expect(breakdown[0].presentValueToday).toBeLessThan(breakdown[0].presentValueAtRetirement);
+        expect(breakdown[1].presentValueToday).toBeLessThan(breakdown[1].presentValueAtRetirement);
+    });
+
     it("una rendita passiva negativa aumenta il target FIRE netto", () => {
         const withoutNegativePassive = computeCoastFireScenarios(baseInput);
         const withNegativePassive = computeCoastFireScenarios({
@@ -128,6 +215,31 @@ describe("computeCoastFireScenarios", () => {
         expect(baseWithNegative).toBeDefined();
         expect(baseWithNegative!.fireTargetNet).toBeGreaterThan(baseWithout!.fireTargetNet);
         expect(baseWithNegative!.passiveIncomePresentValue).toBeLessThan(0);
+    });
+
+    it("il Coast FIRE cresce quando rimuovi i supporti futuri dal modello", () => {
+        const withSupports = computeCoastFireScenarios({
+            ...baseInput,
+            monthlyPublicPension: 1_200,
+            passiveIncomeStreams: [
+                { annualAmount: 9_000, startAge: 63, endAge: 90 },
+            ],
+        });
+        const withoutPassive = computeCoastFireScenarios({
+            ...baseInput,
+            monthlyPublicPension: 1_200,
+        });
+        const withoutSupports = computeCoastFireScenarios(baseInput);
+
+        const baseWithSupports = withSupports.scenarios.find((s) => s.scenario === "base");
+        const baseWithoutPassive = withoutPassive.scenarios.find((s) => s.scenario === "base");
+        const baseWithoutSupports = withoutSupports.scenarios.find((s) => s.scenario === "base");
+
+        expect(baseWithSupports).toBeDefined();
+        expect(baseWithoutPassive).toBeDefined();
+        expect(baseWithoutSupports).toBeDefined();
+        expect(baseWithoutPassive!.coastFireTarget).toBeGreaterThan(baseWithSupports!.coastFireTarget);
+        expect(baseWithoutSupports!.coastFireTarget).toBeGreaterThan(baseWithoutPassive!.coastFireTarget);
     });
 
     it("richiede più capitale se vuoi smettere oggi invece che all'età pensionabile pianificata", () => {

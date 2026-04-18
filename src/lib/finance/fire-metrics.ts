@@ -44,6 +44,10 @@ function toBoolean(value: unknown, fallback = false): boolean {
     return typeof value === "boolean" ? value : fallback;
 }
 
+function parsePreRetirementPassiveIncomeMode(value: unknown): CoastFireInput["preRetirementPassiveIncomeMode"] {
+    return value === "fixed" ? "fixed" : "percent";
+}
+
 function parseRealEstateList(snapshot?: AssetRecord | null): RealEstateProperty[] {
     if (!snapshot) return [];
 
@@ -117,6 +121,10 @@ export function computeFireMetricsFromSnapshot(
         const expectedPublicPension = Math.max(0, toNumber(preferences?.expectedPublicPension));
         const fireExpectedReturn = toNumber(preferences?.fireExpectedReturn, DEFAULT_FIRE_EXPECTED_RETURN);
         const expectedInflation = toNumber(preferences?.expectedInflation, DEFAULT_EXPECTED_INFLATION);
+        const applyTaxStamp = toBoolean(preferences?.applyTaxStamp, true);
+        const preRetirementPassiveIncomeMode = parsePreRetirementPassiveIncomeMode(preferences?.preRetirementPassiveIncomeMode);
+        const preRetirementPassiveIncomeSavingsPct = Math.min(100, Math.max(0, toNumber(preferences?.preRetirementPassiveIncomeSavingsPct, 100)));
+        const preRetirementPassiveIncomeSavingsAnnual = Math.max(0, toNumber(preferences?.preRetirementPassiveIncomeSavingsAnnual));
         const passiveIncomeStreams = buildRealEstatePassiveIncomeStreams(realEstateList, {
             currentAge,
             retirementAge,
@@ -134,6 +142,10 @@ export function computeFireMetricsFromSnapshot(
             withdrawalRatePct: fireWithdrawalRate,
             nominalReturnPct: fireExpectedReturn,
             inflationPct: expectedInflation,
+            applyTaxStamp,
+            preRetirementPassiveIncomeMode,
+            preRetirementPassiveIncomeSavingsPct,
+            preRetirementPassiveIncomeSavingsAnnual,
         };
 
         coastFireAnalysis = computeCoastFireScenarios(coastFireInput);

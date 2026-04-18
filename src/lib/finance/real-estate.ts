@@ -5,6 +5,7 @@
 import type { PassiveIncomeStream } from "./coast-fire";
 
 export interface RealEstateCashflowInput {
+    name?: string;
     rent?: number;             // Rendita annua attesa
     costs?: number;            // Spese fisse annue (condominio, manutenzione, ecc.)
     imu?: number;              // IMU annua
@@ -103,7 +104,6 @@ export function buildRealEstatePassiveIncomeStreams(
 ): PassiveIncomeStream[] {
     const {
         currentAge,
-        retirementAge,
         asOfYearMonth,
         lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
     } = input;
@@ -115,19 +115,19 @@ export function buildRealEstatePassiveIncomeStreams(
         const annualAmount = calculatePropertyAnnualPotentialNetIncome(prop);
         if (annualAmount === 0) return [];
 
-        let startAge = retirementAge;
+        let startAge = currentAge;
         if (!prop.isRented && prop.rentStartDate) {
             const monthsUntilRent = monthsBetweenYearMonths(asOfYearMonth, prop.rentStartDate);
             if (monthsUntilRent == null) return [];
             startAge = currentAge + Math.max(0, monthsUntilRent) / 12;
         }
 
-        const effectiveStartAge = Math.max(retirementAge, startAge);
-        if (!Number.isFinite(effectiveStartAge) || effectiveStartAge >= lifeExpectancy) return [];
+        if (!Number.isFinite(startAge) || startAge >= lifeExpectancy) return [];
 
         return [{
+            label: prop.name,
             annualAmount,
-            startAge: effectiveStartAge,
+            startAge,
             endAge: lifeExpectancy,
         }];
     });

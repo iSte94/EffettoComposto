@@ -1,6 +1,12 @@
 import { createHash } from "crypto";
 import type { AssistantPendingAction as PrismaPendingAction, AssistantThread } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import {
+    type PendingBudgetImportBatchPayload,
+    type PendingBudgetMerchantRulePayload,
+    saveConfirmedBudgetImportBatch,
+} from "@/lib/budget-assistant";
+import { detectBudgetMovementType, normalizeMerchantName } from "@/lib/budget-import";
 import type {
     AssistantChannel,
     PendingAction,
@@ -9,13 +15,14 @@ import type {
 } from "@/types";
 import type { AiToolTraceEntry } from "@/lib/ai/providers";
 
-type PendingActionPayloadMap = {
+export type PendingActionPayloadMap = {
     add_budget_transaction: {
         date: string;
         description: string;
         amount: number;
         category: string;
     };
+    add_budget_transactions_batch: PendingBudgetImportBatchPayload;
     delete_budget_transaction: {
         transactionId: string;
         description?: string;
@@ -23,6 +30,12 @@ type PendingActionPayloadMap = {
     update_budget_transaction_category: {
         transactionId: string;
         category: string;
+    };
+    upsert_budget_merchant_rule: PendingBudgetMerchantRulePayload;
+    delete_budget_merchant_rule: {
+        normalizedMerchant: string;
+        mode: "categorize" | "ignore";
+        merchant?: string;
     };
     create_goal: {
         name: string;
@@ -167,6 +180,8 @@ async function executePendingAction(userId: string, action: PrismaPendingAction)
     case "add_budget_transaction": {
         const data = payload as PendingActionPayloadMap["add_budget_transaction"];
         const hash = hashBudgetTransaction(data.date, data.description, data.amount);
+        const merchantNormalized = normalizeMerchantName(data.description);
+        const movementType = detectBudgetMovementType(data.description, data.amount).movementType;
         await prisma.budgetTransaction.upsert({
             where: { userId_hash: { userId, hash } },
             update: {
@@ -174,6 +189,8 @@ async function executePendingAction(userId: string, action: PrismaPendingAction)
                 description: data.description,
                 amount: data.amount,
                 category: data.category,
+                merchantNormalized,
+                movementType,
             },
             create: {
                 userId,
@@ -182,9 +199,30 @@ async function executePendingAction(userId: string, action: PrismaPendingAction)
                 amount: data.amount,
                 category: data.category,
                 hash,
+                merchantNormalized,
+                movementType,
             },
         });
         return `Transazione salvata: ${data.description} (${data.amount.toFixed(2)} EUR)`;
+    }
+    case "add_budget_transactions_batch": {
+        const data = payload as PendingActionPayloadMap["add_budget_transactions_batch"];
+        if (!Array.isArray(data.transactions) || data.transactions.length === 0) {
+            throw new Error("Nessuna transazione da salvare");
+        }
+        const result = await saveConfirmedBudgetImportBatch({
+            userId,
+            threadId: action.threadId,
+            channel: action.channel,
+            title: action.title,
+            payload: data,
+        });
+        if (result.insertedCount === 0) {
+            return "Nessuna nuova transazione salvata: risultano gia' presenti";
+        }
+        return result.skippedCount > 0
+            ? `Salvate ${result.insertedCount} transazioni (${result.skippedCount} duplicate/ricorrenti ignorate)`
+            : `Salvate ${result.insertedCount} transazioni`;
     }
     case "delete_budget_transaction": {
         const data = payload as PendingActionPayloadMap["delete_budget_transaction"];
@@ -203,6 +241,47 @@ async function executePendingAction(userId: string, action: PrismaPendingAction)
             },
         });
         return `Categoria aggiornata a ${data.category}`;
+    }
+    case "upsert_budget_merchant_rule": {
+        const data = payload as PendingActionPayloadMap["upsert_budget_merchant_rule"];
+        await prisma.budgetMerchantRule.upsert({
+            where: {
+                userId_normalizedMerchant_mode: {
+                    userId,
+                    normalizedMerchant: data.normalizedMerchant,
+                    mode: data.mode,
+                },
+            },
+            update: {
+                displayName: data.merchant,
+                category: data.mode === "categorize" ? data.category ?? "Altro" : null,
+                alias: data.alias ?? null,
+                lastUsedAt: new Date(),
+            },
+            create: {
+                userId,
+                normalizedMerchant: data.normalizedMerchant,
+                displayName: data.merchant,
+                category: data.mode === "categorize" ? data.category ?? "Altro" : null,
+                mode: data.mode,
+                alias: data.alias ?? null,
+                lastUsedAt: new Date(),
+            },
+        });
+        return data.mode === "ignore"
+            ? `Regola salvata: ignora ${data.merchant}`
+            : `Regola salvata: ${data.merchant} -> ${data.category ?? "Altro"}`;
+    }
+    case "delete_budget_merchant_rule": {
+        const data = payload as PendingActionPayloadMap["delete_budget_merchant_rule"];
+        await prisma.budgetMerchantRule.deleteMany({
+            where: {
+                userId,
+                normalizedMerchant: data.normalizedMerchant,
+                mode: data.mode,
+            },
+        });
+        return `Regola rimossa${data.merchant ? `: ${data.merchant}` : ""}`;
     }
     case "create_goal": {
         const data = payload as PendingActionPayloadMap["create_goal"];

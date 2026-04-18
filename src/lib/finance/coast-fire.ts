@@ -9,11 +9,13 @@
  * Tutto calcolato in euro odierni usando rendimenti reali (equazione di Fisher).
  */
 
+import type { PreRetirementPassiveIncomeAllocationMode } from "@/types";
 import { computeRealReturn } from "./fire-projection";
 
 export type CoastFireScenario = "bear" | "base" | "bull";
 
 export interface PassiveIncomeStream {
+    label?: string;
     annualAmount: number;
     startAge: number;
     endAge?: number;
@@ -31,6 +33,10 @@ export interface CoastFireInput {
     withdrawalRatePct: number;         // SWR %
     nominalReturnPct: number;          // Rendimento nominale atteso base (es. 6%)
     inflationPct: number;              // Inflazione attesa (es. 2%)
+    applyTaxStamp?: boolean;           // Bollo titoli 0.2% annuo sul portafoglio tassabile
+    preRetirementPassiveIncomeMode?: PreRetirementPassiveIncomeAllocationMode;
+    preRetirementPassiveIncomeSavingsPct?: number;
+    preRetirementPassiveIncomeSavingsAnnual?: number;
     lifeExpectancy?: number;           // Default 90
 }
 
@@ -56,6 +62,16 @@ export interface CoastFireResult {
     baseFireTarget: number;            // FIRE target lordo (senza pensione)
 }
 
+export interface PassiveIncomeBreakdownEntry {
+    label: string;
+    annualAmount: number;
+    startAge: number;
+    endAge: number;
+    durationYears: number;
+    presentValueAtRetirement: number;
+    presentValueToday: number;
+}
+
 export interface FireTargetProjectionInput {
     retirementAge: number;
     publicPensionAge: number;
@@ -66,6 +82,7 @@ export interface FireTargetProjectionInput {
     withdrawalRatePct: number;
     nominalReturnPct: number;
     inflationPct: number;
+    applyTaxStamp?: boolean;
     lifeExpectancy?: number;
 }
 
@@ -116,6 +133,7 @@ function yearsToGrow(capital: number, target: number, realReturn: number): numbe
 }
 
 function normalizePassiveIncomeStreams(
+    currentAge: number | undefined,
     retirementAge: number,
     lifeExpectancy: number,
     monthlyRealEstateIncome: number,
@@ -125,8 +143,9 @@ function normalizePassiveIncomeStreams(
     if (monthlyRealEstateIncome === 0) return [];
 
     return [{
+        label: "Rendita immobiliare",
         annualAmount: monthlyRealEstateIncome * 12,
-        startAge: retirementAge,
+        startAge: currentAge ?? retirementAge,
         endAge: lifeExpectancy,
     }];
 }
@@ -135,18 +154,162 @@ function getScenarioRealReturn(
     nominalReturnPct: number,
     inflationPct: number,
     scenario: CoastFireScenario,
+    applyTaxStamp = false,
 ): number {
     const baseReal = computeRealReturn(nominalReturnPct, inflationPct);
+    const grossScenarioReal = (() => {
+        switch (scenario) {
+            case "bear":
+                return Math.max(0.001, baseReal - 0.02);
+            case "bull":
+                return baseReal + 0.02;
+            case "base":
+            default:
+                return baseReal;
+        }
+    })();
 
-    switch (scenario) {
-        case "bear":
-            return Math.max(0.001, baseReal - 0.02);
-        case "bull":
-            return baseReal + 0.02;
-        case "base":
-        default:
-            return baseReal;
+    return applyTaxStamp ? grossScenarioReal - 0.002 : grossScenarioReal;
+}
+
+function getMonthlyReturnRate(realReturn: number): number {
+    return Math.pow(1 + realReturn, 1 / 12) - 1;
+}
+
+function getStreamEndAge(stream: PassiveIncomeStream, lifeExpectancy: number): number {
+    return Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
+}
+
+function getActivePassiveIncomeAnnualAtAge(
+    passiveIncomeStreams: PassiveIncomeStream[],
+    age: number,
+    retirementAge: number,
+    lifeExpectancy: number,
+): number {
+    return passiveIncomeStreams.reduce((acc, stream) => {
+        const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
+        if (annualAmount === 0) return acc;
+
+        const startAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
+        const endAge = getStreamEndAge(stream, lifeExpectancy);
+        const effectiveEndAge = Math.min(retirementAge, endAge);
+        if (age + 1e-9 < startAge || age >= effectiveEndAge) return acc;
+
+        return acc + annualAmount;
+    }, 0);
+}
+
+export function allocatePreRetirementPassiveIncomeAnnual(input: {
+    annualPassiveIncome: number;
+    mode?: PreRetirementPassiveIncomeAllocationMode;
+    savingsPct?: number;
+    savingsAnnual?: number;
+}): {
+    savingsAnnual: number;
+    spendingAnnual: number;
+} {
+    const annualPassiveIncome = Number.isFinite(input.annualPassiveIncome) ? input.annualPassiveIncome : 0;
+    if (annualPassiveIncome <= 0) {
+        return {
+            savingsAnnual: annualPassiveIncome,
+            spendingAnnual: 0,
+        };
     }
+
+    if (input.mode === "fixed") {
+        const savingsAnnual = Math.max(0, Math.min(annualPassiveIncome, Number.isFinite(input.savingsAnnual) ? (input.savingsAnnual as number) : 0));
+        return {
+            savingsAnnual,
+            spendingAnnual: Math.max(0, annualPassiveIncome - savingsAnnual),
+        };
+    }
+
+    const savingsPct = Math.min(100, Math.max(0, Number.isFinite(input.savingsPct) ? (input.savingsPct as number) : 100));
+    const savingsAnnual = annualPassiveIncome * (savingsPct / 100);
+
+    return {
+        savingsAnnual,
+        spendingAnnual: Math.max(0, annualPassiveIncome - savingsAnnual),
+    };
+}
+
+export function estimatePreRetirementPassiveIncomeAnnual(
+    passiveIncomeStreams: PassiveIncomeStream[],
+    currentAge: number,
+    retirementAge: number,
+    lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
+): number {
+    const annualIncome = passiveIncomeStreams.reduce((acc, stream) => {
+        const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
+        const startAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
+        const endAge = getStreamEndAge(stream, lifeExpectancy);
+        const overlapsPreRetirement = startAge < retirementAge && endAge > currentAge;
+
+        if (!overlapsPreRetirement) return acc;
+        return acc + annualAmount;
+    }, 0);
+
+    return Math.max(0, annualIncome);
+}
+
+function computePreRetirementPassiveSavingsFutureValueAtRetirement(
+    input: CoastFireInput,
+    scenario: CoastFireScenario,
+): number {
+    const {
+        currentAge,
+        retirementAge,
+        monthlyRealEstateIncome = 0,
+        passiveIncomeStreams = [],
+        nominalReturnPct,
+        inflationPct,
+        applyTaxStamp = false,
+        preRetirementPassiveIncomeMode = "percent",
+        preRetirementPassiveIncomeSavingsPct = 100,
+        preRetirementPassiveIncomeSavingsAnnual = 0,
+        lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
+    } = input;
+
+    const monthsToRetirement = Math.max(0, Math.round((retirementAge - currentAge) * 12));
+    if (monthsToRetirement <= 0) return 0;
+
+    const normalizedPassiveStreams = normalizePassiveIncomeStreams(
+        currentAge,
+        retirementAge,
+        lifeExpectancy,
+        monthlyRealEstateIncome,
+        passiveIncomeStreams,
+    );
+    if (normalizedPassiveStreams.length === 0) return 0;
+
+    const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario, applyTaxStamp);
+    const monthlyReturn = getMonthlyReturnRate(realReturn);
+
+    let futureValue = 0;
+    for (let monthIndex = 0; monthIndex < monthsToRetirement; monthIndex++) {
+        const ageAtMonthStart = currentAge + (monthIndex / 12);
+        const annualPassiveIncome = getActivePassiveIncomeAnnualAtAge(
+            normalizedPassiveStreams,
+            ageAtMonthStart,
+            retirementAge,
+            lifeExpectancy,
+        );
+        if (annualPassiveIncome === 0) continue;
+
+        const allocation = allocatePreRetirementPassiveIncomeAnnual({
+            annualPassiveIncome,
+            mode: preRetirementPassiveIncomeMode,
+            savingsPct: preRetirementPassiveIncomeSavingsPct,
+            savingsAnnual: preRetirementPassiveIncomeSavingsAnnual,
+        });
+        const monthlySavings = allocation.savingsAnnual / 12;
+        if (monthlySavings === 0) continue;
+
+        const remainingMonths = monthsToRetirement - (monthIndex + 1);
+        futureValue += monthlySavings * Math.pow(1 + monthlyReturn, remainingMonths);
+    }
+
+    return futureValue;
 }
 
 export function computeFireTargetForRetirementAge(
@@ -163,6 +326,7 @@ export function computeFireTargetForRetirementAge(
         withdrawalRatePct,
         nominalReturnPct,
         inflationPct,
+        applyTaxStamp = false,
         lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
     } = input;
 
@@ -171,6 +335,7 @@ export function computeFireTargetForRetirementAge(
     const pensionDeferredYears = Math.max(0, publicPensionAge - retirementAge);
     const pensionDuration = Math.max(0, lifeExpectancy - Math.max(retirementAge, publicPensionAge));
     const normalizedPassiveStreams = normalizePassiveIncomeStreams(
+        undefined,
         retirementAge,
         lifeExpectancy,
         monthlyRealEstateIncome,
@@ -179,7 +344,7 @@ export function computeFireTargetForRetirementAge(
 
     const swr = Math.max(0.1, withdrawalRatePct) / 100;
     const baseFireTarget = annualExpenses / swr;
-    const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario);
+    const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario, applyTaxStamp);
 
     const pensionPV = presentValueOfAnnuity(annualPension, realReturn, pensionDeferredYears, pensionDuration);
     const passivePV = normalizedPassiveStreams.reduce((acc, stream) => {
@@ -224,6 +389,58 @@ export function buildDynamicFireTargetSchedule(input: DynamicFireTargetScheduleI
     });
 }
 
+export function buildPassiveIncomeBreakdown(
+    input: CoastFireInput,
+    scenario: CoastFireScenario = "base",
+): PassiveIncomeBreakdownEntry[] {
+    const {
+        currentAge,
+        retirementAge,
+        monthlyRealEstateIncome = 0,
+        passiveIncomeStreams = [],
+        nominalReturnPct,
+        inflationPct,
+        applyTaxStamp = false,
+        lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
+    } = input;
+
+    const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario, applyTaxStamp);
+    const yearsToRetire = Math.max(0, retirementAge - currentAge);
+    const normalizedPassiveStreams = normalizePassiveIncomeStreams(
+        currentAge,
+        retirementAge,
+        lifeExpectancy,
+        monthlyRealEstateIncome,
+        passiveIncomeStreams,
+    );
+
+    return normalizedPassiveStreams.flatMap((stream, index) => {
+        const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
+        if (annualAmount === 0) return [];
+
+        const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
+        const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
+        const effectiveStartAge = Math.max(retirementAge, streamStartAge);
+        const effectiveEndAge = Math.min(lifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
+        const durationYears = Math.max(0, effectiveEndAge - effectiveStartAge);
+        if (durationYears <= 0) return [];
+
+        const deferredYears = Math.max(0, effectiveStartAge - retirementAge);
+        const presentValueAtRetirement = presentValueOfAnnuity(annualAmount, realReturn, deferredYears, durationYears);
+        const presentValueToday = presentValueAtRetirement / Math.pow(1 + realReturn, yearsToRetire);
+
+        return [{
+            label: stream.label?.trim() || `Rendita ${index + 1}`,
+            annualAmount,
+            startAge: effectiveStartAge,
+            endAge: effectiveEndAge,
+            durationYears,
+            presentValueAtRetirement,
+            presentValueToday,
+        }];
+    });
+}
+
 export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResult {
     const {
         currentAge,
@@ -237,6 +454,10 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
         withdrawalRatePct,
         nominalReturnPct,
         inflationPct,
+        applyTaxStamp = false,
+        preRetirementPassiveIncomeMode,
+        preRetirementPassiveIncomeSavingsPct,
+        preRetirementPassiveIncomeSavingsAnnual,
         lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
     } = input;
 
@@ -251,6 +472,7 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
         withdrawalRatePct,
         nominalReturnPct,
         inflationPct,
+        applyTaxStamp,
         lifeExpectancy,
     });
 
@@ -267,12 +489,35 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
                 withdrawalRatePct,
                 nominalReturnPct,
                 inflationPct,
+                applyTaxStamp,
                 lifeExpectancy,
             }, s);
         const realReturn = targetProjection.realReturnPct / 100;
+        const futureValueOfSavedPassiveIncome = computePreRetirementPassiveSavingsFutureValueAtRetirement({
+            currentAge,
+            retirementAge,
+            publicPensionAge,
+            currentCapital,
+            monthlyExpenses,
+            monthlyPublicPension,
+            monthlyRealEstateIncome,
+            passiveIncomeStreams,
+            withdrawalRatePct,
+            nominalReturnPct,
+            inflationPct,
+            applyTaxStamp,
+            preRetirementPassiveIncomeMode,
+            preRetirementPassiveIncomeSavingsPct,
+            preRetirementPassiveIncomeSavingsAnnual,
+            lifeExpectancy,
+        }, s);
 
-        // Coast FIRE target = FIRE target netto scontato a oggi
-        const coastFireTarget = targetProjection.fireTargetNet / Math.pow(1 + realReturn, yearsToRetire);
+        // Coast FIRE target = target netto a retirement, meno il FV delle rendite
+        // pre-FIRE effettivamente reinvestite, poi scontato a oggi.
+        const coastFireTarget = Math.max(
+            0,
+            (targetProjection.fireTargetNet - futureValueOfSavedPassiveIncome) / Math.pow(1 + realReturn, yearsToRetire),
+        );
 
         const coastFireReached = currentCapital >= coastFireTarget;
         const surplusOrGap = currentCapital - coastFireTarget;

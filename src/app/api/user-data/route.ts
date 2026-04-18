@@ -50,8 +50,14 @@ const importSchema = z.object({
         category: z.string(),
         categoryOverride: z.boolean().default(false),
         hash: z.string(),
+        merchantNormalized: z.string().nullable().optional(),
+        movementType: z.string().optional(),
+        importConfidence: z.string().nullable().optional(),
+        importBatchId: z.string().nullable().optional(),
         importedAt: z.string().optional(),
     })).optional(),
+    budgetImportBatches: genericRecordArray,
+    budgetMerchantRules: genericRecordArray,
     dividends: genericRecordArray,
     pacSchedules: genericRecordArray,
     pacExecutions: genericRecordArray,
@@ -85,12 +91,16 @@ export async function POST(req: Request) {
         const data = parsed.data;
         const patrimonioRecords = ((data.assets ?? data.patrimonio) ?? []) as Record<string, unknown>[];
         const goalRecords = ((data.savingsGoals ?? data.obiettivi) ?? []) as Record<string, unknown>[];
+        const budgetImportBatches = (data.budgetImportBatches ?? []) as Record<string, unknown>[];
+        const budgetMerchantRules = (data.budgetMerchantRules ?? []) as Record<string, unknown>[];
         const results = {
             preferences: false,
             patrimonio: 0,
             obiettivi: 0,
             abbonamenti: 0,
             budgetTransactions: 0,
+            budgetImportBatches: 0,
+            budgetMerchantRules: 0,
             dividends: 0,
             pacSchedules: 0,
             pacExecutions: 0,
@@ -156,22 +166,68 @@ export async function POST(req: Request) {
             results.obiettivi = goalRecords.length;
         }
 
-        if (data.budgetTransactions && data.budgetTransactions.length > 0) {
+        if (
+            (data.budgetTransactions && data.budgetTransactions.length > 0)
+            || budgetImportBatches.length > 0
+            || budgetMerchantRules.length > 0
+        ) {
             await prisma.budgetTransaction.deleteMany({ where: { userId } });
+            await prisma.budgetImportBatch.deleteMany({ where: { userId } });
+            await prisma.budgetMerchantRule.deleteMany({ where: { userId } });
 
-            await prisma.budgetTransaction.createMany({
-                data: data.budgetTransactions.map((tx) => ({
-                    date: tx.date,
-                    description: tx.description,
-                    amount: tx.amount,
-                    category: tx.category,
-                    categoryOverride: tx.categoryOverride,
-                    hash: tx.hash,
-                    importedAt: tx.importedAt ? new Date(tx.importedAt) : new Date(),
+            const batchIdMap = new Map<string, string>();
+            for (const record of budgetImportBatches) {
+                const oldId = typeof record.id === "string" ? record.id : null;
+                const created = await prisma.budgetImportBatch.create({
+                    data: {
+                        ...omitImportFields(record, ['userId', 'threadId', 'thread', 'transactions']),
+                        createdAt: toDate(record.createdAt),
+                        updatedAt: toDate(record.updatedAt),
+                        confirmedAt: toDate(record.confirmedAt),
+                        cancelledAt: toDate(record.cancelledAt),
+                        rolledBackAt: toDate(record.rolledBackAt),
+                        userId,
+                    } as Prisma.BudgetImportBatchUncheckedCreateInput,
+                });
+                if (oldId) batchIdMap.set(oldId, created.id);
+            }
+
+            if (data.budgetTransactions && data.budgetTransactions.length > 0) {
+                await prisma.budgetTransaction.createMany({
+                    data: data.budgetTransactions.map((tx) => ({
+                        date: tx.date,
+                        description: tx.description,
+                        amount: tx.amount,
+                        category: tx.category,
+                        categoryOverride: tx.categoryOverride,
+                        hash: tx.hash,
+                        merchantNormalized: tx.merchantNormalized ?? null,
+                        movementType: tx.movementType ?? 'standard',
+                        importConfidence: tx.importConfidence ?? null,
+                        importBatchId: tx.importBatchId ? batchIdMap.get(tx.importBatchId) ?? null : null,
+                        importedAt: tx.importedAt ? new Date(tx.importedAt) : new Date(),
+                        userId,
+                    })),
+                });
+                results.budgetTransactions = data.budgetTransactions.length;
+            }
+            results.budgetImportBatches = batchIdMap.size;
+        } else {
+            await prisma.budgetImportBatch.deleteMany({ where: { userId } });
+            await prisma.budgetMerchantRule.deleteMany({ where: { userId } });
+        }
+
+        if (budgetMerchantRules.length > 0) {
+            await prisma.budgetMerchantRule.createMany({
+                data: budgetMerchantRules.map((record) => ({
+                    ...omitImportFields(record),
+                    createdAt: toDate(record.createdAt),
+                    updatedAt: toDate(record.updatedAt),
+                    lastUsedAt: toDate(record.lastUsedAt),
                     userId,
-                })),
+                })) as Prisma.BudgetMerchantRuleCreateManyInput[],
             });
-            results.budgetTransactions = data.budgetTransactions.length;
+            results.budgetMerchantRules = budgetMerchantRules.length;
         }
 
         if (data.dividends && data.dividends.length > 0) {

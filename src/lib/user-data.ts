@@ -23,11 +23,24 @@ function stripUserFields<T extends Record<string, unknown>>(record: T, fields: s
 }
 
 export async function fetchUserDataBundle(userId: string) {
-    const [preferences, assets, goals, budgetTransactions, dividends, pacSchedules, pacExecutions, pensionAccruals] = await Promise.all([
+    const [
+        preferences,
+        assets,
+        goals,
+        budgetTransactions,
+        budgetImportBatches,
+        budgetMerchantRules,
+        dividends,
+        pacSchedules,
+        pacExecutions,
+        pensionAccruals,
+    ] = await Promise.all([
         prisma.preference.findUnique({ where: { userId } }),
         prisma.assetRecord.findMany({ where: { userId }, orderBy: { date: "asc" } }),
         prisma.savingsGoal.findMany({ where: { userId }, orderBy: { createdAt: "desc" } }),
         prisma.budgetTransaction.findMany({ where: { userId }, orderBy: { date: "asc" } }),
+        prisma.budgetImportBatch.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
+        prisma.budgetMerchantRule.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
         prisma.dividendRecord.findMany({ where: { userId }, orderBy: { paymentDate: "desc" } }),
         prisma.assetPacSchedule.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
         prisma.assetPacExecution.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
@@ -39,6 +52,8 @@ export async function fetchUserDataBundle(userId: string) {
         assets,
         goals,
         budgetTransactions,
+        budgetImportBatches,
+        budgetMerchantRules,
         dividends,
         pacSchedules,
         pacExecutions,
@@ -52,6 +67,8 @@ export async function buildUserExportData(userId: string, includeDerived = false
         assets,
         goals,
         budgetTransactions,
+        budgetImportBatches,
+        budgetMerchantRules,
         dividends,
         pacSchedules,
         pacExecutions,
@@ -62,6 +79,12 @@ export async function buildUserExportData(userId: string, includeDerived = false
     const cleanAssets = assets.map((record) => stripUserFields(record as unknown as Record<string, unknown>));
     const cleanGoals = goals.map((record) => stripUserFields(record as unknown as Record<string, unknown>));
     const cleanBudgetTransactions = budgetTransactions.map((record) => stripUserFields(record as unknown as Record<string, unknown>));
+    const cleanBudgetImportBatches = budgetImportBatches.map((record) =>
+        stripUserFields(record as unknown as Record<string, unknown>, ["userId", "threadId"])
+    );
+    const cleanBudgetMerchantRules = budgetMerchantRules.map((record) =>
+        stripUserFields(record as unknown as Record<string, unknown>)
+    );
     const cleanDividends = dividends.map((record) => stripUserFields(record as unknown as Record<string, unknown>, ["id", "userId", "createdAt", "updatedAt"]));
     const cleanPacSchedules = pacSchedules.map((record) => stripUserFields(record as unknown as Record<string, unknown>, ["userId"]));
     const cleanPacExecutions = pacExecutions.map((record) => stripUserFields(record as unknown as Record<string, unknown>, ["userId"]));
@@ -77,7 +100,7 @@ export async function buildUserExportData(userId: string, includeDerived = false
     }
 
     const exportData: Record<string, unknown> = {
-        version: 2,
+        version: 3,
         exportedAt: new Date().toISOString(),
         preferences: cleanPreferences,
         assets: cleanAssets,
@@ -86,6 +109,8 @@ export async function buildUserExportData(userId: string, includeDerived = false
         obiettivi: cleanGoals,
         abbonamenti: subscriptions,
         budgetTransactions: cleanBudgetTransactions,
+        budgetImportBatches: cleanBudgetImportBatches,
+        budgetMerchantRules: cleanBudgetMerchantRules,
         dividends: cleanDividends,
         pacSchedules: cleanPacSchedules,
         pacExecutions: cleanPacExecutions,

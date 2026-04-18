@@ -26,6 +26,7 @@ export interface AssetRecord {
 export type AssetOwner = "person1" | "person2";
 
 export type PensionContributionMode = "percent" | "fixed";
+export type PreRetirementPassiveIncomeAllocationMode = "percent" | "fixed";
 
 export interface PensionContributionConfig {
     mode: PensionContributionMode;
@@ -209,8 +210,11 @@ export type PendingActionStatus = "pending" | "confirmed" | "canceled" | "failed
 
 export type PendingActionKind =
     | "add_budget_transaction"
+    | "add_budget_transactions_batch"
     | "delete_budget_transaction"
     | "update_budget_transaction_category"
+    | "upsert_budget_merchant_rule"
+    | "delete_budget_merchant_rule"
     | "create_goal"
     | "update_goal"
     | "delete_goal"

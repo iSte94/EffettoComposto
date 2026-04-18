@@ -42,6 +42,12 @@ interface TelegramBotIdentity {
     first_name?: string;
 }
 
+interface TelegramFileMetadata {
+    file_id: string;
+    file_size?: number;
+    file_path?: string;
+}
+
 function getAppBaseUrl(): string {
     const baseUrl = process.env.APP_BASE_URL?.trim();
     if (!baseUrl) {
@@ -363,6 +369,26 @@ export async function setTelegramCurrentThread(connectionId: string, threadId: s
 
 export function decryptTelegramBotToken(connection: Pick<TelegramConnectionRecord, "botTokenEnc">): string {
     return decrypt(connection.botTokenEnc);
+}
+
+export async function getTelegramFileMetadata(args: {
+    botToken: string;
+    fileId: string;
+}): Promise<TelegramFileMetadata> {
+    return telegramApiRequest<TelegramFileMetadata>(args.botToken, "getFile", {
+        file_id: args.fileId,
+    });
+}
+
+export async function downloadTelegramFile(args: {
+    botToken: string;
+    filePath: string;
+}): Promise<Uint8Array> {
+    const res = await fetch(`${TELEGRAM_API_BASE}/file/bot${args.botToken}/${args.filePath}`);
+    if (!res.ok) {
+        throw new Error(`Telegram file download error (${res.status})`);
+    }
+    return new Uint8Array(await res.arrayBuffer());
 }
 
 export function splitTelegramMessage(text: string): string[] {

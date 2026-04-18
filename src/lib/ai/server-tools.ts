@@ -17,11 +17,25 @@ import { fetchBtcPriceEur, fetchStockPrice } from "@/lib/stock-pricing";
 import { isValidIsin, scrapeBondPriceByIsin } from "@/lib/borsa-italiana/bond-scraper";
 import { getCachedOffers, isCacheValid, scrapeAllCombinations } from "@/lib/mutui-market/scraper";
 import { buildPendingActionResult } from "@/lib/ai/pending-actions";
+import {
+    buildBudgetImportPreview,
+    getLatestPendingBudgetImportAction,
+    listBudgetCategoriesAndRules,
+    prepareBudgetImportTransactions,
+    type PendingBudgetImportBatchPayload,
+} from "@/lib/budget-assistant";
+import {
+    normalizeMerchantName,
+    summarizeBudgetImportBatch,
+    type BudgetMovementType,
+    type BudgetImportTransactionDraft,
+} from "@/lib/budget-import";
 import { sanitizePreferenceForClient } from "@/lib/user-data";
 import type { AssistantChannel, AssetRecord, CustomStock } from "@/types";
 
 interface AiToolContext {
     userId: string;
+    threadId: string;
     channel: AssistantChannel;
     canWrite: boolean;
 }
@@ -73,6 +87,84 @@ function parseJson<T>(raw: string | null | undefined, fallback: T): T {
     } catch {
         return fallback;
     }
+}
+
+function normalizeBudgetBatchTransactionInput(input: Record<string, unknown>): BudgetImportTransactionDraft | null {
+    const amount = Math.abs(num(input.amount));
+    if (amount === 0) return null;
+
+    const description = str(input.description).trim();
+    if (!description) return null;
+
+    const direction = str(input.direction, "expense");
+    const signedAmount = direction === "income" ? amount : -amount;
+
+    return {
+        date: str(input.date) || new Date().toISOString().slice(0, 10),
+        description,
+        amount: signedAmount,
+        category: str(input.category).trim() || "Altro",
+        merchant: str(input.merchant).trim() || null,
+        merchantNormalized: normalizeMerchantName(str(input.merchant).trim() || description),
+        confidence: (() => {
+            const confidence = str(input.confidence, "medium");
+            return confidence === "high" || confidence === "medium" || confidence === "low"
+                ? confidence
+                : "medium";
+        })(),
+        movementType: (() => {
+            const movementType = str(input.movementType);
+            const allowed: BudgetMovementType[] = [
+                "standard",
+                "income",
+                "refund",
+                "transfer",
+                "cash_withdrawal",
+                "subscription",
+                "card_payment",
+                "fee",
+                "unknown",
+            ];
+            return allowed.includes(movementType as BudgetMovementType)
+                ? movementType as BudgetMovementType
+                : undefined;
+        })(),
+        notes: str(input.notes).trim() || null,
+        shouldIgnore: bool(input.skip, false),
+    };
+}
+
+async function loadPendingBudgetImportAction(args: {
+    userId: string;
+    threadId: string;
+    pendingActionId?: string;
+}) {
+    if (args.pendingActionId) {
+        const action = await prisma.assistantPendingAction.findFirst({
+            where: {
+                id: args.pendingActionId,
+                userId: args.userId,
+                kind: "add_budget_transactions_batch",
+                status: "pending",
+            },
+            select: {
+                id: true,
+                title: true,
+                previewText: true,
+                payload: true,
+            },
+        });
+        if (!action) return null;
+        return {
+            ...action,
+            payload: parseJson<PendingBudgetImportBatchPayload>(action.payload, { transactions: [] }),
+        };
+    }
+
+    return getLatestPendingBudgetImportAction({
+        userId: args.userId,
+        threadId: args.threadId,
+    });
 }
 
 async function getPreferences(userId: string) {
@@ -1242,6 +1334,312 @@ function buildAddBudgetTransactionTool(context: AiToolContext): AiToolDef {
     };
 }
 
+function buildEnhancedAddBudgetTransactionsBatchTool(context: AiToolContext): AiToolDef {
+    return {
+        name: "add_budget_transactions_batch",
+        description: "Propone l'aggiunta di piu' transazioni budget in un'unica conferma. Utile per screenshot, estratti conto e riepiloghi di spese.",
+        parameters: {
+            type: "object",
+            properties: {
+                transactions: {
+                    type: "array",
+                    items: {
+                        type: "object",
+                        properties: {
+                            description: { type: "string" },
+                            amount: { type: "number", description: "Importo positivo" },
+                            category: { type: "string" },
+                            direction: { type: "string", enum: ["expense", "income"] },
+                            date: { type: "string", description: "YYYY-MM-DD. Default oggi." },
+                            merchant: { type: "string" },
+                            confidence: { type: "string", enum: ["high", "medium", "low"] },
+                            movementType: { type: "string" },
+                            notes: { type: "string" },
+                            skip: { type: "boolean", description: "True se la riga va ignorata e non importata." },
+                        },
+                        required: ["description", "amount", "category", "direction"],
+                    },
+                },
+                note: { type: "string" },
+            },
+            required: ["transactions"],
+        },
+        async handler(args) {
+            makeReadOnlyGuard(context);
+            const inputTransactions = Array.isArray(args.transactions)
+                ? args.transactions as Array<Record<string, unknown>>
+                : [];
+
+            if (inputTransactions.length === 0) {
+                return { error: "Serve almeno una transazione" };
+            }
+
+            const normalizedDrafts = inputTransactions
+                .slice(0, 50)
+                .map((transaction) => normalizeBudgetBatchTransactionInput(transaction))
+                .filter((transaction): transaction is BudgetImportTransactionDraft => Boolean(transaction));
+
+            if (normalizedDrafts.length === 0) {
+                return { error: "Non ho trovato transazioni valide da proporre" };
+            }
+
+            const prepared = await prepareBudgetImportTransactions({
+                userId: context.userId,
+                transactions: normalizedDrafts,
+            });
+            const payload: PendingBudgetImportBatchPayload = {
+                transactions: prepared,
+                note: str(args.note).trim() || null,
+            };
+            const previewText = buildBudgetImportPreview(payload);
+
+            return buildPendingActionResult(
+                "add_budget_transactions_batch",
+                "Importa transazioni budget da screenshot",
+                previewText,
+                payload,
+            );
+        },
+    };
+}
+
+function buildGetPendingBudgetImportBatchTool(context: AiToolContext): AiToolDef {
+    return {
+        name: "get_pending_budget_import_batch",
+        description: "Restituisce il batch di import spese in attesa di conferma nel thread corrente, utile per correggerlo prima del salvataggio.",
+        parameters: {
+            type: "object",
+            properties: {
+                pendingActionId: { type: "string" },
+            },
+        },
+        async handler(args) {
+            const pendingActionId = str(args.pendingActionId).trim() || undefined;
+            const action = await loadPendingBudgetImportAction({
+                userId: context.userId,
+                threadId: context.threadId,
+                pendingActionId,
+            });
+            if (!action) {
+                return { error: "Nessun batch di import spese in attesa di conferma" };
+            }
+
+            return {
+                pendingActionId: action.id,
+                title: action.title,
+                note: action.payload.note ?? null,
+                previewText: action.previewText,
+                totals: summarizeBudgetImportBatch(action.payload.transactions),
+                transactions: action.payload.transactions,
+            };
+        },
+    };
+}
+
+function buildReviseBudgetTransactionsBatchTool(context: AiToolContext): AiToolDef {
+    return {
+        name: "revise_budget_transactions_batch",
+        description: "Sostituisce il batch di import spese in attesa con una versione corretta, senza salvarla ancora nel database.",
+        parameters: {
+            type: "object",
+            properties: {
+                pendingActionId: { type: "string" },
+                transactions: {
+                    type: "array",
+                    items: {
+                        type: "object",
+                        properties: {
+                            description: { type: "string" },
+                            amount: { type: "number", description: "Importo positivo" },
+                            category: { type: "string" },
+                            direction: { type: "string", enum: ["expense", "income"] },
+                            date: { type: "string", description: "YYYY-MM-DD. Default oggi." },
+                            merchant: { type: "string" },
+                            confidence: { type: "string", enum: ["high", "medium", "low"] },
+                            movementType: { type: "string" },
+                            notes: { type: "string" },
+                            skip: { type: "boolean" },
+                        },
+                        required: ["description", "amount", "category", "direction"],
+                    },
+                },
+                note: { type: "string" },
+            },
+            required: ["transactions"],
+        },
+        async handler(args) {
+            makeReadOnlyGuard(context);
+            const pendingActionId = str(args.pendingActionId).trim() || undefined;
+            const action = await loadPendingBudgetImportAction({
+                userId: context.userId,
+                threadId: context.threadId,
+                pendingActionId,
+            });
+            if (!action) {
+                return { error: "Nessun batch di import spese in attesa di conferma" };
+            }
+
+            const inputTransactions = Array.isArray(args.transactions)
+                ? args.transactions as Array<Record<string, unknown>>
+                : [];
+            const normalizedDrafts = inputTransactions
+                .slice(0, 50)
+                .map((transaction) => normalizeBudgetBatchTransactionInput(transaction))
+                .filter((transaction): transaction is BudgetImportTransactionDraft => Boolean(transaction));
+
+            if (normalizedDrafts.length === 0) {
+                return { error: "Serve almeno una transazione valida per aggiornare il batch" };
+            }
+
+            const prepared = await prepareBudgetImportTransactions({
+                userId: context.userId,
+                transactions: normalizedDrafts,
+            });
+            const payload: PendingBudgetImportBatchPayload = {
+                transactions: prepared,
+                note: str(args.note).trim() || action.payload.note || null,
+            };
+            const previewText = buildBudgetImportPreview(payload);
+
+            await prisma.assistantPendingAction.update({
+                where: { id: action.id },
+                data: {
+                    previewText,
+                    payload: JSON.stringify(payload),
+                    updatedAt: new Date(),
+                },
+            });
+
+            return {
+                pendingActionId: action.id,
+                updated: true,
+                note: payload.note,
+                previewText,
+                totals: summarizeBudgetImportBatch(prepared),
+                transactions: prepared,
+            };
+        },
+    };
+}
+
+function buildGetBudgetMerchantRulesTool(context: AiToolContext): AiToolDef {
+    return {
+        name: "get_budget_merchant_rules",
+        description: "Mostra le categorie budget disponibili e le regole merchant apprese o salvate dall'utente.",
+        parameters: {
+            type: "object",
+            properties: {},
+        },
+        async handler() {
+            return listBudgetCategoriesAndRules(context.userId);
+        },
+    };
+}
+
+function buildSaveBudgetMerchantRuleTool(context: AiToolContext): AiToolDef {
+    return {
+        name: "save_budget_merchant_rule",
+        description: "Propone di salvare una regola permanente per categorizzare o ignorare un merchant. Richiede conferma.",
+        parameters: {
+            type: "object",
+            properties: {
+                merchant: { type: "string" },
+                mode: { type: "string", enum: ["categorize", "ignore"] },
+                category: { type: "string" },
+                alias: { type: "string" },
+            },
+            required: ["merchant", "mode"],
+        },
+        async handler(args) {
+            makeReadOnlyGuard(context);
+            const merchant = str(args.merchant).trim();
+            const mode = str(args.mode, "categorize");
+            const category = str(args.category).trim() || null;
+            const alias = str(args.alias).trim() || null;
+            const normalizedMerchant = normalizeMerchantName(merchant);
+
+            if (!merchant || !normalizedMerchant) {
+                return { error: "Merchant non valido per creare una regola" };
+            }
+            if (mode === "categorize" && !category) {
+                return { error: "Serve una categoria per la regola di categorizzazione" };
+            }
+
+            return buildPendingActionResult(
+                "upsert_budget_merchant_rule",
+                mode === "ignore" ? "Ignora merchant budget" : "Salva regola merchant budget",
+                mode === "ignore"
+                    ? `Ignorare in automatico i movimenti del merchant "${merchant}"?`
+                    : `Salvare la regola "${merchant}" -> ${category}?`,
+                {
+                    merchant,
+                    normalizedMerchant,
+                    mode: mode === "ignore" ? "ignore" : "categorize",
+                    category,
+                    alias,
+                },
+            );
+        },
+    };
+}
+
+function buildDeleteBudgetMerchantRuleTool(context: AiToolContext): AiToolDef {
+    return {
+        name: "delete_budget_merchant_rule",
+        description: "Propone di eliminare una regola merchant esistente. Richiede conferma.",
+        parameters: {
+            type: "object",
+            properties: {
+                merchant: { type: "string" },
+                normalizedMerchant: { type: "string" },
+                mode: { type: "string", enum: ["categorize", "ignore"] },
+            },
+            required: ["mode"],
+        },
+        async handler(args) {
+            makeReadOnlyGuard(context);
+            const merchant = str(args.merchant).trim();
+            const normalizedMerchant = str(args.normalizedMerchant).trim() || normalizeMerchantName(merchant) || "";
+            const mode = str(args.mode, "categorize");
+
+            if (!normalizedMerchant) {
+                return { error: "Serve il merchant o il merchant normalizzato della regola da rimuovere" };
+            }
+
+            const rule = await prisma.budgetMerchantRule.findFirst({
+                where: {
+                    userId: context.userId,
+                    normalizedMerchant,
+                    mode,
+                },
+                select: {
+                    normalizedMerchant: true,
+                    displayName: true,
+                    mode: true,
+                    category: true,
+                },
+            });
+
+            if (!rule) {
+                return { error: "Regola merchant non trovata" };
+            }
+
+            return buildPendingActionResult(
+                "delete_budget_merchant_rule",
+                "Rimuovi regola merchant budget",
+                rule.mode === "ignore"
+                    ? `Rimuovere la regola che ignora "${rule.displayName}"?`
+                    : `Rimuovere la regola "${rule.displayName}" -> ${rule.category ?? "Altro"}?`,
+                {
+                    normalizedMerchant: rule.normalizedMerchant,
+                    mode: rule.mode as "categorize" | "ignore",
+                    merchant: rule.displayName,
+                },
+            );
+        },
+    };
+}
+
 function buildDeleteBudgetTransactionTool(context: AiToolContext): AiToolDef {
     return {
         name: "delete_budget_transaction",
@@ -1519,6 +1917,12 @@ export function getServerAiTools(context: AiToolContext): AiToolDef[] {
         buildMortgageMarketTool(),
 
         buildAddBudgetTransactionTool(context),
+        buildEnhancedAddBudgetTransactionsBatchTool(context),
+        buildGetPendingBudgetImportBatchTool(context),
+        buildReviseBudgetTransactionsBatchTool(context),
+        buildGetBudgetMerchantRulesTool(context),
+        buildSaveBudgetMerchantRuleTool(context),
+        buildDeleteBudgetMerchantRuleTool(context),
         buildDeleteBudgetTransactionTool(context),
         buildUpdateBudgetTransactionCategoryTool(context),
         buildCreateGoalTool(context),

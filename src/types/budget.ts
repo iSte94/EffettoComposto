@@ -15,6 +15,10 @@ export interface BudgetTransaction {
     category: string;
     categoryOverride?: boolean;
     hash: string;
+    merchantNormalized?: string | null;
+    movementType?: string;
+    importConfidence?: string | null;
+    importBatchId?: string | null;
 }
 
 export type BudgetViewMode = "month" | "avg" | "all";

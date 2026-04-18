@@ -1,6 +1,8 @@
 // Monte Carlo Simulation Web Worker
 // Riceve parametri e esegue 10k simulazioni senza bloccare la UI
 
+import { allocatePreRetirementPassiveIncomeAnnual } from "@/lib/finance/coast-fire";
+
 interface MonteCarloParams {
     startingCapital: number;
     fireTargetsByYear: number[];
@@ -12,6 +14,9 @@ interface MonteCarloParams {
     applyTaxStamp: boolean;
     annualExpenses: number;
     monthlySavings: number;
+    preRetirementPassiveIncomeMode: "percent" | "fixed";
+    preRetirementPassiveIncomeSavingsPct: number;
+    preRetirementPassiveIncomeSavingsAnnual: number;
     publicPensionAge: number;
     expectedPublicPension: number;
     enablePensionOptimizer: boolean;
@@ -72,6 +77,7 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
         startingCapital, fireTargetsByYear, currentAge, retirementAge,
         simYears, fireVolatility, realReturnDecimal, applyTaxStamp,
         annualExpenses, monthlySavings,
+        preRetirementPassiveIncomeMode, preRetirementPassiveIncomeSavingsPct, preRetirementPassiveIncomeSavingsAnnual,
         publicPensionAge, expectedPublicPension,
         enablePensionOptimizer, annualTaxRefund,
         targetRuns, debtByMonth, passiveIncomeByMonth, baseInstallmentNow,
@@ -125,7 +131,14 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                         const monthIdx = Math.min(m, debtByMonth.length - 1);
                         const activeDebtThisMonth = debtByMonth[monthIdx] || 0;
                         const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth;
-                        totalSavingsThisYear += (monthlySavings + Math.max(0, freedUpCashFlow));
+                        const passiveIncomeAnnual = passiveIncomeByMonth[Math.min(m, passiveIncomeByMonth.length - 1)] || 0;
+                        const savedPassiveIncomeThisMonth = allocatePreRetirementPassiveIncomeAnnual({
+                            annualPassiveIncome: passiveIncomeAnnual,
+                            mode: preRetirementPassiveIncomeMode,
+                            savingsPct: preRetirementPassiveIncomeSavingsPct,
+                            savingsAnnual: preRetirementPassiveIncomeSavingsAnnual,
+                        }).savingsAnnual / 12;
+                        totalSavingsThisYear += (monthlySavings + Math.max(0, freedUpCashFlow) + savedPassiveIncomeThisMonth);
                     }
                     runCap += totalSavingsThisYear;
                 }

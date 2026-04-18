@@ -276,6 +276,7 @@ export async function runAssistantTurn(args: {
         messages: providerMessages,
         tools: getServerAiTools({
             userId: args.userId,
+            threadId: thread.id,
             channel: args.channel,
             canWrite: args.canWrite ?? true,
         }),

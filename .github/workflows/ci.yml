@@ -9,6 +9,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: file:./ci-test.db
 
     steps:
       - name: Checkout
@@ -38,5 +40,3 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          DATABASE_URL: file:./ci-test.db

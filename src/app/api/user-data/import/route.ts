@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         const raw = await req.json();
         const payload = isRecord(raw) && isRecord(raw.data) ? raw.data : raw;
 
-        if (!isRecord(payload) || payload.version !== 2) {
+        if (!isRecord(payload) || (payload.version !== 2 && payload.version !== 3)) {
             return NextResponse.json({ error: "Backup non valido o versione non supportata" }, { status: 400 });
         }
 
@@ -41,17 +41,21 @@ export async function POST(req: Request) {
         const assets = recordsFrom(payload.assets);
         const savingsGoals = recordsFrom(payload.savingsGoals);
         const budgetTransactions = recordsFrom(payload.budgetTransactions);
+        const budgetImportBatches = recordsFrom(payload.budgetImportBatches);
+        const budgetMerchantRules = recordsFrom(payload.budgetMerchantRules);
         const dividends = recordsFrom(payload.dividends);
         const pacSchedules = recordsFrom(payload.pacSchedules);
         const pacExecutions = recordsFrom(payload.pacExecutions);
         const pensionAccruals = recordsFrom(payload.pensionAccruals);
 
         const result = await prisma.$transaction(async (tx) => {
+            await tx.budgetTransaction.deleteMany({ where: { userId } });
+            await tx.budgetImportBatch.deleteMany({ where: { userId } });
+            await tx.budgetMerchantRule.deleteMany({ where: { userId } });
             await tx.assetPacExecution.deleteMany({ where: { userId } });
             await tx.assetPacSchedule.deleteMany({ where: { userId } });
             await tx.pensionFundAccrual.deleteMany({ where: { userId } });
             await tx.dividendRecord.deleteMany({ where: { userId } });
-            await tx.budgetTransaction.deleteMany({ where: { userId } });
             await tx.savingsGoal.deleteMany({ where: { userId } });
             await tx.assetRecord.deleteMany({ where: { userId } });
 
@@ -88,13 +92,45 @@ export async function POST(req: Request) {
                 });
             }
 
+            const batchIdMap = new Map<string, string>();
+            for (const record of budgetImportBatches) {
+                const oldId = typeof record.id === "string" ? record.id : null;
+                const created = await tx.budgetImportBatch.create({
+                    data: {
+                        ...omitFields(sanitizeForCreate(record), ["threadId", "thread", "transactions"]),
+                        createdAt: toDate(record.createdAt),
+                        updatedAt: toDate(record.updatedAt),
+                        confirmedAt: toDate(record.confirmedAt),
+                        cancelledAt: toDate(record.cancelledAt),
+                        rolledBackAt: toDate(record.rolledBackAt),
+                        userId,
+                    } as Prisma.BudgetImportBatchUncheckedCreateInput,
+                });
+                if (oldId) batchIdMap.set(oldId, created.id);
+            }
+
             if (budgetTransactions.length > 0) {
                 await tx.budgetTransaction.createMany({
                     data: budgetTransactions.map((record) => ({
-                        ...sanitizeForCreate(record),
+                        ...omitFields(sanitizeForCreate(record), ["importBatchId", "importBatch"]),
+                        importBatchId: typeof record.importBatchId === "string"
+                            ? batchIdMap.get(record.importBatchId) ?? null
+                            : null,
                         importedAt: toDate(record.importedAt),
                         userId,
                     })) as Prisma.BudgetTransactionCreateManyInput[],
+                });
+            }
+
+            if (budgetMerchantRules.length > 0) {
+                await tx.budgetMerchantRule.createMany({
+                    data: budgetMerchantRules.map((record) => ({
+                        ...sanitizeForCreate(record),
+                        createdAt: toDate(record.createdAt),
+                        updatedAt: toDate(record.updatedAt),
+                        lastUsedAt: toDate(record.lastUsedAt),
+                        userId,
+                    })) as Prisma.BudgetMerchantRuleCreateManyInput[],
                 });
             }
 
@@ -154,6 +190,8 @@ export async function POST(req: Request) {
                 assets: assets.length,
                 savingsGoals: savingsGoals.length,
                 budgetTransactions: budgetTransactions.length,
+                budgetImportBatches: batchIdMap.size,
+                budgetMerchantRules: budgetMerchantRules.length,
                 dividends: dividends.length,
                 pacSchedules: scheduleIdMap.size,
                 pacExecutions: importedExecutions,
@@ -163,7 +201,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({
             message: "Import completato",
-            version: 2,
+            version: Number(payload.version),
             imported: result,
         });
     } catch (error) {
