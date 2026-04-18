@@ -58,6 +58,9 @@ export function CompoundInterestCalculator() {
         // Valore reale a potere d'acquisto odierno: deflaziona il nominale finale.
         const inflationFactor = Math.pow(1 + inflationRate / 100, years);
         const realFinalBalance = inflationFactor > 0 ? balance / inflationFactor : balance;
+        // Guadagno reale: crescita effettiva del potere d'acquisto rispetto a quanto versato.
+        // Se negativo, l'inflazione ha eroso piu' di quanto il rendimento abbia prodotto.
+        const realGain = realFinalBalance - totalDeposited;
 
         return {
             finalBalance: balance,
@@ -66,6 +69,7 @@ export function CompoundInterestCalculator() {
             chartData,
             crossoverYear,
             realFinalBalance,
+            realGain,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -197,6 +201,21 @@ export function CompoundInterestCalculator() {
                                         <div className="mt-0.5 text-[10px] text-muted-foreground">non raggiunto in {years} anni</div>
                                     </>
                                 )}
+                            </div>
+                        </div>
+
+                        <div className="rounded-3xl border border-border/70 bg-card/80 p-4 backdrop-blur-xl">
+                            <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {result.realGain >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />} Guadagno Reale
+                                <InfoTooltip iconClassName="w-3 h-3">Crescita effettiva del potere d&apos;acquisto: valore reale finale meno totale versato. Se positivo hai davvero arricchito il tuo capitale al netto dell&apos;inflazione; se negativo l&apos;inflazione ha eroso piu&apos; di quanto il rendimento abbia prodotto, nonostante il saldo nominale sembri cresciuto.</InfoTooltip>
+                            </div>
+                            <div className={`text-center text-2xl font-extrabold ${result.realGain >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                {result.realGain >= 0 ? "+" : ""}{formatEuro(result.realGain)}
+                            </div>
+                            <div className="mt-1 text-center text-[10px] text-muted-foreground">
+                                {result.realGain >= 0
+                                    ? `potere d'acquisto in piu' rispetto ai ${formatEuro(result.totalDeposited)} versati`
+                                    : `potere d'acquisto perso rispetto ai ${formatEuro(result.totalDeposited)} versati`}
                             </div>
                         </div>
                     </div>
