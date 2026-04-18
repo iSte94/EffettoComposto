@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.4.0`
+**Versione corrente:** `v0.4.1`
 
 ---
 
@@ -60,6 +60,7 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 | **Calcolatore FIRE** | 10.000 simulazioni Monte Carlo via Web Worker, proiezione patrimonio, probabilita' di successo per anno target |
 | **Interesse Composto** | Simulazione crescita capitale con versamenti periodici e reinvestimento |
 | **Calcolatore Inflazione** | Impatto dell'inflazione sul potere d'acquisto nel tempo |
+| **Calcolatore Finanziamento** | Rata di prestiti personali con ammortamento alla francese, anticipo, costo totale del credito e analisi DTI sul reddito |
 | **Viewer Movimenti Directa** | Importa il CSV dei movimenti da Directa Trading: dashboard con KPI, grafici cumulativi, flussi mensili, breakdown per strumento, riepilogo annuale e tabella filtrata (solo visualizzazione, nessun dato salvato) |
 | **Advisor Acquisti** | Analisi dell'impatto di un acquisto sul percorso FIRE con grafici comparativi |
 | **Lordo -> Netto** | Calcolo dinamico stipendio netto con IRPEF, INPS, addizionali, bonus, cronologia scenari salvati e richiamo rapido delle simulazioni |
@@ -111,6 +112,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.4.1 - 18 aprile 2026 (Calcolatore finanziamento + DTI prestiti)
+
+- **Nuovo Calcolatore Rata Finanziamento** - la sezione `Strumenti` include ora un simulatore dedicato ai prestiti personali con ammortamento alla francese, pensato per auto, moto, arredamento e altri finanziamenti non immobiliari. Il tool consente di impostare importo, anticipo, TAN e durata fino a 10 anni e restituisce subito rata mensile, totale pagato, interessi complessivi e percentuale di costo del credito
+- **Analisi DTI integrata con i prestiti gia' presenti in piattaforma** - il calcolatore puo' attribuire il nuovo finanziamento a Persona 1, Persona 2 oppure Entrambi e combina automaticamente la nuova rata con le rate gia' censite nel patrimonio. In questo modo il rapporto rata/reddito viene valutato sul carico debitorio reale gia' sostenuto dall'utente, invece che su una simulazione isolata
+- **Feedback di sostenibilita' piu' concreto** - oltre al DTI percentuale, l'interfaccia evidenzia fascia verde/amber/rossa rispetto alle soglie bancarie, mostra quanta rata aggiuntiva resta sostenibile al 33% e rende piu' leggibile il piano di rimborso con riepilogo live, grafico annuale capitale/interessi/debito residuo e tabella dettagliata espandibile
 
 ### v0.4.0 - 17 aprile 2026 (Fondo pensione strutturato + PAC automatici)
 
