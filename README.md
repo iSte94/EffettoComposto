@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.4.0`
+**Versione corrente:** `v1.0.1`
 
 ---
 
@@ -60,6 +60,7 @@ Installabile come app su smartphone (PWA), funziona anche offline e i calcoli pe
 | **Calcolatore FIRE** | 10.000 simulazioni Monte Carlo via Web Worker, proiezione patrimonio, probabilita' di successo per anno target |
 | **Interesse Composto** | Simulazione crescita capitale con versamenti periodici e reinvestimento |
 | **Calcolatore Inflazione** | Impatto dell'inflazione sul potere d'acquisto nel tempo |
+| **Calcolatore Finanziamento** | Rata di prestiti personali con ammortamento alla francese, anticipo, costo totale del credito e analisi DTI sul reddito |
 | **Viewer Movimenti Directa** | Importa il CSV dei movimenti da Directa Trading: dashboard con KPI, grafici cumulativi, flussi mensili, breakdown per strumento, riepilogo annuale e tabella filtrata (solo visualizzazione, nessun dato salvato) |
 | **Advisor Acquisti** | Analisi dell'impatto di un acquisto sul percorso FIRE con grafici comparativi |
 | **Lordo -> Netto** | Calcolo dinamico stipendio netto con IRPEF, INPS, addizionali, bonus, cronologia scenari salvati e richiamo rapido delle simulazioni |
@@ -111,6 +112,32 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.0.1 - 18 aprile 2026 (fix finanziario critico: `projectFire` ignorava l'esborso immediato nel flag `alreadyFire`)
+
+- **Bug critico nel motore FIRE deterministico (`src/lib/finance/fire-projection.ts`)** — il flag `alreadyFire` e il conseguente azzeramento di `monthsToFire`/`yearsToFire` erano calcolati con `startingCapital >= fireTarget`, ignorando completamente `oneTimeOutflow`. Quando un utente gia' FIRE simulava un acquisto che lo portava SOTTO la soglia (es. patrimonio 2M, casa 1.7M, target 600k → capitale effettivo 300k), il loop individuava correttamente i mesi necessari per tornare a FIRE ma poi li sovrascriveva a 0, dando all'Advisor la falsa certezza che "l'acquisto non ritarda il FIRE". Conseguenza: `fireDelayMonths(baseline, withPurchase)` ritornava 0 anche per esborsi molto significativi, silenziando il principale indicatore comparativo dell'Advisor
+- **Formula corretta** — introdotta la variabile derivata `initialCapital = max(0, startingCapital - oneTimeOutflow)` usata sia come punto di partenza della proiezione sia come criterio per `alreadyFire`. Il punto 0 del `chartData` riflette ora il capitale reale disponibile dopo l'esborso, e il flag indica correttamente se il piano e' gia' FIRE *dopo* l'acquisto
+- **4 nuovi test di regressione** in `fire-projection.test.ts`: (1) esborso che porta sotto il target NON deve lasciare `alreadyFire=true`, (2) `fireDelayMonths` rileva il ritardo quando il baseline e' gia' FIRE, (3) esborso che non scende sotto il target mantiene `alreadyFire=true`, (4) esborso >= capitale iniziale non produce capitale negativo. Suite totale: **215 test passati**
+- **Impatto** — il fix rende finanziariamente affidabile il confronto "con vs senza acquisto" per tutti gli utenti con patrimonio superiore al target FIRE, che rappresentano il segmento piu' esposto a decisioni di spesa ad alto impatto (prima casa, investimenti immobiliari, passaggi generazionali)
+
+### v1.0.0 - 18 aprile 2026 (AI unificata server-side + bot Telegram personale)
+
+- **Release 1.0 ufficiale** - Effetto Composto entra nella fase `1.0.0` con un'architettura AI stabile e pronta per l'uso reale: il motore conversazionale non vive piu' nel browser ma in un runtime server-side unico, riusato dalla tab AI web, dall'analisi performance e dal nuovo canale Telegram
+- **Nuovo runtime AI server-side unificato** - introdotti un contesto utente derivato privacy-first, prompt builder centrale, registry tool lato server e persistenza completa di thread, messaggi, allegati e memoria. Il browser non chiama piu' direttamente Gemini/OpenRouter per la chat principale: provider, modello e chiave vengono salvati sul server in forma cifrata e riusati in tutti i canali
+- **Bot Telegram personale per ogni utente** - ogni account puo' configurare il proprio token BotFather, registrare automaticamente il webhook e collegarsi tramite deep link `/start <codice>`. Il bot gira sullo stesso modello della tab AI, vede gli stessi dati utente e supporta `/help`, `/new`, `/status`, `/unlink`, piu' dialogo libero in linguaggio naturale
+- **AI consulente + calcolatore professionista** - Telegram e web condividono tutti i tool analitici principali della piattaforma: lettura patrimonio, budget, obiettivi, dividendi, preferenze e simulazioni di scenario. Aggiunti anche tool ad alto livello per simulazione mutuo e simulazione FIRE con override testuali, cosi' il bot puo' rispondere a domande tipo "se compro casa a 300k con mutuo 20 anni?" usando i dati reali del profilo
+- **Azioni scrivibili con conferma esplicita** - introdotto il lifecycle `AssistantPendingAction`: l'AI puo' preparare operazioni su budget, obiettivi e memoria, ma ogni scrittura resta in stato pending finche' l'utente non conferma da web o da Telegram. Questo evita side effect silenziosi e rende il bot davvero utilizzabile su dati personali sensibili
+- **Cronologia unica multi-canale** - i thread AI ora hanno metadato `channel` (`web` o `telegram`), badge dedicato nella sidebar e persistenza unificata. Una conversazione Telegram non e' piu' separata dal resto dell'assistente: entra nello stesso storico dell'utente con i messaggi e gli eventuali esiti delle conferme
+- **Secret ripuliti dai payload client/LLM** - `aiApiKeyEnc`, token Telegram e webhook secret non compaiono piu' nelle API browser e non entrano nel contesto inviato al modello. Le preferenze esposte al frontend vengono sanificate, e l'export utente AI usa un bundle derivato controllato
+- **Analisi performance migrata sul backend** - anche il dialog "Analizza con AI" del tab performance usa ora il motore server-side, mantenendo lo stesso provider/modello dell'assistente principale e togliendo un altro punto di contatto diretto browser-provider
+- **Fondamenta deploy-ready per il live** - aggiunta la migration `20260418153000_add_telegram_ai_runtime`, introdotta `APP_BASE_URL` per webhook e deep link e aggiornato il percorso di deploy per gestire in modo sicuro la nuova major senza toccare i dati utente esistenti
+- **Qualita' di release verificata** - suite confermata verde con `eslint`, `next build` e **211 test passati**
+
+### v0.4.1 - 18 aprile 2026 (Calcolatore finanziamento + DTI prestiti)
+
+- **Nuovo Calcolatore Rata Finanziamento** - la sezione `Strumenti` include ora un simulatore dedicato ai prestiti personali con ammortamento alla francese, pensato per auto, moto, arredamento e altri finanziamenti non immobiliari. Il tool consente di impostare importo, anticipo, TAN e durata fino a 10 anni e restituisce subito rata mensile, totale pagato, interessi complessivi e percentuale di costo del credito
+- **Analisi DTI integrata con i prestiti gia' presenti in piattaforma** - il calcolatore puo' attribuire il nuovo finanziamento a Persona 1, Persona 2 oppure Entrambi e combina automaticamente la nuova rata con le rate gia' censite nel patrimonio. In questo modo il rapporto rata/reddito viene valutato sul carico debitorio reale gia' sostenuto dall'utente, invece che su una simulazione isolata
+- **Feedback di sostenibilita' piu' concreto** - oltre al DTI percentuale, l'interfaccia evidenzia fascia verde/amber/rossa rispetto alle soglie bancarie, mostra quanta rata aggiuntiva resta sostenibile al 33% e rende piu' leggibile il piano di rimborso con riepilogo live, grafico annuale capitale/interessi/debito residuo e tabella dettagliata espandibile
 
 ### v0.4.0 - 17 aprile 2026 (Fondo pensione strutturato + PAC automatici)
 

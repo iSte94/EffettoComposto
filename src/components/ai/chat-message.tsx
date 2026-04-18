@@ -4,8 +4,10 @@ import { memo, useState } from "react";
 import { Bot, User, Wrench, ChevronDown, ChevronRight, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Button } from "@/components/ui/button";
 import type { AiAttachmentDescriptor } from "@/lib/ai/attachments";
 import type { AiToolTraceEntry } from "@/lib/ai/providers";
+import type { PendingAction } from "@/types";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -13,6 +15,9 @@ interface Props {
     content: string;
     attachments?: AiAttachmentDescriptor[];
     tools?: AiToolTraceEntry[] | null;
+    pendingActions?: PendingAction[];
+    onConfirmPendingAction?: (actionId: string) => void;
+    onCancelPendingAction?: (actionId: string) => void;
     streaming?: boolean;
 }
 
@@ -108,11 +113,49 @@ function AttachmentList({ attachments, isUser }: { attachments: AiAttachmentDesc
     );
 }
 
+function PendingActionList({
+    actions,
+    onConfirm,
+    onCancel,
+}: {
+    actions: PendingAction[];
+    onConfirm?: (actionId: string) => void;
+    onCancel?: (actionId: string) => void;
+}) {
+    if (actions.length === 0) return null;
+
+    return (
+        <div className="mt-2 space-y-2">
+            {actions.map((action) => (
+                <div key={action.id} className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs">
+                    <div className="font-semibold text-amber-800 dark:text-amber-200">{action.title}</div>
+                    <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{action.previewText}</p>
+                    {action.status === "pending" ? (
+                        <div className="mt-3 flex gap-2">
+                            <Button size="sm" className="h-8 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => onConfirm?.(action.id)}>
+                                Conferma
+                            </Button>
+                            <Button size="sm" variant="outline" className="h-8" onClick={() => onCancel?.(action.id)}>
+                                Annulla
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="mt-2 font-medium text-muted-foreground">{`Stato: ${action.status}${action.resultSummary ? ` | ${action.resultSummary}` : ""}`}</div>
+                    )}
+                </div>
+            ))}
+        </div>
+    );
+}
+
 export const ChatMessage = memo(function ChatMessage({
     role,
     content,
     attachments = [],
     tools,
+    pendingActions = [],
+    onConfirmPendingAction,
+    onCancelPendingAction,
     streaming,
 }: Props) {
     const isUser = role === "user";
@@ -176,6 +219,13 @@ export const ChatMessage = memo(function ChatMessage({
                     </div>
                 )}
                 {tools && tools.length > 0 && <ToolTrace entries={tools} />}
+                {pendingActions.length > 0 && (
+                    <PendingActionList
+                        actions={pendingActions}
+                        onConfirm={onConfirmPendingAction}
+                        onCancel={onCancelPendingAction}
+                    />
+                )}
             </div>
             {isUser && (
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-blue-500/10">

@@ -9,13 +9,7 @@ import { calculateNetSalary } from "@/lib/finance/irpef";
 import { computeCoastFireScenarios } from "@/lib/finance/coast-fire";
 import { computeFireSensitivity } from "@/lib/finance/fire-sensitivity";
 import { computeSaleTax } from "@/lib/finance/sale-tax";
-
-export interface AiToolDef {
-    name: string;
-    description: string;
-    parameters: Record<string, unknown>;
-    handler: (args: Record<string, unknown>) => Promise<unknown>;
-}
+import type { AiToolDef } from "@/lib/ai/tool-types";
 
 // ---------- helpers ----------
 

@@ -110,7 +110,14 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
     // Proteggi da rendimenti reali <= -100% (scenario degenere irrealistico).
     const monthlyRate = 1 + realReturn > 0 ? Math.pow(1 + realReturn, 1 / 12) - 1 : -1;
 
-    let capital = Math.max(0, startingCapital - oneTimeOutflow);
+    // `initialCapital` e' il punto di partenza REALE della proiezione, dopo
+    // aver scalato l'eventuale oneTimeOutflow (es. anticipo casa). Tutte le
+    // decisioni su "sei gia' FIRE?" devono basarsi su questo valore, non sul
+    // patrimonio pre-acquisto, altrimenti il consulente riporta erroneamente
+    // "nessun ritardo" quando un esborso una tantum toglie l'utente dalla
+    // soglia FIRE (regressione #fire-already-fire-outflow).
+    const initialCapital = Math.max(0, startingCapital - oneTimeOutflow);
+    let capital = initialCapital;
     const chartData: FireProjectionPoint[] = [];
     let yearsToFire = -1;
     let monthsToFire = -1;
@@ -158,7 +165,14 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
         }
     }
 
-    const alreadyFire = startingCapital >= fireTarget;
+    // BUG FIX: prima il flag e gli azzeramenti di monthsToFire/yearsToFire
+    // usavano `startingCapital >= fireTarget`, ignorando `oneTimeOutflow`.
+    // Questo rendeva l'advisor cieco al ritardo prodotto da un grosso acquisto
+    // (es. 2M di patrimonio, 1.7M di casa: il simulatore trovava correttamente
+    // ~N mesi per tornare a FIRE ma poi li sovrascriveva a 0 perche'
+    // startingCapital superava il target). Ora la valutazione usa il capitale
+    // effettivamente disponibile a t=0 dopo l'esborso.
+    const alreadyFire = initialCapital >= fireTarget;
     if (alreadyFire) {
         yearsToFire = 0;
         monthsToFire = 0;
