@@ -406,6 +406,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                 monthlyExpenses: preferences?.expectedMonthlyExpenses ? Number(preferences.expectedMonthlyExpenses) : undefined,
                 monthlyIncome: preferences ? Number(preferences.person1Income || 0) + Number(preferences.person2Income || 0) : undefined,
                 monthlyInstallment: preferences?.existingInstallment ? Number(preferences.existingInstallment) : undefined,
+                monthlySavings,
                 fireTarget: metrics.fireTarget || undefined,
                 fireProgress: metrics.fireProgress || undefined,
             }} />
