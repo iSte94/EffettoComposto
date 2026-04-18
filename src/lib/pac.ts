@@ -22,9 +22,17 @@ function matchesDayOfMonth(date: Date, timing: PacTimingConfig): boolean {
 }
 
 function matchesPeriodicMonth(date: Date, anchorMonth: number, intervalMonths: number): boolean {
+    if (!Number.isFinite(anchorMonth) || anchorMonth < 1 || anchorMonth > 12) return false;
+    if (!Number.isFinite(intervalMonths) || intervalMonths <= 0) return false;
     const currentMonth = date.getMonth() + 1;
-    const offset = currentMonth - anchorMonth;
-    return offset >= 0 && offset % intervalMonths === 0;
+    // Modulo positivo: la cadenza si ripete ciclicamente a prescindere dall'anno
+    // solare. Il codice precedente scartava i mesi precedenti all'anchor nello
+    // stesso anno, saltando silenziosamente fino al 75% delle esecuzioni PAC
+    // (es. anchor Nov + quarterly => venivano eseguite solo in Novembre, mai
+    // in Feb/Mag/Ago dell'anno successivo).
+    const diff = currentMonth - anchorMonth;
+    const offset = ((diff % intervalMonths) + intervalMonths) % intervalMonths;
+    return offset === 0;
 }
 
 export function stringifyPacTimingConfig(timingConfig: PacTimingConfig): string {
