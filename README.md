@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.0.0`
+**Versione corrente:** `v1.0.1`
 
 ---
 
@@ -112,6 +112,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.0.1 - 18 aprile 2026 (fix finanziario critico: `projectFire` ignorava l'esborso immediato nel flag `alreadyFire`)
+
+- **Bug critico nel motore FIRE deterministico (`src/lib/finance/fire-projection.ts`)** — il flag `alreadyFire` e il conseguente azzeramento di `monthsToFire`/`yearsToFire` erano calcolati con `startingCapital >= fireTarget`, ignorando completamente `oneTimeOutflow`. Quando un utente gia' FIRE simulava un acquisto che lo portava SOTTO la soglia (es. patrimonio 2M, casa 1.7M, target 600k → capitale effettivo 300k), il loop individuava correttamente i mesi necessari per tornare a FIRE ma poi li sovrascriveva a 0, dando all'Advisor la falsa certezza che "l'acquisto non ritarda il FIRE". Conseguenza: `fireDelayMonths(baseline, withPurchase)` ritornava 0 anche per esborsi molto significativi, silenziando il principale indicatore comparativo dell'Advisor
+- **Formula corretta** — introdotta la variabile derivata `initialCapital = max(0, startingCapital - oneTimeOutflow)` usata sia come punto di partenza della proiezione sia come criterio per `alreadyFire`. Il punto 0 del `chartData` riflette ora il capitale reale disponibile dopo l'esborso, e il flag indica correttamente se il piano e' gia' FIRE *dopo* l'acquisto
+- **4 nuovi test di regressione** in `fire-projection.test.ts`: (1) esborso che porta sotto il target NON deve lasciare `alreadyFire=true`, (2) `fireDelayMonths` rileva il ritardo quando il baseline e' gia' FIRE, (3) esborso che non scende sotto il target mantiene `alreadyFire=true`, (4) esborso >= capitale iniziale non produce capitale negativo. Suite totale: **215 test passati**
+- **Impatto** — il fix rende finanziariamente affidabile il confronto "con vs senza acquisto" per tutti gli utenti con patrimonio superiore al target FIRE, che rappresentano il segmento piu' esposto a decisioni di spesa ad alto impatto (prima casa, investimenti immobiliari, passaggi generazionali)
 
 ### v1.0.0 - 18 aprile 2026 (AI unificata server-side + bot Telegram personale)
 
