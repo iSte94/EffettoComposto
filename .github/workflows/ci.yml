@@ -10,6 +10,8 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     env:
+      # Keep this at job level so Prisma config works in every step and release
+      # commits do not show a red GitHub X for a missing DATABASE_URL.
       DATABASE_URL: file:./ci-test.db
 
     steps:
