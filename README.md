@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.1.1`
+**Versione corrente:** `v1.1.3`
 
 ---
 
@@ -113,6 +113,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.1.3 - 18 aprile 2026 (UX — "Guadagno Reale" nel calcolatore Interesse Composto)
+
+- **Nuova KPI "Guadagno Reale" nel calcolatore Interesse Composto** — aggiunta una card dedicata che mostra la crescita effettiva del potere d'acquisto (`realFinalBalance - totalDeposited`), ovvero di quanto l'utente si e' davvero arricchito in termini reali rispetto a quanto ha versato. Il valore viene colorato in verde se positivo (capitale cresciuto al netto dell'inflazione) o in rosso se negativo (rendimento non sufficiente a compensare l'erosione inflattiva), con icona `TrendingUp`/`TrendingDown` coerente e sottotitolo che ricorda il totale versato di confronto. Include un `InfoTooltip` didattico che spiega il significato finanziario del dato
+- **Perche' migliora l'esperienza** — il simulatore mostrava gia' "Valore Reale" (saldo finale deflazionato) e "Totale Versato", ma l'utente doveva fare mentalmente la sottrazione per capire se i suoi soldi avevano davvero lavorato. In scenari realistici (rendimento basso + inflazione alta + orizzonte breve) il valore reale puo' risultare inferiore ai contributi, cioe' la strategia ha *perso* potere d'acquisto: renderlo esplicito come singolo numero colorato trasforma il calcolatore in uno strumento che smaschera l'illusione dei rendimenti nominali gonfiati, completando il trittico "Valore Reale / Punto di Svolta / Guadagno Reale" senza introdurre nuove API o parametri utente
+- **Zero regressioni** — il calcolo vive nello stesso `useMemo` gia' esistente (nessuna nuova dipendenza), lint pulito e suite di 228 test unitari confermata verde
 
 ### v1.1.2 - 18 aprile 2026 (fix finanziario critico: PAC trimestrali/semestrali saltati silenziosamente)
 
