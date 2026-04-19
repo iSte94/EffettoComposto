@@ -114,6 +114,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v1.2.3 - 19 aprile 2026 (UX — skeleton loader Obiettivi di Risparmio)
+
+- **Stato di caricamento migliorato nel tab "Obiettivi di Risparmio"** (`src/components/savings-goals.tsx`) — durante il fetch iniziale dei goal da API, il componente mostrava un semplice testo statico "Caricamento..." su sfondo tratteggiato; sostituito con un componente `SavingsGoalsSkeleton` dedicato che riproduce fedelmente la struttura reale della UI: card di riepilogo con barra di progresso e 3 mini-metriche, seguite da 3 card-goal con placeholder per icona categoria, nome, badge, importi e barra di avanzamento individuale
+- **Coerenza visiva** — il pattern skeleton è già presente in `overview-dashboard.tsx` (importa `Skeleton` da `@/components/ui/skeleton`); estenderlo agli obiettivi elimina l'incoerenza tra i tab e dà una percezione di velocità più elevata, riducendo il layout shift al completamento del fetch
+- **Impatto zero su logica** — nessuna modifica alle API call, agli hook o ai calcoli; la funzione `SavingsGoalsSkeleton` è definita a livello di modulo (non inline dentro il componente) per evitare ricreazioni ad ogni render
+
 ### v1.2.2 - 19 aprile 2026 (fix finanziario: cliff di €65 nelle detrazioni IRPEF al confine 28k)
 
 - **Bug nel calcolo delle detrazioni lavoro dipendente (`src/lib/finance/irpef.ts` → `calculateNetSalary`)** — il terzo scaglione di `detrazioniLavoro` (28.001–50.000€ di imponibile) usava il coefficiente base `1910` come punto di partenza: `detrazioniLavoro = 1910 × (50.000 − imponibile) / 22.000`. Tuttavia il secondo scaglione (15.001–28.000€) include una correzione `+65` aggiornata alle direttive 2025/2026 e termina a **1975** (= 1910 + 65) sull'imponibile di esattamente 28.000€. La discrepanza tra i due scaglioni produceva un salto brusco di **€65** nelle detrazioni appena sopra la soglia: guadagnare un euro in più a 28.001€ aumentava l'IRPEF netta di €65, riducendo il reddito netto di circa **€64**
