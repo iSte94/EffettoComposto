@@ -67,7 +67,11 @@ export function calculateNetSalary(config: SalaryConfig): SalaryResult {
     // Aggiunto il +65 per matchare al 100% le direttive aggiornate della curva 2025/2026
     detrazioniLavoro = 1910 + 1190 * ((28000 - imponibileIrpef) / 13000) + 65; 
   } else if (imponibileIrpef <= 50000) {
-    detrazioniLavoro = 1910 * ((50000 - imponibileIrpef) / 22000);
+    // Coefficiente 1975 (= 1910 + 65) per garantire continuità al confine 28k:
+    // il secondo scaglione termina a 1975, quindi il terzo deve iniziare da 1975.
+    // Usare 1910 qui creava un cliff di €65 in cui guadagnare un euro in più a
+    // 28.001€ di imponibile aumentava l'IRPEF netta di €65, riducendo il netto.
+    detrazioniLavoro = 1975 * ((50000 - imponibileIrpef) / 22000);
   }
 
   // 5. Detrazione Cuneo Fiscale (2025/2026) in quota IRPEF

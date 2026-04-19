@@ -114,6 +114,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v1.2.2 - 19 aprile 2026 (fix finanziario: cliff di €65 nelle detrazioni IRPEF al confine 28k)
+
+- **Bug nel calcolo delle detrazioni lavoro dipendente (`src/lib/finance/irpef.ts` → `calculateNetSalary`)** — il terzo scaglione di `detrazioniLavoro` (28.001–50.000€ di imponibile) usava il coefficiente base `1910` come punto di partenza: `detrazioniLavoro = 1910 × (50.000 − imponibile) / 22.000`. Tuttavia il secondo scaglione (15.001–28.000€) include una correzione `+65` aggiornata alle direttive 2025/2026 e termina a **1975** (= 1910 + 65) sull'imponibile di esattamente 28.000€. La discrepanza tra i due scaglioni produceva un salto brusco di **€65** nelle detrazioni appena sopra la soglia: guadagnare un euro in più a 28.001€ aumentava l'IRPEF netta di €65, riducendo il reddito netto di circa **€64**
+- **Conseguenza concreta** — il simulatore stipendi mostrava uno stipendio netto artificialmente gonfiato per redditi appena sotto 28.000€ e un brusco crollo appena sopra; le proiezioni FIRE e la pianificazione di risparmio erano falsate per chiunque si trovasse nella fascia 28.000–50.000€ di imponibile
+- **Formula corretta** — allineato il coefficiente del terzo scaglione da `1910` a `1975` (= 1910 + 65), in modo che la curva delle detrazioni sia continua al confine 28k: `detrazioniLavoro = 1975 × (50.000 − imponibile) / 22.000`. A 28.000€ il valore è ancora 1975 (invariato rispetto al secondo scaglione), a 50.000€ si azzera correttamente a 0; i contribuenti nella fascia 28k–50k ricevono detrazioni leggermente superiori (max +€65 a 28.001€, proporzionale a zero verso 50.000€)
+- **Test di regressione** — aggiunto test automatico `REGRESSION: nessun cliff di detrazioni al confine 28k` che verifica con due RAL ravvicinati (imponibile uno sotto e uno sopra 28.000€) che il reddito netto sia monotonicamente crescente, prevenendo il re-inserimento del cliff in future modifiche ai coefficienti IRPEF
+
 ### v1.2.1 - 19 aprile 2026 (performance: eliminato JSON.parse ridondante nel hot path FIRE)
 
 - **Hot path simulazione FIRE ottimizzato** — la funzione `getActiveRealEstatePassiveIncomeAtMonth` chiamava `JSON.parse(realEstateListStr)` a ogni invocazione: nella simulazione deterministica (1.201 iterazioni × 2 chiamate) e nel pre-computo Monte Carlo (~800 chiamate) questo produceva oltre **2.400 parse ridondanti per ogni run**, su una stringa identica per tutta la durata della simulazione. La lista immobili e' ora memorizzata con `useMemo` e aggiornata solo quando cambia `realEstateListStr`, eliminando il parsing ripetuto e rendendo l'intera simulazione piu' veloce

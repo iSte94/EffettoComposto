@@ -165,4 +165,24 @@ describe('Calcolatore Stipendio Netto 2026', () => {
     expect(res.addizionali).toBe(0);
   });
 
+  // ===== REGRESSION: nessun "cliff" al confine 28k tra secondo e terzo scaglione =====
+
+  it('REGRESSION: nessun cliff di detrazioni al confine 28k — il reddito netto non cala attraversando la soglia', () => {
+    // RAL che porta imponibile appena sotto 28k vs appena sopra 28k (senza cuneo, senza bonus)
+    // imponibileIrpef = RAL * (1 - 0.0919) → RAL ≈ 30833 dà imponibile ≈ 28000
+    const justBelow = calculateNetSalary({ ral: 30830, contractType: 'standard', applyCuneoFiscale: false, applyBonus100: false });
+    const justAbove = calculateNetSalary({ ral: 30840, contractType: 'standard', applyCuneoFiscale: false, applyBonus100: false });
+
+    // justBelow.imponibileIrpef < 28000 (secondo scaglione detrazioni)
+    // justAbove.imponibileIrpef > 28000 (terzo scaglione detrazioni)
+    expect(justBelow.imponibileIrpef).toBeLessThan(28000);
+    expect(justAbove.imponibileIrpef).toBeGreaterThan(28000);
+
+    // Il reddito netto deve crescere (o restare stabile) al crescere del reddito lordo.
+    // Un cliff negativo (nettoAnnuale che cala) indica che le detrazioni hanno una
+    // discontinuità al confine: il terzo scaglione usa 1910 come coefficiente mentre
+    // il secondo scaglione termina a 1975 (1910 + 65), causando un salto brusco.
+    expect(justAbove.nettoAnnuale).toBeGreaterThanOrEqual(justBelow.nettoAnnuale);
+  });
+
 });
