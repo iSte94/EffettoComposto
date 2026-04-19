@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.3.1`
+**Versione corrente:** `v1.3.2`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.3.2 - 20 aprile 2026 (migration di produzione per il workspace Consulente)
+
+- **Migration Prisma mancante aggiunta correttamente al repo** - la release `v1.3.0` aveva introdotto i campi `advisorSavedScenarios` e `advisorReminders` nel modello `Preference`, ma senza una migration versionata corrispondente. In locale il problema era rimasto nascosto perche' il database di sviluppo era stato aggiornato con `prisma db push`, mentre in produzione `prisma migrate deploy` non aveva nulla da applicare
+- **Fix strutturale del processo di deploy** - aggiunta la migration `20260420003500_add_advisor_workspace_preference_fields` che allinea finalmente schema Prisma e database reale in produzione con due `ALTER TABLE` espliciti. In questo modo i deploy futuri non dipendono piu' da stato locale implicito o da DB gia' “sporchi” di sviluppo
+- **Impatto diretto sul bug utente** - senza queste colonne, il runtime server-side poteva fallire leggendo `Preference` e il refresh snapshot notturno andava in errore con `P2022` (`The column main.Preference.advisorSavedScenarios does not exist`). La migration elimina questa classe di mismatch e rende coerenti login, preferenze, scheduler e workspace Advisor sul DB live
+- **Allineamento release** - bump versione a `v1.3.2` per tenere tracciato anche il fix infrastrutturale del database, oltre all'hotfix cache/sessione della `v1.3.1`
 
 ### v1.3.1 - 20 aprile 2026 (hotfix cache/sessione per dati utente e cashflow)
 
