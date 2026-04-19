@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import { cookies } from 'next/headers';
 
+export const PRIVATE_NO_STORE_HEADERS = {
+    "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
+    Vary: "Cookie",
+} as const;
+
 export class UnauthorizedError extends Error {
     constructor() {
         super('Unauthorized');
@@ -33,5 +38,8 @@ export async function getAuthenticatedUserId(): Promise<string> {
  * Risposta 401 standard per route non autenticate.
  */
 export function unauthorizedResponse() {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401, headers: PRIVATE_NO_STORE_HEADERS },
+    );
 }

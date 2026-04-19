@@ -20,9 +20,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetch('/api/auth/me')
-            .then(res => res.json())
-            .then(data => {
+        fetch('/api/auth/me', {
+            cache: "no-store",
+            credentials: "same-origin",
+        })
+            .then(async (res) => ({
+                ok: res.ok,
+                data: await res.json(),
+            }))
+            .then(({ ok, data }) => {
+                if (!ok) {
+                    setUser(null);
+                    return;
+                }
+
                 if (data.user) {
                     setUser(data.user);
                 }

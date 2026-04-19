@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
+import { getAuthenticatedUserId, PRIVATE_NO_STORE_HEADERS, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
 import { assetRecordSchema, deleteRecordSchema } from '@/lib/validations/patrimonio';
 
 // GET: Recupera tutto lo storico per i grafici
@@ -13,7 +13,7 @@ export async function GET() {
             orderBy: { date: 'asc' }
         });
 
-        return NextResponse.json({ history });
+        return NextResponse.json({ history }, { headers: PRIVATE_NO_STORE_HEADERS });
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
         console.error('Failed to get history:', error);

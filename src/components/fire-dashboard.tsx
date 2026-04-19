@@ -174,13 +174,25 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
     const fetchData = useCallback(async () => {
         try {
-            const prefRes = await fetch('/api/preferences');
+            const prefRes = await fetch('/api/preferences', {
+                cache: "no-store",
+                credentials: "same-origin",
+            });
+            if (!prefRes.ok) {
+                throw new Error(`Preferences request failed with status ${prefRes.status}`);
+            }
             const prefData = await prefRes.json();
             const preferences = prefData.preferences ?? null;
             let parsedLoans: ExistingLoan[] = [];
             let derivedMonthlyExpenses = 0;
 
-            const patRes = await fetch('/api/patrimonio');
+            const patRes = await fetch('/api/patrimonio', {
+                cache: "no-store",
+                credentials: "same-origin",
+            });
+            if (!patRes.ok) {
+                throw new Error(`Patrimonio request failed with status ${patRes.status}`);
+            }
             const patData = await patRes.json();
 
             let lastSnapshot: AssetRecord | null = null;

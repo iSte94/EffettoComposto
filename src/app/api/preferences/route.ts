@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
+import { getAuthenticatedUserId, PRIVATE_NO_STORE_HEADERS, UnauthorizedError, unauthorizedResponse } from '@/lib/api-auth';
 import { preferencesSchema } from '@/lib/validations/preferences';
 import { sanitizePreferenceForClient } from '@/lib/user-data';
 
@@ -12,7 +12,10 @@ export async function GET() {
             where: { userId }
         });
 
-        return NextResponse.json({ preferences: sanitizePreferenceForClient(preferences) });
+        return NextResponse.json(
+            { preferences: sanitizePreferenceForClient(preferences) },
+            { headers: PRIVATE_NO_STORE_HEADERS },
+        );
     } catch (error) {
         if (error instanceof UnauthorizedError) return unauthorizedResponse();
         console.error('Failed to get preferences:', error);

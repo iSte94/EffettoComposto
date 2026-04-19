@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { getAuthenticatedUserId, UnauthorizedError } from '@/lib/api-auth';
+import { getAuthenticatedUserId, PRIVATE_NO_STORE_HEADERS, UnauthorizedError } from '@/lib/api-auth';
 
 export async function GET() {
     try {
@@ -12,13 +12,19 @@ export async function GET() {
         });
 
         if (!user) {
-            return NextResponse.json({ user: null }, { status: 401 });
+            return NextResponse.json(
+                { user: null },
+                { status: 401, headers: PRIVATE_NO_STORE_HEADERS },
+            );
         }
 
-        return NextResponse.json({ user });
+        return NextResponse.json({ user }, { headers: PRIVATE_NO_STORE_HEADERS });
     } catch (error) {
         if (error instanceof UnauthorizedError) {
-            return NextResponse.json({ user: null }, { status: 401 });
+            return NextResponse.json(
+                { user: null },
+                { status: 401, headers: PRIVATE_NO_STORE_HEADERS },
+            );
         }
         console.error('Session check failed:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -116,7 +116,13 @@ export function usePreferences() {
         }
 
         try {
-            const res = await fetch('/api/preferences');
+            const res = await fetch('/api/preferences', {
+                cache: "no-store",
+                credentials: "same-origin",
+            });
+            if (!res.ok) {
+                throw new Error(`Preferences request failed with status ${res.status}`);
+            }
             const data = await res.json();
             if (data.preferences) {
                 setPreferences(normalizePreferences(data.preferences));
@@ -127,6 +133,7 @@ export function usePreferences() {
             setIsLoaded(true);
         } catch (error) {
             console.error("Errore nel caricamento preferenze:", error);
+            toast.error("Impossibile caricare le preferenze del tuo account");
             setIsLoaded(true);
         }
     }, [normalizePreferences, user]);

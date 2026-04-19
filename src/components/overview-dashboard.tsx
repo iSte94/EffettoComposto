@@ -63,8 +63,20 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
 
         try {
             const [patrimonioData, prefData] = await Promise.all([
-                fetch('/api/patrimonio').then(r => r.json()),
-                fetch('/api/preferences').then(r => r.json()),
+                fetch('/api/patrimonio', {
+                    cache: "no-store",
+                    credentials: "same-origin",
+                }).then(async (r) => {
+                    if (!r.ok) throw new Error(`Patrimonio request failed with status ${r.status}`);
+                    return r.json();
+                }),
+                fetch('/api/preferences', {
+                    cache: "no-store",
+                    credentials: "same-origin",
+                }).then(async (r) => {
+                    if (!r.ok) throw new Error(`Preferences request failed with status ${r.status}`);
+                    return r.json();
+                }),
             ]);
 
             if (patrimonioData.history) {

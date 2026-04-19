@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.3.0`
+**Versione corrente:** `v1.3.1`
 
 ---
 
@@ -114,6 +114,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v1.3.1 - 20 aprile 2026 (hotfix cache/sessione per dati utente e cashflow)
+
+- **Fix robusto per dati utente stale o incoerenti dopo login/release** - le route autenticate piu' sensibili (`/api/auth/me`, `/api/preferences`, `/api/patrimonio`) ora rispondono con header `Cache-Control: private, no-store` e `Vary: Cookie`, impedendo al browser o a layer intermedi di riutilizzare risposte utente vecchie per sessioni diverse
+- **Service Worker corretto per non cacheare piu' API utente** - `public/sw.js` e' stato aggiornato a `fi-cache-v4` e ora bypassa completamente tutte le richieste `/api/*`. Questo elimina la possibilita' che preferenze, storico patrimonio o stato sessione vengano riletti da cache obsolete dopo deploy, refresh o problemi di rete, che era il candidato principale dietro il ritorno di etichette come `Persona 1 / Persona 2` e cashflow incompleto
+- **Fetch client critiche forzate `no-store`** - `AuthContext`, `usePreferences`, `Patrimonio`, `FIRE`, `Riepilogo`, header KPI e `Advisor` ora richiedono i dati account-specific sempre con `cache: "no-store"` e `credentials: "same-origin"`, cosi' i nomi reali delle persone, le spese e lo storico vengono letti dal backend live invece che da un eventuale cache locale stantia
+- **Error handling piu' trasparente** - nelle dashboard principali il fallimento del caricamento dati non resta piu' silenzioso dietro fallback fuorvianti: vengono loggati errori piu' precisi e l'utente riceve un feedback esplicito se i dati del proprio account non risultano caricabili
+- **Dati di `stefano` verificati integri sul DB live** - durante l'analisi del bug e' stato confermato che l'account `stefano` mantiene ancora preferenze corrette (`Stefano`, `Simona`), `expensesList`, prestiti e `13` snapshot patrimonio; il problema era quindi di lettura/cache/sessione e non di perdita database
+- **Verifica release** - hotfix validato con `eslint`, `vitest` e `next build` tutti verdi prima del deploy
 ### v1.3.0 - 19 aprile 2026 (Consulente acquisti come workspace decisionale)
 
 - **Consulente acquisti separato dai dati reali** - il vecchio flusso `Accetta Spesa` e' stato rimosso: una simulazione non aggiorna piu' automaticamente patrimonio, rate reali o dashboard FIRE/Overview. Il tab Consulente torna a essere uno spazio decisionale, non un punto di registrazione contabile

@@ -521,9 +521,18 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
         setLoading(true);
         setLoadedSnapshotLabel(null);
         try {
-            const prefRes = await fetch("/api/preferences");
+            const prefRes = await fetch("/api/preferences", {
+                cache: "no-store",
+                credentials: "same-origin",
+            });
+            if (!prefRes.ok) {
+                throw new Error(`Preferences request failed with status ${prefRes.status}`);
+            }
             const prefData = await prefRes.json();
-            const accrualRes = await fetch("/api/pension-accruals?limit=24");
+            const accrualRes = await fetch("/api/pension-accruals?limit=24", {
+                cache: "no-store",
+                credentials: "same-origin",
+            });
             let loadedLoans: ExistingLoan[] = [];
 
             if (prefData.preferences) {
@@ -566,7 +575,13 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                 setPensionAccruals(accrualData.accruals || []);
             }
 
-            const res = await fetch("/api/patrimonio");
+            const res = await fetch("/api/patrimonio", {
+                cache: "no-store",
+                credentials: "same-origin",
+            });
+            if (!res.ok) {
+                throw new Error(`Patrimonio request failed with status ${res.status}`);
+            }
             const data = await res.json();
 
             if (data.history) {
@@ -627,8 +642,9 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                     setBitcoinAmountP2(otherOwn?.bitcoinAmountP2 ?? 0);
                 }
             }
-        } catch {
-            toast.error("Errore nel caricamento storico");
+        } catch (error) {
+            console.error("Failed to load patrimonio data", error);
+            toast.error("Impossibile caricare i dati del Patrimonio dal tuo account");
         } finally {
             setLoading(false);
         }

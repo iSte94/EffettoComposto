@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fi-cache-v3';
+const CACHE_NAME = 'fi-cache-v4';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/favicon/favicon.svg',
@@ -27,7 +27,8 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch: network-first for navigations and API, cache-first for static assets
+// Fetch: network-first for navigations, cache-first for static assets.
+// User-specific API responses must bypass the SW cache because they depend on session cookies.
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -35,11 +36,15 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET and cross-origin
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
 
-  // HTML documents and API routes should prefer the network so releases appear immediately.
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // HTML documents should prefer the network so releases appear immediately.
   const isNavigationRequest =
     request.mode === 'navigate' || request.destination === 'document';
 
-  if (isNavigationRequest || url.pathname.startsWith('/api/')) {
+  if (isNavigationRequest) {
     event.respondWith(
       fetch(request)
         .then((response) => {

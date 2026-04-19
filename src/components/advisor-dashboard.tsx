@@ -98,9 +98,18 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     const loadData = async () => {
       try {
         const [prefRes, patrimonioRes, workspaceRes] = await Promise.all([
-          fetch("/api/preferences"),
-          fetch("/api/patrimonio"),
-          fetch("/api/advisor-workspace"),
+          fetch("/api/preferences", {
+            cache: "no-store",
+            credentials: "same-origin",
+          }),
+          fetch("/api/patrimonio", {
+            cache: "no-store",
+            credentials: "same-origin",
+          }),
+          fetch("/api/advisor-workspace", {
+            cache: "no-store",
+            credentials: "same-origin",
+          }),
         ]);
         const prefData = await prefRes.json();
         const patrimonioData = await patrimonioRes.json();
