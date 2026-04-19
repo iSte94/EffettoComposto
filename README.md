@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.2.0`
+**Versione corrente:** `v1.2.1`
 
 ---
 
@@ -113,7 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
- 
+
+### v1.2.1 - 19 aprile 2026 (performance: eliminato JSON.parse ridondante nel hot path FIRE)
+
+- **Hot path simulazione FIRE ottimizzato** — la funzione `getActiveRealEstatePassiveIncomeAtMonth` chiamava `JSON.parse(realEstateListStr)` a ogni invocazione: nella simulazione deterministica (1.201 iterazioni × 2 chiamate) e nel pre-computo Monte Carlo (~800 chiamate) questo produceva oltre **2.400 parse ridondanti per ogni run**, su una stringa identica per tutta la durata della simulazione. La lista immobili e' ora memorizzata con `useMemo` e aggiornata solo quando cambia `realEstateListStr`, eliminando il parsing ripetuto e rendendo l'intera simulazione piu' veloce
+- **Tipo `any` rimosso** — il parametro `prop` nel `reduce` era annotato `any` con eslint-disable; ora usa correttamente `RealEstateProperty` (gia' importato), migliorando la type safety e rimuovendo il commento di soppressione
+- **Dead state rimosso** — lo state `const [, setLoading]` era impostato ma il valore non veniva mai letto (la schermata di caricamento e' gestita da `isLoadingUser`): rimossi i tre statement `useState`, `setLoading(true)` e `setLoading(false)` inutili che causavano un re-render aggiuntivo inutile all'avvio del fetch
+
 ### v1.2.0 - 19 aprile 2026 (AI Telegram piu' robusto + Consulente acquisti/FIRE ridisegnato)
 
 - **Telegram piu' affidabile e leggibile lato utente** - il bot ora renderizza una porzione molto piu' ampia del Markdown in HTML compatibile con Telegram (`bold`, `inline code`, link, heading e code block), spezza i messaggi senza superare i limiti effettivi dopo il rendering HTML, evita per quanto possibile di rompere i blocchi di codice a meta' e mantiene la tastiera inline solo sull'ultimo chunk. Se Telegram rifiuta il payload HTML per errori di parsing delle entity, il send torna automaticamente in plain text invece di perdere la risposta
