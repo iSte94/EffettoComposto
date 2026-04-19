@@ -42,6 +42,50 @@ describe("PAC scheduling", () => {
         expect(isPacScheduleDue(semiannual, new Date(2026, 5, 5)).due).toBe(false);
     });
 
+    it("supporta cadenze che attraversano l'anno solare (anchor nel 2o semestre)", () => {
+        // Regressione: con anchorMonth=11 quarterly, prima tutti i mesi
+        // Feb/Mag/Ago venivano scartati perche' `offset = currentMonth - 11 < 0`.
+        // Conseguenza: su 4 esecuzioni previste all'anno, solo 1 veniva eseguita.
+        const quarterlyNov = {
+            active: true,
+            cadence: "quarterly" as const,
+            timingConfig: { anchorMonth: 11, dayOfMonth: 10 },
+        };
+        expect(isPacScheduleDue(quarterlyNov, new Date(2026, 10, 10)).due).toBe(true);  // Nov
+        expect(isPacScheduleDue(quarterlyNov, new Date(2027, 1, 10)).due).toBe(true);   // Feb
+        expect(isPacScheduleDue(quarterlyNov, new Date(2027, 4, 10)).due).toBe(true);   // Mag
+        expect(isPacScheduleDue(quarterlyNov, new Date(2027, 7, 10)).due).toBe(true);   // Ago
+        expect(isPacScheduleDue(quarterlyNov, new Date(2027, 2, 10)).due).toBe(false);  // Mar
+        expect(isPacScheduleDue(quarterlyNov, new Date(2027, 11, 10)).due).toBe(false); // Dic
+
+        const semiannualAug = {
+            active: true,
+            cadence: "semiannual" as const,
+            timingConfig: { anchorMonth: 8, dayOfMonth: 1 },
+        };
+        expect(isPacScheduleDue(semiannualAug, new Date(2026, 7, 1)).due).toBe(true);  // Ago
+        expect(isPacScheduleDue(semiannualAug, new Date(2027, 1, 1)).due).toBe(true);  // Feb
+        expect(isPacScheduleDue(semiannualAug, new Date(2026, 0, 1)).due).toBe(false); // Gen (non allineato)
+    });
+
+    it("rifiuta anchorMonth fuori range senza errori (guardrail difensivo)", () => {
+        // Se il DB contiene un anchorMonth corrotto (0, 13, NaN) la schedule non
+        // deve mai attivarsi silenziosamente su un mese casuale.
+        const invalidAnchor = {
+            active: true,
+            cadence: "quarterly" as const,
+            timingConfig: { anchorMonth: 0, dayOfMonth: 1 },
+        };
+        expect(isPacScheduleDue(invalidAnchor, new Date(2026, 0, 1)).due).toBe(false);
+
+        const outOfRange = {
+            active: true,
+            cadence: "semiannual" as const,
+            timingConfig: { anchorMonth: 13, dayOfMonth: 1 },
+        };
+        expect(isPacScheduleDue(outOfRange, new Date(2026, 0, 1)).due).toBe(false);
+    });
+
     it("supporta annuale e formattazioni chiave idempotenti", () => {
         const schedule = {
             active: true,

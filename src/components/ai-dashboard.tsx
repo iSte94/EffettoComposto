@@ -1,24 +1,26 @@
 "use client";
 
 import {
+    type ChangeEvent,
+    type ClipboardEvent,
+    type KeyboardEvent,
     useCallback,
     useEffect,
     useMemo,
     useRef,
     useState,
-    type ChangeEvent,
-    type ClipboardEvent,
-    type KeyboardEvent,
 } from "react";
 import {
     Bot,
     BrainCircuit,
+    ExternalLink,
     FileText,
     Loader2,
     Paperclip,
     RefreshCw,
     Send,
     Settings,
+    Smartphone,
     Trash2,
     UserCircle2,
     X,
@@ -36,16 +38,14 @@ import {
     AI_ATTACHMENT_MAX_TOTAL_BYTES,
     formatBytes,
     type AiAttachmentDescriptor,
-    type AiAttachmentInput,
     validateAiAttachmentMeta,
 } from "@/lib/ai/attachments";
-import { chat, type AiChatMessage, type AiToolTraceEntry } from "@/lib/ai/providers";
-import { AI_TOOLS } from "@/lib/ai/tools";
+import type { AiToolTraceEntry } from "@/lib/ai/providers";
 import { ThreadSidebar, type ThreadSummary } from "@/components/ai/thread-sidebar";
 import { MemoryPanel, type MemoryEntry } from "@/components/ai/memory-panel";
 import { ChatMessage } from "@/components/ai/chat-message";
 import { ContextualPromptChips } from "@/components/ai/contextual-prompt-chips";
-import { extractAndPersistMemory } from "@/lib/ai/memory-extractor";
+import type { PendingAction, TelegramBotState } from "@/types";
 
 interface Props {
     user: { username: string } | null;
@@ -61,36 +61,22 @@ interface ChatTurn {
     content: string;
     attachments?: ChatAttachment[];
     toolTrace?: AiToolTraceEntry[] | null;
+    pendingActions?: PendingAction[];
 }
 
-const SYSTEM_PROMPT_BASE = `Sei un consulente finanziario personale esperto, integrato nella piattaforma "Effetto Composto" - un cruscotto in italiano per pianificare l'indipendenza finanziaria (FIRE), gestire patrimonio, mutui, investimenti, dividendi e budget.
+interface ServerMessagePayload {
+    id: string;
+    role: "user" | "assistant";
+    content: string;
+    toolTrace: AiToolTraceEntry[] | null;
+    attachments?: ChatAttachment[];
+    pendingActions?: PendingAction[];
+}
 
-REGOLE OPERATIVE:
-- Rispondi SEMPRE in italiano, con tono chiaro, diretto, pragmatico.
-- Mostra solo la risposta finale per l'utente. Non mostrare mai ragionamenti interni, thought summaries, prompt interni, checklist o note di lavoro.
-- Hai accesso a 23 strumenti (function calling). USALI senza chiedere conferma quando servono dati/calcoli precisi: metriche portafoglio, Coast FIRE, Monte Carlo, ammortamento mutuo, IRPEF, sensitivity FIRE, sale tax, prezzi live, offerte mutui, dividendi YoC, sommari patrimonio/budget.
-- Non stimare a parole cio' che puoi calcolare.
-- Puoi incatenare tool (fino a 6 round): es. prima leggi snapshot, poi calcoli performance, poi Monte Carlo.
-- Base ogni consiglio sui dati reali dell'utente + risultati tool + fatti in MEMORIA (sotto).
-- Se mancano dati rilevanti, indica all'utente la sezione da compilare (Patrimonio, FIRE, Budget, Obiettivi, "Parlami di te").
-- Usa formattazione Markdown: grassetto per cifre chiave, tabelle per confronti, liste per azioni.
-- Non inventare cifre non supportate dai dati/tool.
-- Non sei consulenza vincolante: avvisalo brevemente solo se fornisci raccomandazioni concrete di acquisto/vendita.
-- Quando l'utente rivela un fatto stabile su di se' (eta', obiettivi, decisioni, preferenze), non commentarlo esplicitamente: verra' memorizzato automaticamente per le conversazioni future.
-`;
-
-function buildSystemPrompt(userProfile: string, dataJson: string, memory: MemoryEntry[]): string {
-    const profileBlock = userProfile.trim()
-        ? `\n--- PROFILO UTENTE (scritto dall'utente in "Parlami di te") ---\n${userProfile.trim()}\n`
-        : `\n--- PROFILO UTENTE ---\n(L'utente non ha compilato "Parlami di te". Invitalo a farlo se serve contesto anagrafico.)\n`;
-
-    const memoryBlock = memory.length > 0
-        ? `\n--- MEMORIA PERSISTENTE (fatti estratti nelle conversazioni passate) ---\n${
-            memory.slice(0, 40).map((m) => `[${m.category}${m.pinned ? " - pinned" : ""}] ${m.fact}`).join("\n")
-        }\n`
-        : "";
-
-    return `${SYSTEM_PROMPT_BASE}${profileBlock}${memoryBlock}\n--- DATI UTENTE (snapshot JSON esportato dalla piattaforma, include 'derived' con aggregati pronti) ---\n${dataJson}`;
+interface ChatRouteResponse {
+    thread: ThreadSummary;
+    assistantMessage: ServerMessagePayload;
+    pendingActions?: PendingAction[];
 }
 
 function revokeAttachmentUrls(attachments: ChatAttachment[]) {
@@ -107,13 +93,15 @@ function revokeTurnAttachmentUrls(turns: ChatTurn[]) {
     }
 }
 
-function fileToDataUrl(file: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
-        reader.onerror = () => reject(reader.error ?? new Error("Impossibile leggere il file"));
-        reader.readAsDataURL(file);
-    });
+function mapServerMessageToTurn(message: ServerMessagePayload): ChatTurn {
+    return {
+        id: message.id,
+        role: message.role,
+        content: message.content,
+        attachments: message.attachments ?? [],
+        toolTrace: message.toolTrace,
+        pendingActions: message.pendingActions ?? [],
+    };
 }
 
 export function AiDashboard({ user }: Props) {
@@ -135,10 +123,13 @@ export function AiDashboard({ user }: Props) {
     const [input, setInput] = useState("");
     const [composerAttachments, setComposerAttachments] = useState<ChatAttachment[]>([]);
     const [sending, setSending] = useState(false);
-    const [pendingTools, setPendingTools] = useState<AiToolTraceEntry[]>([]);
 
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [profileOpen, setProfileOpen] = useState(false);
+    const [telegramState, setTelegramState] = useState<TelegramBotState | null>(null);
+    const [telegramLoading, setTelegramLoading] = useState(false);
+    const [telegramToken, setTelegramToken] = useState("");
+    const [telegramSaving, setTelegramSaving] = useState(false);
 
     const endRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -151,6 +142,25 @@ export function AiDashboard({ user }: Props) {
         setComposerAttachments([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
     }, []);
+
+    const loadTelegramState = useCallback(async () => {
+        if (!user) {
+            setTelegramState(null);
+            return;
+        }
+
+        setTelegramLoading(true);
+        try {
+            const res = await fetch("/api/telegram/bot", { credentials: "include" });
+            if (!res.ok) throw new Error("Impossibile caricare lo stato Telegram");
+            const json = await res.json();
+            setTelegramState(json.telegram ?? null);
+        } catch (e) {
+            toast.error((e as Error).message);
+        } finally {
+            setTelegramLoading(false);
+        }
+    }, [user]);
 
     const loadThreads = useCallback(async () => {
         if (!user) return;
@@ -196,14 +206,9 @@ export function AiDashboard({ user }: Props) {
                 content: string;
                 toolTrace: AiToolTraceEntry[] | null;
                 attachments?: ChatAttachment[];
+                pendingActions?: PendingAction[];
             }>;
-            setTurns(msgs.map((m) => ({
-                id: m.id,
-                role: m.role,
-                content: m.content,
-                attachments: m.attachments ?? [],
-                toolTrace: m.toolTrace,
-            })));
+            setTurns(msgs.map(mapServerMessageToTurn));
         } catch (e) {
             toast.error((e as Error).message);
             setActiveThreadId(null);
@@ -235,12 +240,13 @@ export function AiDashboard({ user }: Props) {
         if (!user) return;
         void loadThreads();
         void loadMemory();
+        void loadTelegramState();
         if (!userDataJson) void refreshUserData();
-    }, [user, loadThreads, loadMemory, refreshUserData, userDataJson]);
+    }, [user, loadThreads, loadMemory, loadTelegramState, refreshUserData, userDataJson]);
 
     useEffect(() => {
         endRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [turns, sending, pendingTools]);
+    }, [turns, sending]);
 
     useEffect(() => {
         turnsRef.current = turns;
@@ -255,7 +261,7 @@ export function AiDashboard({ user }: Props) {
         revokeAttachmentUrls(composerAttachmentsRef.current);
     }, []);
 
-    const isConfigured = loaded && !!settings.apiKey && !!settings.model;
+    const isConfigured = loaded && settings.hasStoredKey && !!settings.model;
 
     const contextSignals = useMemo(() => {
         const base = {
@@ -358,97 +364,125 @@ export function AiDashboard({ user }: Props) {
         addComposerFiles(files);
     };
 
-    const resolveAttachmentInput = useCallback(async (attachment: ChatAttachment): Promise<AiAttachmentInput> => {
-        let dataUrl = "";
-        if (attachment.file) {
-            dataUrl = await fileToDataUrl(attachment.file);
-        } else if (attachment.url) {
-            const res = await fetch(attachment.url, { credentials: "include" });
-            if (!res.ok) throw new Error(`Impossibile rileggere ${attachment.filename}`);
-            const blob = await res.blob();
-            dataUrl = await fileToDataUrl(blob);
-        } else {
-            throw new Error(`Allegato non disponibile: ${attachment.filename}`);
-        }
+    const sendChatRequest = useCallback(async (
+        content: string,
+        attachments: ChatAttachment[],
+    ): Promise<ChatRouteResponse> => {
+        const uploadableAttachments = attachments.filter((attachment) => !!attachment.file);
+        const hasFiles = uploadableAttachments.length > 0;
 
-        return {
-            kind: attachment.kind,
-            mimeType: attachment.mimeType,
-            filename: attachment.filename,
-            size: attachment.size,
-            dataUrl,
-        };
-    }, []);
-
-    const buildProviderMessages = useCallback(async (chatTurns: ChatTurn[]): Promise<AiChatMessage[]> => (
-        Promise.all(chatTurns.map(async (turn) => ({
-            role: turn.role,
-            content: turn.content,
-            attachments: turn.attachments?.length
-                ? await Promise.all(turn.attachments.map((attachment) => resolveAttachmentInput(attachment)))
-                : undefined,
-        })))
-    ), [resolveAttachmentInput]);
-
-    const ensureThread = async (): Promise<string | null> => {
-        if (activeThreadId) return activeThreadId;
-        try {
-            const res = await fetch("/api/ai/threads", {
+        const res = await fetch("/api/ai/chat", hasFiles
+            ? {
+                method: "POST",
+                credentials: "include",
+                body: (() => {
+                    const formData = new FormData();
+                    formData.set("content", content);
+                    if (activeThreadId) {
+                        formData.set("threadId", activeThreadId);
+                    }
+                    for (const attachment of uploadableAttachments) {
+                        if (attachment.file) {
+                            formData.append("attachments", attachment.file, attachment.filename);
+                        }
+                    }
+                    return formData;
+                })(),
+            }
+            : {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({}),
+                body: JSON.stringify({
+                    threadId: activeThreadId,
+                    content,
+                }),
             });
-            if (!res.ok) throw new Error("Impossibile creare thread");
-            const json = await res.json();
-            setActiveThreadId(json.thread.id);
-            setThreads((prev) => [json.thread, ...prev]);
-            return json.thread.id;
-        } catch (e) {
-            toast.error((e as Error).message);
-            return null;
-        }
-    };
 
-    const persistMessage = async (
-        threadId: string,
-        role: "user" | "assistant",
-        content: string,
-        toolTrace?: AiToolTraceEntry[],
-        attachments?: ChatAttachment[],
-    ) => {
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(json.error || "Errore AI");
+        }
+        return json as ChatRouteResponse;
+    }, [activeThreadId]);
+
+    const refreshAfterWrite = useCallback(async () => {
+        await Promise.all([
+            loadThreads(),
+            loadMemory(),
+            refreshUserData(),
+        ]);
+    }, [loadMemory, loadThreads, refreshUserData]);
+
+    const handlePendingActionResolution = useCallback(async (actionId: string, mode: "confirm" | "cancel") => {
         try {
-            const uploadableAttachments = attachments?.filter((attachment) => !!attachment.file) ?? [];
-            if (uploadableAttachments.length > 0) {
-                const formData = new FormData();
-                formData.set("role", role);
-                formData.set("content", content);
-                if (toolTrace?.length) {
-                    formData.set("toolTrace", JSON.stringify(toolTrace));
-                }
-                for (const attachment of uploadableAttachments) {
-                    if (attachment.file) {
-                        formData.append("attachments", attachment.file, attachment.filename);
-                    }
-                }
-                await fetch(`/api/ai/threads/${threadId}/messages`, {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                });
-                return;
+            const res = await fetch(`/api/ai/pending-actions/${actionId}/${mode}`, {
+                method: "POST",
+                credentials: "include",
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error || `Impossibile ${mode === "confirm" ? "confermare" : "annullare"} l'azione`);
             }
 
-            await fetch(`/api/ai/threads/${threadId}/messages`, {
+            toast.success(json.summary || (mode === "confirm" ? "Azione confermata" : "Azione annullata"));
+            await refreshAfterWrite();
+            if (json.threadId) {
+                await loadThread(json.threadId);
+            }
+        } catch (e) {
+            toast.error((e as Error).message);
+        }
+    }, [loadThread, refreshAfterWrite]);
+
+    const saveTelegramBot = useCallback(async () => {
+        const token = telegramToken.trim();
+        if (!token) {
+            toast.error("Inserisci il token BotFather");
+            return;
+        }
+
+        setTelegramSaving(true);
+        try {
+            const res = await fetch("/api/telegram/bot", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({ role, content, toolTrace: toolTrace ?? null }),
+                body: JSON.stringify({ botToken: token }),
             });
-        } catch {
-            /* noop - client state is the source of truth for UI */
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error || "Configurazione Telegram fallita");
+            }
+            setTelegramToken("");
+            setTelegramState(json.telegram ?? null);
+            toast.success("Bot Telegram configurato");
+        } catch (e) {
+            toast.error((e as Error).message);
+        } finally {
+            setTelegramSaving(false);
         }
-    };
+    }, [telegramToken]);
+
+    const disconnectTelegramBot = useCallback(async () => {
+        setTelegramSaving(true);
+        try {
+            const res = await fetch("/api/telegram/bot", {
+                method: "DELETE",
+                credentials: "include",
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(json.error || "Disconnessione Telegram fallita");
+            }
+            setTelegramState(json.telegram ?? null);
+            toast.success("Bot Telegram rimosso");
+        } catch (e) {
+            toast.error((e as Error).message);
+        } finally {
+            setTelegramSaving(false);
+        }
+    }, []);
 
     const newThread = () => {
         revokeTurnAttachmentUrls(turnsRef.current);
@@ -557,21 +591,18 @@ export function AiDashboard({ user }: Props) {
             return;
         }
         if (!isConfigured) {
-            toast.error("Configura prima provider, API key e modello");
+            toast.error("Configura prima provider, chiave server-side e modello");
             setSettingsOpen(true);
             return;
         }
 
-        let contextJson = userDataJson;
-        if (!contextJson) {
-            contextJson = await refreshUserData();
-            if (!contextJson) return;
+        if (!userDataJson) {
+            const refreshed = await refreshUserData();
+            if (!refreshed) return;
         }
 
-        const threadId = await ensureThread();
-        if (!threadId) return;
-
         const userAttachments = composerAttachments.map((attachment) => ({ ...attachment }));
+        const previousTurns = turnsRef.current;
         const userTurn: ChatTurn = {
             role: "user",
             content: prompt,
@@ -584,71 +615,37 @@ export function AiDashboard({ user }: Props) {
         setComposerAttachments([]);
         if (fileInputRef.current) fileInputRef.current.value = "";
         setSending(true);
-        setPendingTools([]);
-
-        void persistMessage(threadId, "user", prompt, undefined, userAttachments);
 
         try {
-            const providerMessages = await buildProviderMessages(nextTurns);
-            const reply = await chat({
-                provider: settings.provider,
-                apiKey: settings.apiKey,
-                model: settings.model,
-                systemPrompt: buildSystemPrompt(userProfile, contextJson, memory),
-                messages: providerMessages,
-                tools: AI_TOOLS,
-                onToolCall: (entry) => setPendingTools((prev) => [...prev, entry]),
-            });
+            const response = await sendChatRequest(prompt, userAttachments);
+            const assistantTurn = mapServerMessageToTurn(response.assistantMessage);
 
-            const assistantText = reply.text || "(nessuna risposta)";
-            const assistantTurn: ChatTurn = {
-                role: "assistant",
-                content: assistantText,
-                toolTrace: reply.toolTrace.length > 0 ? reply.toolTrace : null,
-            };
+            setActiveThreadId(response.thread.id);
             setTurns([...nextTurns, assistantTurn]);
-
-            void persistMessage(threadId, "assistant", assistantText, reply.toolTrace);
-
-            setThreads((prev) => {
-                const t = prev.find((x) => x.id === threadId);
-                if (!t) return prev;
-                const updated = { ...t, updatedAt: new Date().toISOString(), messageCount: t.messageCount + 2 };
-                if (t.title === "Nuova conversazione") {
-                    updated.title = prompt.slice(0, 60)
-                        || userAttachments[0]?.filename
-                        || "Nuova conversazione";
-                }
-                return [updated, ...prev.filter((x) => x.id !== threadId)];
-            });
-
-            if (prompt) {
-                void (async () => {
-                    try {
-                        const extracted = await extractAndPersistMemory({
-                            provider: settings.provider,
-                            apiKey: settings.apiKey,
-                            model: settings.model,
-                            userMessage: prompt,
-                            assistantMessage: assistantText,
-                        });
-                        if (extracted.length > 0) {
-                            toast.success(`Memorizzati ${extracted.length} nuovi fatti`, { duration: 3000 });
-                            void loadMemory();
-                        }
-                    } catch {
-                        /* noop */
-                    }
-                })();
+            setThreads((prev) => [
+                response.thread,
+                ...prev.filter((thread) => thread.id !== response.thread.id),
+            ]);
+            if (response.pendingActions?.length) {
+                toast.success(`${response.pendingActions.length} azione${response.pendingActions.length > 1 ? "i" : ""} in attesa di conferma`);
             }
         } catch (e) {
+            revokeAttachmentUrls(userAttachments);
+            setTurns(previousTurns);
             toast.error(`Errore AI: ${(e as Error).message.slice(0, 200)}`);
         } finally {
             setSending(false);
-            setPendingTools([]);
             textareaRef.current?.focus();
         }
     };
+
+    const confirmPendingAction = useCallback(async (actionId: string) => {
+        await handlePendingActionResolution(actionId, "confirm");
+    }, [handlePendingActionResolution]);
+
+    const cancelPendingAction = useCallback(async (actionId: string) => {
+        await handlePendingActionResolution(actionId, "cancel");
+    }, [handlePendingActionResolution]);
 
     const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -727,7 +724,7 @@ export function AiDashboard({ user }: Props) {
                         <span className="opacity-60">|</span>
                         <span><strong>Contesto:</strong> {userDataJson ? `${(dataBytes / 1024).toFixed(1)} KB` : "vuoto"}</span>
                         <span className="opacity-60">|</span>
-                        <span><strong>Tools:</strong> {AI_TOOLS.length}</span>
+                        <span><strong>Runtime:</strong> server-side unificato</span>
                         <span className="opacity-60">|</span>
                         <span><strong>Memoria:</strong> {memory.length} fatti</span>
                         <span className="opacity-60">|</span>
@@ -737,6 +734,103 @@ export function AiDashboard({ user }: Props) {
                                 {userProfile.trim() ? `compilato (${userProfile.length} car.)` : "vuoto"}
                             </button>
                         </span>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-background/70 p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                                    <Smartphone className="size-4 text-sky-500" />
+                                    Bot Telegram personale
+                                </div>
+                                <p className="max-w-2xl text-xs text-muted-foreground">
+                                    Usa lo stesso motore AI della chat web: vede i tuoi dati, richiama gli stessi strumenti e ti chiede conferma esplicita prima di scrivere su budget, obiettivi o memoria.
+                                </p>
+                            </div>
+                            <div className="rounded-xl border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                                {telegramLoading ? "Caricamento stato Telegram..." : (
+                                    telegramState?.configured
+                                        ? `Bot @${telegramState.botUsername ?? "sconosciuto"} • ${telegramState.linkStatus === "linked" ? "collegato" : "in attesa di link"}`
+                                        : "Nessun bot configurato"
+                                )}
+                            </div>
+                        </div>
+
+                        {!isConfigured && (
+                            <div className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+                                Prima salva una chiave AI sul server dalla sezione <strong>Config</strong>: Telegram e chat web usano la stessa configurazione.
+                            </div>
+                        )}
+
+                        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+                            <div className="space-y-3">
+                                <div className="space-y-1">
+                                    <label htmlFor="telegram-bot-token" className="text-xs font-medium text-foreground">
+                                        Token BotFather
+                                    </label>
+                                    <input
+                                        id="telegram-bot-token"
+                                        value={telegramToken}
+                                        onChange={(e) => setTelegramToken(e.target.value)}
+                                        placeholder={telegramState?.configured ? "Lascia vuoto per mantenere il bot attuale" : "123456789:AA..."}
+                                        disabled={!isConfigured || telegramSaving}
+                                        className="flex h-10 w-full rounded-xl border border-border/60 bg-background px-3 text-sm outline-none ring-0 placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60"
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void loadTelegramState()}
+                                        disabled={telegramLoading || telegramSaving}
+                                    >
+                                        <RefreshCw className={`mr-1 size-4 ${telegramLoading ? "animate-spin" : ""}`} />
+                                        Stato
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={() => void saveTelegramBot()}
+                                        disabled={!isConfigured || telegramSaving || !telegramToken.trim()}
+                                        className="bg-sky-600 text-white hover:bg-sky-700"
+                                    >
+                                        {telegramSaving ? <Loader2 className="mr-1 size-4 animate-spin" /> : <Smartphone className="mr-1 size-4" />}
+                                        Salva bot
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void disconnectTelegramBot()}
+                                        disabled={telegramSaving || !telegramState?.configured}
+                                    >
+                                        Rimuovi bot
+                                    </Button>
+                                    {telegramState?.deepLink && (
+                                        <Button type="button" variant="outline" size="sm" asChild>
+                                            <a href={telegramState.deepLink} target="_blank" rel="noopener noreferrer">
+                                                <ExternalLink className="mr-1 size-4" />
+                                                Apri bot
+                                            </a>
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 rounded-2xl border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground">
+                                <div><strong className="text-foreground">Stato:</strong> {telegramState?.botStatus ?? "non configurato"}</div>
+                                <div><strong className="text-foreground">Link:</strong> {telegramState?.linkStatus ?? "non collegato"}</div>
+                                <div><strong className="text-foreground">Username:</strong> {telegramState?.botUsername ? `@${telegramState.botUsername}` : "n/d"}</div>
+                                <div><strong className="text-foreground">Utente Telegram:</strong> {telegramState?.linkedTelegramUsername ? `@${telegramState.linkedTelegramUsername}` : "non collegato"}</div>
+                                {telegramState?.lastError && (
+                                    <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-rose-700 dark:text-rose-300">
+                                        {telegramState.lastError}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="flex flex-col gap-4 lg:flex-row">
@@ -766,6 +860,9 @@ export function AiDashboard({ user }: Props) {
                                             content={t.content}
                                             attachments={t.attachments}
                                             tools={t.toolTrace}
+                                            pendingActions={t.pendingActions}
+                                            onConfirmPendingAction={(actionId) => void confirmPendingAction(actionId)}
+                                            onCancelPendingAction={(actionId) => void cancelPendingAction(actionId)}
                                         />
                                     ))
                                 )}
@@ -778,17 +875,8 @@ export function AiDashboard({ user }: Props) {
                                         <div className="flex flex-col gap-1">
                                             <div className="flex items-center gap-2 rounded-2xl bg-muted px-4 py-2 text-sm text-muted-foreground">
                                                 <Loader2 className="size-4 animate-spin" />
-                                                {pendingTools.length > 0 ? `Eseguo strumenti (${pendingTools.length})...` : "Sto pensando..."}
+                                                Sto elaborando la richiesta sul motore AI server-side...
                                             </div>
-                                            {pendingTools.length > 0 && (
-                                                <div className="flex flex-wrap gap-1">
-                                                    {pendingTools.map((t, i) => (
-                                                        <span key={i} className="rounded-full bg-purple-500/10 px-2 py-0.5 font-mono text-[10px] text-purple-700 dark:text-purple-300">
-                                                            {t.name}
-                                                        </span>
-                                                    ))}
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -835,7 +923,7 @@ export function AiDashboard({ user }: Props) {
                                     placeholder={
                                         isConfigured
                                             ? "Scrivi la tua domanda oppure incolla un'immagine... (Invio per inviare, Shift+Invio per nuova riga)"
-                                            : "Configura provider e API key per iniziare"
+                                            : "Configura provider, modello e chiave server-side per iniziare"
                                     }
                                     rows={3}
                                     disabled={!isConfigured || sending}

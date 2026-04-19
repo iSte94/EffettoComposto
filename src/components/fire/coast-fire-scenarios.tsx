@@ -2,12 +2,31 @@
 
 import { memo, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Briefcase, CheckCircle2, Clock, Info, TrendingDown, TrendingUp, Zap } from "lucide-react";
+import { Briefcase, CheckCircle2, Clock, Info, Shield, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import { formatEuro } from "@/lib/format";
-import { computeCoastFireScenarios, type CoastFireInput, type CoastFireScenarioResult } from "@/lib/finance/coast-fire";
+import {
+    buildPassiveIncomeBreakdown,
+    computeCoastFireScenarios,
+    type CoastFireInput,
+    type CoastFireScenarioResult,
+    type PassiveIncomeBreakdownEntry,
+} from "@/lib/finance/coast-fire";
 
 interface CoastFireScenariosProps {
     input: CoastFireInput;
+}
+
+interface ConservativeVariant {
+    id: string;
+    label: string;
+    hint: string;
+    value: number;
+    deltaFromBase: number;
+}
+
+function formatAge(age: number): string {
+    const roundedAge = Math.round(age * 10) / 10;
+    return Number.isInteger(roundedAge) ? `${roundedAge}` : roundedAge.toFixed(1);
 }
 
 const SCENARIO_STYLE: Record<string, {
@@ -121,9 +140,74 @@ function ScenarioCard({ s, currentCapital }: { s: CoastFireScenarioResult; curre
     );
 }
 
+function getBaseScenario(result: ReturnType<typeof computeCoastFireScenarios>): CoastFireScenarioResult {
+    return result.scenarios.find((scenario) => scenario.scenario === "base") ?? result.scenarios[0];
+}
+
 export const CoastFireScenarios = memo(function CoastFireScenarios({ input }: CoastFireScenariosProps) {
-    const result = useMemo(() => computeCoastFireScenarios(input), [input]);
-    const bestScenario = result.scenarios.reduce((best, s) => s.coastFireTarget < best.coastFireTarget ? s : best, result.scenarios[0]);
+    const { result, bestScenario, conservativeVariants, passiveBreakdown, baseScenario } = useMemo(() => {
+        const computedResult = computeCoastFireScenarios(input);
+        const best = computedResult.scenarios.reduce((currentBest, scenario) =>
+            scenario.coastFireTarget < currentBest.coastFireTarget ? scenario : currentBest,
+        computedResult.scenarios[0]);
+        const baseScenario = getBaseScenario(computedResult);
+        const hasPassiveSupport = baseScenario.passiveIncomePresentValue > 0;
+        const hasPensionSupport = baseScenario.pensionPresentValue > 0;
+        const hasPreRetirementPassiveSupport = (input.passiveIncomeStreams ?? []).some((stream) => stream.startAge < input.retirementAge);
+        const breakdown = hasPassiveSupport ? buildPassiveIncomeBreakdown(input, "base") : [];
+        const variants: ConservativeVariant[] = [{
+            id: "base",
+            label: "Base",
+            hint: hasPreRetirementPassiveSupport
+                ? "Include pensione INPS, rendite future e quota reinvestita prima del FIRE"
+                : "Include pensione INPS e rendite future",
+            value: baseScenario.coastFireTarget,
+            deltaFromBase: 0,
+        }];
+
+        if (hasPassiveSupport) {
+            const withoutFutureRents = computeCoastFireScenarios({
+                ...input,
+                monthlyRealEstateIncome: 0,
+                passiveIncomeStreams: [],
+            });
+            const withoutFutureRentsBase = getBaseScenario(withoutFutureRents);
+
+            variants.push({
+                id: "without-rents",
+                label: hasPensionSupport ? "Prudente" : "Senza affitti",
+                hint: hasPensionSupport ? "Ignora gli affitti futuri" : "Esclude le rendite future",
+                value: withoutFutureRentsBase.coastFireTarget,
+                deltaFromBase: withoutFutureRentsBase.coastFireTarget - baseScenario.coastFireTarget,
+            });
+        }
+
+        if (hasPensionSupport) {
+            const withoutFutureSupports = computeCoastFireScenarios({
+                ...input,
+                monthlyPublicPension: 0,
+                monthlyRealEstateIncome: 0,
+                passiveIncomeStreams: [],
+            });
+            const withoutFutureSupportsBase = getBaseScenario(withoutFutureSupports);
+
+            variants.push({
+                id: "without-supports",
+                label: hasPassiveSupport ? "Molto prudente" : "Prudente",
+                hint: hasPassiveSupport ? "Ignora pensione e affitti futuri" : "Ignora la pensione INPS",
+                value: withoutFutureSupportsBase.coastFireTarget,
+                deltaFromBase: withoutFutureSupportsBase.coastFireTarget - baseScenario.coastFireTarget,
+            });
+        }
+
+        return {
+            result: computedResult,
+            bestScenario: best,
+            conservativeVariants: variants,
+            passiveBreakdown: breakdown,
+            baseScenario,
+        };
+    }, [input]);
 
     return (
         <Card className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl overflow-hidden shadow-sm">
@@ -134,7 +218,7 @@ export const CoastFireScenarios = memo(function CoastFireScenarios({ input }: Co
                             <Zap className="w-5 h-5 mr-3 text-violet-500" /> Coast FIRE · Scenari di mercato
                         </CardTitle>
                         <CardDescription className="text-sm mt-1">
-                            Quanto capitale serve oggi per smettere di risparmiare e arrivare comunque a FIRE a {input.retirementAge} anni, considerando la pensione INPS a {input.publicPensionAge} anni.
+                            Non e il capitale per andare in pensione subito: e la soglia per smettere di contribuire oggi e arrivare comunque a FIRE a {input.retirementAge} anni, considerando la pensione INPS a {input.publicPensionAge} anni.
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-2 rounded-full bg-muted/60 border border-border/70 px-3 py-1.5">
@@ -151,11 +235,119 @@ export const CoastFireScenarios = memo(function CoastFireScenarios({ input }: Co
                     ))}
                 </div>
 
+                {conservativeVariants.length > 1 && (
+                    <div className="mt-5 rounded-2xl border border-amber-200/70 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+                        <div className="flex items-start gap-3">
+                            <div className="rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                <Shield className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Lettura prudente</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                                    Confronta il numero base con una soglia piu prudente, togliendo i supporti futuri che oggi non hai ancora in tasca.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className={`mt-4 grid gap-3 ${conservativeVariants.length > 2 ? "md:grid-cols-3" : "md:grid-cols-2"}`}>
+                            {conservativeVariants.map((variant) => {
+                                const isBase = variant.id === "base";
+
+                                return (
+                                    <div
+                                        key={variant.id}
+                                        className={`rounded-2xl border p-4 ${isBase
+                                            ? "border-violet-200/70 bg-violet-50/80 dark:border-violet-900/40 dark:bg-violet-950/30"
+                                            : "border-amber-200/70 bg-white/80 dark:border-amber-900/40 dark:bg-slate-950/30"
+                                            }`}
+                                    >
+                                        <div className={`text-[10px] font-extrabold uppercase tracking-[0.22em] ${isBase ? "text-violet-600 dark:text-violet-400" : "text-amber-700 dark:text-amber-300"}`}>
+                                            {variant.label}
+                                        </div>
+                                        <div className={`mt-1 text-2xl font-extrabold tabular-nums ${isBase ? "text-violet-700 dark:text-violet-300" : "text-slate-900 dark:text-slate-100"}`}>
+                                            {formatEuro(variant.value)}
+                                        </div>
+                                        <div className="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                            {variant.hint}
+                                        </div>
+                                        {!isBase && (
+                                            <div className="mt-3 inline-flex rounded-full border border-amber-200/80 bg-amber-100/80 px-2.5 py-1 text-[10px] font-bold text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/30 dark:text-amber-200">
+                                                +{formatEuro(variant.deltaFromBase)} vs base
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {passiveBreakdown.length > 0 && (
+                    <div className="mt-5 rounded-2xl border border-emerald-200/70 bg-emerald-50/60 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Breakdown rendite future</p>
+                                <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                                    Tutti i valori sono in euro di oggi: l&apos;inflazione e gia incorporata nel rendimento reale dello scenario base ({baseScenario.realReturnPct.toFixed(2)}%).
+                                </p>
+                            </div>
+                            <div className="rounded-full border border-emerald-200/80 bg-white/80 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.2em] text-emerald-700 dark:border-emerald-900/40 dark:bg-slate-950/30 dark:text-emerald-300">
+                                Scenario Base
+                            </div>
+                        </div>
+
+                        <div className="mt-4 overflow-hidden rounded-2xl border border-emerald-100/80 bg-white/80 dark:border-emerald-900/30 dark:bg-slate-950/30">
+                            <div className="hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 border-b border-emerald-100/80 px-4 py-3 text-[10px] font-extrabold uppercase tracking-[0.2em] text-slate-500 dark:border-emerald-900/30 md:grid">
+                                <span>Immobile</span>
+                                <span>Netto annuo</span>
+                                <span>Conta da</span>
+                                <span>PV a pensionamento</span>
+                                <span>Equivalente oggi</span>
+                            </div>
+
+                            <div className="divide-y divide-emerald-100/80 dark:divide-emerald-900/30">
+                                {passiveBreakdown.map((entry: PassiveIncomeBreakdownEntry) => (
+                                    <div key={`${entry.label}-${entry.startAge}`} className="px-4 py-3">
+                                        <div className="grid gap-3 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)] md:items-center">
+                                            <div>
+                                                <div className="text-sm font-bold text-slate-900 dark:text-slate-100">{entry.label}</div>
+                                                <div className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                                    {formatAge(entry.durationYears)} anni di rendita conteggiati nel Coast FIRE
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3 md:block">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 md:hidden">Netto annuo</span>
+                                                <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatEuro(entry.annualAmount)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3 md:block">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 md:hidden">Conta da</span>
+                                                <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-slate-100">{formatAge(entry.startAge)} anni</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3 md:block">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 md:hidden">PV a pensionamento</span>
+                                                <span className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-300">{formatEuro(entry.presentValueAtRetirement)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-3 md:block">
+                                                <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 md:hidden">Equivalente oggi</span>
+                                                <span className="text-sm font-bold tabular-nums text-violet-700 dark:text-violet-300">{formatEuro(entry.presentValueToday)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <p className="mt-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                            Il breakdown mostra solo il supporto post-FIRE. Se una rendita parte prima del pensionamento, la quota destinata al risparmio entra gia nel percorso pre-FIRE secondo le impostazioni del pannello.
+                        </p>
+                    </div>
+                )}
+
                 <div className="mt-5 rounded-2xl bg-muted/40 border border-border/70 p-4 flex items-start gap-3">
                     <Info className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="text-xs text-muted-foreground leading-relaxed">
                         <p>
-                            <strong className="text-foreground">Come leggerlo:</strong> se il tuo capitale attuale ({formatEuro(input.currentCapital)}) supera il target Coast FIRE di uno scenario, puoi tecnicamente smettere di contribuire e il compound porterà comunque il portafoglio al traguardo FIRE entro {input.retirementAge} anni.
+                            <strong className="text-foreground">Come leggerlo:</strong> non e il capitale per vivere di rendita da oggi. Se il tuo capitale attuale ({formatEuro(input.currentCapital)}) supera il target Coast FIRE di uno scenario, puoi tecnicamente smettere di contribuire e il compound porterà comunque il portafoglio al traguardo FIRE entro {input.retirementAge} anni.
                         </p>
                         {bestScenario && bestScenario.coastFireReached && (
                             <p className="mt-2">

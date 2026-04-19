@@ -1,3 +1,4 @@
+import { describe, expect, it } from "vitest";
 import { extractGeminiVisibleText, geminiSanitizeSchema } from "@/lib/ai/providers";
 
 describe("geminiSanitizeSchema", () => {

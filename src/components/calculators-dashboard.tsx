@@ -3,6 +3,7 @@
 import { InflationCalculator } from "@/components/inflation-calculator";
 import { CompoundInterestCalculator } from "@/components/compound-interest-calculator";
 import { DirectaMovementsViewer } from "@/components/directa-movements-viewer";
+import { LoanCalculator } from "@/components/loan-calculator";
 import { Wrench } from "lucide-react";
 
 export function CalculatorsDashboard() {
@@ -17,6 +18,7 @@ export function CalculatorsDashboard() {
             </div>
 
             <DirectaMovementsViewer />
+            <LoanCalculator />
             <InflationCalculator />
             <CompoundInterestCalculator />
         </div>

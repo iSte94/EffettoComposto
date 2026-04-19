@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
+import { allocatePreRetirementPassiveIncomeAnnual } from "@/lib/finance/coast-fire";
 import { formatEuro } from "@/lib/format";
-import type { AssetOwner, PensionConfig, PensionContributionMode } from "@/types";
+import type { AssetOwner, PensionConfig, PensionContributionMode, PreRetirementPassiveIncomeAllocationMode } from "@/types";
 import type { PensionBreakdownSummary } from "@/lib/finance/pension-optimizer";
 
 interface FireSettingsPanelProps {
@@ -19,6 +20,10 @@ interface FireSettingsPanelProps {
     retirementAge: number;
     expectedMonthlyExpenses: number;
     monthlySavings: number;
+    preRetirementPassiveIncomeMode: PreRetirementPassiveIncomeAllocationMode;
+    preRetirementPassiveIncomeSavingsPct: number;
+    preRetirementPassiveIncomeSavingsAnnual: number;
+    estimatedPreRetirementPassiveIncomeAnnual: number;
     fireWithdrawalRate: number;
     expectedInflation: number;
     fireExpectedReturn: number;
@@ -40,6 +45,9 @@ interface FireSettingsPanelProps {
     onRetirementAgeChange: (v: number) => void;
     onExpectedMonthlyExpensesChange: (v: number) => void;
     onMonthlySavingsChange: (v: number) => void;
+    onPreRetirementPassiveIncomeModeChange: (v: PreRetirementPassiveIncomeAllocationMode) => void;
+    onPreRetirementPassiveIncomeSavingsPctChange: (v: number) => void;
+    onPreRetirementPassiveIncomeSavingsAnnualChange: (v: number) => void;
     onFireWithdrawalRateChange: (v: number) => void;
     onExpectedInflationChange: (v: number) => void;
     onFireExpectedReturnChange: (v: number) => void;
@@ -106,6 +114,14 @@ function updatePersonField(
 }
 
 export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSettingsPanelProps) {
+    const preRetirementPassiveIncomePreview = allocatePreRetirementPassiveIncomeAnnual({
+        annualPassiveIncome: props.estimatedPreRetirementPassiveIncomeAnnual,
+        mode: props.preRetirementPassiveIncomeMode,
+        savingsPct: props.preRetirementPassiveIncomeSavingsPct,
+        savingsAnnual: props.preRetirementPassiveIncomeSavingsAnnual,
+    });
+    const hasAllocablePreRetirementPassiveIncome = props.estimatedPreRetirementPassiveIncomeAnnual > 0;
+
     const renderPersonCard = (personKey: AssetOwner, label: string, accentClass: string) => {
         const config = props.pensionConfig[personKey];
         const breakdown = props.pensionSummary.byPerson[personKey];
@@ -241,6 +257,109 @@ export const FireSettingsPanel = memo(function FireSettingsPanel(props: FireSett
                                 <InfoTooltip>Questo importo rappresenta solo il capitale che aggiungi al portafoglio investibile. I contributi al fondo pensione seguono un canale separato qui sotto.</InfoTooltip>
                             </div>
                             <Input type="number" step="50" value={props.monthlySavings} onChange={e => props.onMonthlySavingsChange(Number(e.target.value))} className="h-11 border-blue-200 bg-blue-50 font-extrabold text-lg text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300" />
+                        </div>
+
+                        <div className="space-y-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-1">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Affitti prima del FIRE</Label>
+                                    <InfoTooltip>Se una rendita immobiliare parte prima del FIRE, puoi decidere quanta quota reinvestire. Solo la quota a risparmio accelera FIRE e Coast FIRE; la quota usata per spesa migliora il tenore di vita ma non anticipa i target.</InfoTooltip>
+                                </div>
+                                <p className="text-xs leading-relaxed text-emerald-900/75 dark:text-emerald-100/75">
+                                    {hasAllocablePreRetirementPassiveIncome
+                                        ? `Fino a ${formatEuro(props.estimatedPreRetirementPassiveIncomeAnnual)} l&apos;anno netti possono entrare prima dei ${props.retirementAge} anni.`
+                                        : `Al momento non risultano rendite nette che partono prima dei ${props.retirementAge} anni.`}
+                                </p>
+                            </div>
+
+                            {hasAllocablePreRetirementPassiveIncome ? (
+                                <>
+                                    <div className="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => props.onPreRetirementPassiveIncomeModeChange("percent")}
+                                            className={`rounded-full border px-3 py-2 text-xs font-bold transition-all ${props.preRetirementPassiveIncomeMode === "percent"
+                                                ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
+                                                : "border-emerald-200 bg-white/80 text-emerald-800 hover:bg-white dark:border-emerald-900/40 dark:bg-slate-950/30 dark:text-emerald-200 dark:hover:bg-slate-900/60"
+                                                }`}
+                                        >
+                                            % al risparmio
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => props.onPreRetirementPassiveIncomeModeChange("fixed")}
+                                            className={`rounded-full border px-3 py-2 text-xs font-bold transition-all ${props.preRetirementPassiveIncomeMode === "fixed"
+                                                ? "border-emerald-500 bg-emerald-600 text-white shadow-sm"
+                                                : "border-emerald-200 bg-white/80 text-emerald-800 hover:bg-white dark:border-emerald-900/40 dark:bg-slate-950/30 dark:text-emerald-200 dark:hover:bg-slate-900/60"
+                                                }`}
+                                        >
+                                            EUR annui al risparmio
+                                        </button>
+                                    </div>
+
+                                    {props.preRetirementPassiveIncomeMode === "percent" ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-end justify-between gap-3">
+                                                <Label className="text-[10px] font-bold uppercase tracking-wider text-emerald-800/70 dark:text-emerald-200/70">Quota reinvestita</Label>
+                                                <span className="text-sm font-extrabold text-emerald-700 dark:text-emerald-300">
+                                                    {props.preRetirementPassiveIncomeSavingsPct.toFixed(0)}%
+                                                </span>
+                                            </div>
+                                            <Slider
+                                                value={[props.preRetirementPassiveIncomeSavingsPct]}
+                                                min={0}
+                                                max={100}
+                                                step={5}
+                                                onValueChange={(value) => props.onPreRetirementPassiveIncomeSavingsPctChange(value[0])}
+                                            />
+                                            <p className="text-[11px] leading-relaxed text-emerald-900/70 dark:text-emerald-100/70">
+                                                0% = usi tutto per spesa, 100% = reinvesti tutto.
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <Label className="text-[10px] font-bold uppercase tracking-wider text-emerald-800/70 dark:text-emerald-200/70">Quota reinvestita / anno (EUR)</Label>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                step={500}
+                                                value={props.preRetirementPassiveIncomeSavingsAnnual}
+                                                onChange={(e) => props.onPreRetirementPassiveIncomeSavingsAnnualChange(Number(e.target.value))}
+                                                className="h-11 border-emerald-200 bg-white/80 font-bold text-emerald-800 dark:border-emerald-900 dark:bg-slate-950/30 dark:text-emerald-100"
+                                            />
+                                            <p className="text-[11px] leading-relaxed text-emerald-900/70 dark:text-emerald-100/70">
+                                                Se in un dato anno incassi meno del valore scelto, il motore usa automaticamente l&apos;importo disponibile.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <div className="rounded-2xl border border-emerald-200/80 bg-white/80 p-3 shadow-sm dark:border-emerald-900/40 dark:bg-slate-950/30">
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-700/70 dark:text-emerald-300/70">Al risparmio</div>
+                                            <div className="mt-1 text-lg font-extrabold text-emerald-700 dark:text-emerald-300">
+                                                {formatEuro(preRetirementPassiveIncomePreview.savingsAnnual)}
+                                            </div>
+                                            <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                                                Questa quota accelera FIRE e Coast FIRE.
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950/30">
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">Alla spesa</div>
+                                            <div className="mt-1 text-lg font-extrabold text-slate-900 dark:text-slate-100">
+                                                {formatEuro(preRetirementPassiveIncomePreview.spendingAnnual)}
+                                            </div>
+                                            <p className="mt-1 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                                                Migliora il tenore di vita, ma non anticipa i target nello stesso modo.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="rounded-xl border border-white/80 bg-white/75 p-3 text-xs leading-relaxed text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-400">
+                                    Questa leva si attiva quando almeno una rendita immobiliare inizia prima del pensionamento.
+                                </div>
+                            )}
                         </div>
                     </div>
                 </CardContent>

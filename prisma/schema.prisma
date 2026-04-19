@@ -27,6 +27,10 @@ model User {
   pensionAccruals    PensionFundAccrual[]
   aiThreads          AssistantThread[]
   aiMemory           AssistantMemory[]
+  pendingActions     AssistantPendingAction[]
+  telegramBotConnection TelegramBotConnection?
+  budgetImportBatches BudgetImportBatch[]
+  budgetMerchantRules BudgetMerchantRule[]
 }
 
 model Preference {
@@ -75,6 +79,9 @@ model Preference {
   expectedPublicPension    Float    @default(0)
   publicPensionAge         Int      @default(67)
   applyTaxStamp            Boolean  @default(true)
+  preRetirementPassiveIncomeMode         String   @default("percent")
+  preRetirementPassiveIncomeSavingsPct   Float    @default(100)
+  preRetirementPassiveIncomeSavingsAnnual Float   @default(0)
   includeIlliquidInFire    Boolean  @default(false)
   separateEmergencyFund    Boolean  @default(false)
 
@@ -177,6 +184,11 @@ model BudgetTransaction {
   category         String
   categoryOverride Boolean  @default(false)
   hash             String   // dedupe key
+  merchantNormalized String?
+  movementType     String   @default("standard")
+  importConfidence String?
+  importBatchId    String?
+  importBatch      BudgetImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
   importedAt       DateTime @default(now())
 
   userId String
@@ -184,6 +196,56 @@ model BudgetTransaction {
 
   @@unique([userId, hash])
   @@index([userId, date])
+  @@index([userId, merchantNormalized])
+  @@index([importBatchId])
+}
+
+model BudgetImportBatch {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threadId       String?
+  thread         AssistantThread? @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  channel        String   @default("telegram")
+  status         String   @default("confirmed")
+  title          String
+  sourceKind     String
+  sourceFiles    String   @default("[]")
+  summary        String
+  payload        String
+  totalCount     Int      @default(0)
+  insertedCount  Int      @default(0)
+  skippedCount   Int      @default(0)
+  totalIncome    Float    @default(0)
+  totalExpenses  Float    @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  confirmedAt    DateTime?
+  cancelledAt    DateTime?
+  rolledBackAt   DateTime?
+
+  transactions   BudgetTransaction[]
+
+  @@index([userId, status, confirmedAt])
+  @@index([threadId, createdAt])
+}
+
+model BudgetMerchantRule {
+  id                 String   @id @default(uuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  normalizedMerchant String
+  displayName        String
+  category           String?
+  mode               String   @default("categorize") // categorize | ignore
+  alias              String?
+  hits               Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  lastUsedAt         DateTime?
+
+  @@unique([userId, normalizedMerchant, mode])
+  @@index([userId, mode, updatedAt])
 }
 
 model MortgageMarketCache {
@@ -202,13 +264,18 @@ model AssistantThread {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  channel   String   @default("web")
   title     String   @default("Nuova conversazione")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   messages  AssistantMessage[]
+  pendingActions AssistantPendingAction[]
+  telegramCurrentConnections TelegramBotConnection[] @relation("TelegramCurrentThread")
+  budgetImportBatches BudgetImportBatch[]
 
   @@index([userId, updatedAt])
+  @@index([userId, channel, updatedAt])
 }
 
 model AssistantMessage {
@@ -221,6 +288,7 @@ model AssistantMessage {
   toolTrace String?  // JSON AiToolTraceEntry[] (solo per assistant)
   createdAt DateTime @default(now())
   attachments AssistantAttachment[]
+  pendingActions AssistantPendingAction[]
 
   @@index([threadId, createdAt])
 }
@@ -254,6 +322,98 @@ model AssistantMemory {
 
   @@index([userId, category])
   @@index([userId, pinned])
+}
+
+model AssistantPendingAction {
+  id                 String            @id @default(uuid())
+  userId             String
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  threadId           String
+  thread             AssistantThread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  assistantMessageId String?
+  assistantMessage   AssistantMessage? @relation(fields: [assistantMessageId], references: [id], onDelete: SetNull)
+
+  channel            String            @default("web")
+  kind               String
+  status             String            @default("pending")
+  title              String
+  previewText        String
+  payload            String
+  resultSummary      String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+  executedAt         DateTime?
+
+  @@index([userId, status, createdAt])
+  @@index([threadId, status, createdAt])
+  @@index([assistantMessageId])
+}
+
+model TelegramBotConnection {
+  id                String           @id @default(uuid())
+  userId            String           @unique
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  botTokenEnc       String
+  botId             String?
+  botUsername       String?
+  botFirstName      String?
+  webhookSecret     String
+  botStatus         String           @default("configured")
+  linkStatus        String           @default("pending")
+  linkCode          String?
+  linkCodeExpiresAt DateTime?
+  telegramUserId    String?
+  telegramChatId    String?
+  telegramUsername  String?
+  linkedAt          DateTime?
+  currentThreadId   String?
+  currentThread     AssistantThread? @relation("TelegramCurrentThread", fields: [currentThreadId], references: [id], onDelete: SetNull)
+  lastWebhookAt     DateTime?
+  lastError         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  pendingMediaGroups TelegramPendingMediaGroup[]
+
+  @@index([botStatus])
+  @@index([linkStatus])
+  @@index([telegramUserId])
+}
+
+model TelegramPendingMediaGroup {
+  id                 String                    @id @default(uuid())
+  connectionId       String
+  connection         TelegramBotConnection     @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  mediaGroupId       String
+  mode               String                    @default("expense_capture")
+  status             String                    @default("collecting")
+  note               String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  processedAt        DateTime?
+  items              TelegramPendingMediaItem[]
+
+  @@unique([connectionId, mediaGroupId])
+  @@index([connectionId, status, updatedAt])
+}
+
+model TelegramPendingMediaItem {
+  id                 String                    @id @default(uuid())
+  groupId            String
+  group              TelegramPendingMediaGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  telegramMessageId  String
+  kind               String
+  mimeType           String
+  filename           String
+  size               Int
+  data               Bytes
+  sortOrder          Int                      @default(0)
+  createdAt          DateTime                 @default(now())
+
+  @@unique([groupId, telegramMessageId])
+  @@index([groupId, sortOrder, createdAt])
 }
 
 model DividendRecord {

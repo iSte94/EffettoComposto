@@ -118,6 +118,65 @@ describe('projectFire', () => {
         expect(result.yearsToFire).toBe(0);
     });
 
+    it('REGRESSIONE: oneTimeOutflow che porta sotto il target NON deve lasciare alreadyFire=true', () => {
+        // Scenario: utente gia' FIRE (2M, target 600k) che compra casa per 1.7M.
+        // Capitale effettivo a t=0 = 300k, quindi NON e' piu' FIRE e deve
+        // risparmiare/crescere per tornare al target. Prima del fix, il flag
+        // alreadyFire si basava su startingCapital (2M) e azzerava monthsToFire,
+        // nascondendo completamente il ritardo nella FIRE date.
+        const result = projectFire({
+            ...baseParams,
+            startingCapital: 2_000_000,
+            oneTimeOutflow: 1_700_000,
+        });
+
+        expect(result.alreadyFire).toBe(false);
+        expect(result.monthsToFire).toBeGreaterThan(0);
+        expect(result.yearsToFire).toBeGreaterThan(0);
+        // Punto iniziale deve riflettere il capitale POST-esborso.
+        expect(result.chartData[0].capital).toBe(300_000);
+    });
+
+    it('REGRESSIONE: fireDelayMonths rileva il ritardo di un acquisto quando il baseline e\' gia\' FIRE', () => {
+        // Prima del fix: baseline gia' FIRE (monthsToFire=0) e withPurchase
+        // anch'esso erroneamente 0 (startingCapital >= target => override).
+        // Delay calcolato = 0, dando al consulente la falsa conferma che
+        // un esborso di 1.7M "non ritarda" il FIRE. Dopo il fix il delay
+        // e' positivo.
+        const baseline = projectFire({ ...baseParams, startingCapital: 2_000_000 });
+        const withPurchase = projectFire({
+            ...baseParams,
+            startingCapital: 2_000_000,
+            oneTimeOutflow: 1_700_000,
+        });
+        expect(baseline.monthsToFire).toBe(0);
+        expect(withPurchase.monthsToFire).toBeGreaterThan(0);
+        const delay = fireDelayMonths(baseline, withPurchase);
+        expect(delay).toBeGreaterThan(0);
+    });
+
+    it('oneTimeOutflow che NON porta sotto target mantiene alreadyFire=true', () => {
+        // Sanity check: se l'esborso non incide sulla soglia FIRE, il flag resta true.
+        const result = projectFire({
+            ...baseParams,
+            startingCapital: 2_000_000,
+            oneTimeOutflow: 100_000, // 1.9M rimasti, target 600k
+        });
+        expect(result.alreadyFire).toBe(true);
+        expect(result.monthsToFire).toBe(0);
+        expect(result.chartData[0].capital).toBe(1_900_000);
+    });
+
+    it('oneTimeOutflow >= startingCapital lascia capitale iniziale a 0 (no negativo)', () => {
+        const result = projectFire({
+            ...baseParams,
+            startingCapital: 50_000,
+            oneTimeOutflow: 500_000,
+        });
+        expect(result.chartData[0].capital).toBe(0);
+        expect(result.alreadyFire).toBe(false);
+    });
+
     it('gestisce scenario degenere (reale <= -100%) senza esplodere', () => {
         // Inflazione iperbolica vs rendimento nominale zero.
         // Il capitale dovrebbe crollare a 0, non divergere o diventare NaN.

@@ -15,7 +15,11 @@ import { toast } from "sonner";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computePensionBreakdown } from "@/lib/finance/pension-optimizer";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
-import { buildDynamicFireTargetSchedule } from "@/lib/finance/coast-fire";
+import {
+    allocatePreRetirementPassiveIncomeAnnual,
+    buildDynamicFireTargetSchedule,
+    estimatePreRetirementPassiveIncomeAnnual,
+} from "@/lib/finance/coast-fire";
 import {
     calculatePropertyAnnualNetIncome,
 } from "@/lib/finance/real-estate";
@@ -23,7 +27,15 @@ import { liquidatePensionFund, shouldLiquidatePensionFund } from "@/lib/finance/
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { addFinancialDataChangedListener, broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { DEFAULT_PENSION_CONFIG, parsePensionConfig, stringifyPensionConfig } from "@/lib/pension-config";
-import type { AssetRecord, ExistingLoan, AcceptedPurchase, MonthlyExpense, PensionConfig, RealEstateProperty } from "@/types";
+import type {
+    AcceptedPurchase,
+    AssetRecord,
+    ExistingLoan,
+    MonthlyExpense,
+    PensionConfig,
+    PreRetirementPassiveIncomeAllocationMode,
+    RealEstateProperty,
+} from "@/types";
 import { formatEuro } from "@/lib/format";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
 import { CoastFireScenarios } from "@/components/fire/coast-fire-scenarios";
@@ -129,6 +141,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const [fireVolatility, setFireVolatility] = useState<number>(15.0); // Monte Carlo Volatility
     const [expectedInflation, setExpectedInflation] = useState<number>(2.0); // For dynamic target
     const [monthlyPacBudget, setMonthlyPacBudget] = useState<number>(1000);
+    const [preRetirementPassiveIncomeMode, setPreRetirementPassiveIncomeMode] = useState<PreRetirementPassiveIncomeAllocationMode>("percent");
+    const [preRetirementPassiveIncomeSavingsPct, setPreRetirementPassiveIncomeSavingsPct] = useState<number>(100);
+    const [preRetirementPassiveIncomeSavingsAnnual, setPreRetirementPassiveIncomeSavingsAnnual] = useState<number>(0);
 
     // NEW: Public Pension & Taxes
     const [expectedPublicPension, setExpectedPublicPension] = useState<number>(1000); // In today's euros
@@ -199,6 +214,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 }
                 if (p.monthlyPacBudget != null) setMonthlyPacBudget(p.monthlyPacBudget);
                 else if (p.monthlySavings != null) setMonthlyPacBudget(p.monthlySavings);
+                setPreRetirementPassiveIncomeMode(p.preRetirementPassiveIncomeMode === "fixed" ? "fixed" : "percent");
+                if (p.preRetirementPassiveIncomeSavingsPct != null) setPreRetirementPassiveIncomeSavingsPct(p.preRetirementPassiveIncomeSavingsPct);
+                if (p.preRetirementPassiveIncomeSavingsAnnual != null) setPreRetirementPassiveIncomeSavingsAnnual(p.preRetirementPassiveIncomeSavingsAnnual);
                 if (p.fireWithdrawalRate != null) setFireWithdrawalRate(p.fireWithdrawalRate);
                 if (p.fireExpectedReturn != null) setFireExpectedReturn(p.fireExpectedReturn);
                 if (p.fireVolatility != null) setFireVolatility(p.fireVolatility);
@@ -275,6 +293,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     retirementAge,
                     ...(isDerivedFireExpenseRef.current ? {} : { expectedMonthlyExpenses }),
                     monthlyPacBudget,
+                    preRetirementPassiveIncomeMode,
+                    preRetirementPassiveIncomeSavingsPct,
+                    preRetirementPassiveIncomeSavingsAnnual,
                     fireWithdrawalRate,
                     fireExpectedReturn,
                     fireVolatility,
@@ -307,6 +328,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     }, [
         user,
         birthYear, retirementAge, expectedMonthlyExpenses, monthlyPacBudget, fireWithdrawalRate,
+        preRetirementPassiveIncomeMode, preRetirementPassiveIncomeSavingsPct, preRetirementPassiveIncomeSavingsAnnual,
         fireExpectedReturn, fireVolatility, expectedInflation, enablePensionOptimizer,
         pensionConfig, pensionFundAccessAge,
         pensionFundExitTaxRate, pensionExitMode, expectedPublicPension, publicPensionAge, applyTaxStamp,
@@ -338,6 +360,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
         return () => clearTimeout(timeoutId);
     }, [
         birthYear, retirementAge, expectedMonthlyExpenses, monthlyPacBudget,
+        preRetirementPassiveIncomeMode, preRetirementPassiveIncomeSavingsPct, preRetirementPassiveIncomeSavingsAnnual,
         fireWithdrawalRate, fireExpectedReturn, fireVolatility,
         expectedInflation, enablePensionOptimizer, pensionConfig,
         pensionFundAccessAge, pensionFundExitTaxRate, pensionExitMode,
@@ -418,6 +441,10 @@ export function FireDashboard({ user }: FireDashboardProps) {
         expectedInflation,
         expectedPublicPension,
         publicPensionAge,
+        applyTaxStamp,
+        preRetirementPassiveIncomeMode,
+        preRetirementPassiveIncomeSavingsPct,
+        preRetirementPassiveIncomeSavingsAnnual,
         includeIlliquidInFire,
     });
 
@@ -437,6 +464,14 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const coastFireAnalysis = fireMetrics.coastFireAnalysis;
     const coastFireInput = fireMetrics.coastFireInput;
     const baseCoastScenario = coastFireAnalysis?.scenarios.find((scenario) => scenario.scenario === "base") ?? coastFireAnalysis?.scenarios[0];
+    const baseCoastRealReturnPct = baseCoastScenario?.realReturnPct ?? (realReturnDecimal * 100);
+    const estimatedPreRetirementPassiveIncomeAnnual = coastFireInput
+        ? estimatePreRetirementPassiveIncomeAnnual(
+            coastFireInput.passiveIncomeStreams ?? [],
+            currentAge,
+            retirementAge,
+        )
+        : 0;
     const plannedFireTarget = fireMetrics.fireTarget;
     const coastFireTarget = fireMetrics.coastFireTarget;
     const maxYearsSim = 100;
@@ -451,6 +486,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
             withdrawalRatePct: fireWithdrawalRate,
             nominalReturnPct: fireExpectedReturn,
             inflationPct: expectedInflation,
+            applyTaxStamp: coastFireInput.applyTaxStamp,
         })
         : Array.from({ length: maxYearsSim + 1 }, () => plannedFireTarget);
     const fireTarget = fireTargetsByYear[0] ?? plannedFireTarget;
@@ -512,6 +548,16 @@ export function FireDashboard({ user }: FireDashboardProps) {
         }
     };
 
+    const getSavedPreRetirementPassiveIncomeAtMonth = (monthsFromNow: number) => {
+        const annualPassiveIncome = getActiveRealEstatePassiveIncomeAtMonth(monthsFromNow);
+        return allocatePreRetirementPassiveIncomeAnnual({
+            annualPassiveIncome,
+            mode: preRetirementPassiveIncomeMode,
+            savingsPct: preRetirementPassiveIncomeSavingsPct,
+            savingsAnnual: preRetirementPassiveIncomeSavingsAnnual,
+        }).savingsAnnual / 12;
+    };
+
     // Calculate baseline (current) total installment so we only ADD the "freed up" cash flow
     const baseInstallmentNow = getActiveDebtAtMonth(0);
     const effectivePensionConfig = enablePensionOptimizer
@@ -555,7 +601,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
         // Calculate dynamic savings rate for this specific month
         const activeDebtThisMonth = getActiveDebtAtMonth(m);
         const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth; // Money no longer going to the bank
-        const currentMonthlySavings = monthlyPacBudget + Math.max(0, freedUpCashFlow);
+        const savedPassiveIncomeThisMonth = getSavedPreRetirementPassiveIncomeAtMonth(m);
+        const currentMonthlySavings = monthlyPacBudget + Math.max(0, freedUpCashFlow) + savedPassiveIncomeThisMonth;
 
         // Target fisso in euro odierni (inflazione già sottratta dal rendimento)
         const isRetired = yAge >= retirementAge || tempCap >= currentFireTarget;
@@ -696,6 +743,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
             applyTaxStamp,
             annualExpenses,
             monthlySavings: monthlyPacBudget,
+            preRetirementPassiveIncomeMode,
+            preRetirementPassiveIncomeSavingsPct,
+            preRetirementPassiveIncomeSavingsAnnual,
             publicPensionAge,
             expectedPublicPension,
             enablePensionOptimizer,
@@ -755,7 +805,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
             for (let m = (i * 12); m < ((i + 1) * 12); m++) {
                 const activeDebtThisMonth = getActiveDebtAtMonth(m);
                 const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth;
-                totalSavingsThisYear += (monthlyPacBudget + Math.max(0, freedUpCashFlow));
+                const savedPassiveIncomeThisMonth = getSavedPreRetirementPassiveIncomeAtMonth(m);
+                totalSavingsThisYear += (monthlyPacBudget + Math.max(0, freedUpCashFlow) + savedPassiveIncomeThisMonth);
             }
             stressCap += totalSavingsThisYear;
         }
@@ -882,7 +933,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                             <div className={`text-2xl font-extrabold ${coastFireReached ? 'text-teal-600' : 'text-teal-500'}`}>
                                 {formatEuro(coastFireTarget)}
                             </div>
-                            <div className="text-xs text-teal-600/70 mt-1">Capitale da avere OGGI per ritirarti a {retirementAge} anni.</div>
+                            <div className="text-xs text-teal-600/70 mt-1">Soglia da avere OGGI per smettere di contribuire e arrivare a {retirementAge} anni col target FIRE.</div>
                         </CardContent>
                     </Card>
 
@@ -1063,6 +1114,10 @@ export function FireDashboard({ user }: FireDashboardProps) {
                     retirementAge={retirementAge}
                     expectedMonthlyExpenses={expectedMonthlyExpenses}
                     monthlySavings={monthlyPacBudget}
+                    preRetirementPassiveIncomeMode={preRetirementPassiveIncomeMode}
+                    preRetirementPassiveIncomeSavingsPct={preRetirementPassiveIncomeSavingsPct}
+                    preRetirementPassiveIncomeSavingsAnnual={preRetirementPassiveIncomeSavingsAnnual}
+                    estimatedPreRetirementPassiveIncomeAnnual={estimatedPreRetirementPassiveIncomeAnnual}
                     fireWithdrawalRate={fireWithdrawalRate}
                     expectedInflation={expectedInflation}
                     fireExpectedReturn={fireExpectedReturn}
@@ -1087,6 +1142,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
                         setExpectedMonthlyExpenses(value);
                     }}
                     onMonthlySavingsChange={setMonthlyPacBudget}
+                    onPreRetirementPassiveIncomeModeChange={setPreRetirementPassiveIncomeMode}
+                    onPreRetirementPassiveIncomeSavingsPctChange={setPreRetirementPassiveIncomeSavingsPct}
+                    onPreRetirementPassiveIncomeSavingsAnnualChange={setPreRetirementPassiveIncomeSavingsAnnual}
                     onFireWithdrawalRateChange={setFireWithdrawalRate}
                     onExpectedInflationChange={setExpectedInflation}
                     onFireExpectedReturnChange={setFireExpectedReturn}
@@ -1171,8 +1229,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                         </h4>
                                         <p className={`text-sm leading-relaxed font-medium ${coastFireReached ? 'text-teal-800/80' : 'text-slate-600 dark:text-slate-400'}`}>
                                             {coastFireReached
-                                                ? `Complimenti! Hai superato la soglia di ${formatEuro(coastFireTarget)}. Significa che potresti smettere di risparmiare oggi e, grazie all'interesse composto di ${fireExpectedReturn}% reale annuo, arrivare a ${retirementAge} anni con il capitale netto richiesto dal tuo piano FIRE (${formatEuro(plannedFireTarget)}).`
-                                                : `Il Coast FIRE è il traguardo intermedio. Ti mancano ${formatEuro(coastFireTarget - startingCapital)} per raggiungere i ${formatEuro(coastFireTarget)}. Una volta raggiunto, il mercato potrà completare il percorso verso il tuo obiettivo FIRE netto entro i ${retirementAge} anni.`}
+                                                ? `Complimenti! Hai superato la soglia di ${formatEuro(coastFireTarget)}. Significa che potresti smettere di risparmiare oggi e, con un rendimento reale stimato del ${baseCoastRealReturnPct.toFixed(2)}% annuo, arrivare a ${retirementAge} anni con il capitale netto richiesto dal tuo piano FIRE (${formatEuro(plannedFireTarget)}), al netto di pensione INPS e rendite future.`
+                                                : `Il Coast FIRE e il traguardo intermedio: non e il capitale per vivere di rendita da oggi, ma la soglia per lasciare lavorare il compound fino ai ${retirementAge} anni. Ti mancano ${formatEuro(coastFireTarget - startingCapital)} per raggiungere i ${formatEuro(coastFireTarget)}.`}
                                         </p>
                                     </div>
 

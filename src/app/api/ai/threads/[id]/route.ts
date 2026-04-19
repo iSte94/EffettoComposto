@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAuthenticatedUserId, UnauthorizedError, unauthorizedResponse } from "@/lib/api-auth";
+import { serializePendingAction } from "@/lib/ai/pending-actions";
 
 interface Ctx { params: Promise<{ id: string }> }
 
@@ -17,6 +18,9 @@ export async function GET(_req: Request, { params }: Ctx) {
                         attachments: {
                             orderBy: { createdAt: "asc" },
                         },
+                        pendingActions: {
+                            orderBy: { createdAt: "asc" },
+                        },
                     },
                 },
             },
@@ -26,6 +30,7 @@ export async function GET(_req: Request, { params }: Ctx) {
             thread: {
                 id: thread.id,
                 title: thread.title,
+                channel: thread.channel,
                 createdAt: thread.createdAt.toISOString(),
                 updatedAt: thread.updatedAt.toISOString(),
             },
@@ -42,6 +47,7 @@ export async function GET(_req: Request, { params }: Ctx) {
                     size: attachment.size,
                     url: `/api/ai/attachments/${attachment.id}`,
                 })),
+                pendingActions: m.pendingActions.map(serializePendingAction),
                 createdAt: m.createdAt.toISOString(),
             })),
         });

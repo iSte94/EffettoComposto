@@ -44,6 +44,9 @@ export const preferencesSchema = z.object({
     expectedPublicPension: z.number().min(0).optional(),
     publicPensionAge: z.number().int().min(50).max(100).optional(),
     applyTaxStamp: z.boolean().optional(),
+    preRetirementPassiveIncomeMode: z.enum(["percent", "fixed"]).optional(),
+    preRetirementPassiveIncomeSavingsPct: z.number().min(0).max(100).optional(),
+    preRetirementPassiveIncomeSavingsAnnual: z.number().min(0).optional(),
     includeIlliquidInFire: z.boolean().optional(),
     separateEmergencyFund: z.boolean().optional(),
     // Fondo Pensione Complementare

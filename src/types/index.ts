@@ -26,6 +26,7 @@ export interface AssetRecord {
 export type AssetOwner = "person1" | "person2";
 
 export type PensionContributionMode = "percent" | "fixed";
+export type PreRetirementPassiveIncomeAllocationMode = "percent" | "fixed";
 
 export interface PensionContributionConfig {
     mode: PensionContributionMode;
@@ -201,4 +202,61 @@ export interface AcceptedPurchase {
     totalTCO: number;
     // Linked loan ID (if financed, auto-created in existingLoansList)
     linkedLoanId?: string;
+}
+
+export type AssistantChannel = "web" | "telegram";
+
+export type PendingActionStatus = "pending" | "confirmed" | "canceled" | "failed";
+
+export type PendingActionKind =
+    | "add_budget_transaction"
+    | "add_budget_transactions_batch"
+    | "delete_budget_transaction"
+    | "update_budget_transaction_category"
+    | "upsert_budget_merchant_rule"
+    | "delete_budget_merchant_rule"
+    | "create_goal"
+    | "update_goal"
+    | "delete_goal"
+    | "add_memory"
+    | "delete_memory"
+    | "toggle_memory_pin";
+
+export interface PendingAction {
+    id: string;
+    threadId: string;
+    assistantMessageId?: string | null;
+    channel: AssistantChannel;
+    kind: PendingActionKind;
+    status: PendingActionStatus;
+    title: string;
+    previewText: string;
+    resultSummary?: string | null;
+    createdAt: string;
+    updatedAt: string;
+    confirmedAt?: string | null;
+    cancelledAt?: string | null;
+    executedAt?: string | null;
+}
+
+export type TelegramBotStatus = "configured" | "linked" | "error";
+
+export type TelegramLinkStatus = "pending" | "linked" | "unlinked";
+
+export interface TelegramBotState {
+    configured: boolean;
+    botStatus: TelegramBotStatus | null;
+    linkStatus: TelegramLinkStatus | null;
+    botUsername?: string | null;
+    botFirstName?: string | null;
+    deepLink?: string | null;
+    linkedTelegramUsername?: string | null;
+    linkedAt?: string | null;
+    lastError?: string | null;
+}
+
+export interface ServerAiConfigStatus {
+    provider: "gemini" | "openrouter" | null;
+    model: string | null;
+    hasStoredKey: boolean;
 }

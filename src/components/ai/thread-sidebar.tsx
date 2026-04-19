@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 export interface ThreadSummary {
     id: string;
     title: string;
+    channel?: "web" | "telegram";
     createdAt: string;
     updatedAt: string;
     messageCount: number;
@@ -122,6 +123,11 @@ export const ThreadSidebar = memo(function ThreadSidebar({ threads, activeId, on
                                                         {t.title}
                                                     </div>
                                                     <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                                                        {t.channel === "telegram" && (
+                                                            <span className="rounded-full bg-sky-500/10 px-1.5 py-0.5 font-medium text-sky-700 dark:text-sky-300">
+                                                                Telegram
+                                                            </span>
+                                                        )}
                                                         <span>{t.messageCount} msg</span>
                                                         <span className="opacity-40">•</span>
                                                         <span>{formatRelative(t.updatedAt)}</span>
