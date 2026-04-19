@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
     BarChart3, Home, Wallet, Bitcoin, Package,
-    Flame, Target, ShieldAlert, TrendingDown, FileDown, CheckCircle2,
+    Flame, Target, ShieldAlert, TrendingDown, FileDown,
     LineChart, Activity,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
@@ -19,7 +19,7 @@ import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { addFinancialDataChangedListener } from "@/lib/client-data-events";
-import type { AssetRecord, AcceptedPurchase } from "@/types";
+import type { AssetRecord } from "@/types";
 
 interface OverviewDashboardProps {
     user: { username: string } | null;
@@ -56,7 +56,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [history, setHistory] = useState<AssetRecord[]>([]);
     const [preferences, setPreferences] = useState<Record<string, unknown>>({});
     const [loading, setLoading] = useState(true);
-    const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
 
     const loadOverviewData = useCallback(async (showLoading = true) => {
         if (!user) return;
@@ -80,7 +79,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             }
             if (prefData.preferences) {
                 setPreferences(prefData.preferences as Record<string, unknown>);
-                try { setAcceptedPurchases(JSON.parse(prefData.preferences.acceptedPurchases || "[]")); } catch { /* empty */ }
             }
         } catch (error) {
             console.error(error);
@@ -442,37 +440,6 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
 
             {/* Net Worth Projection */}
             <NetWorthProjection history={history} monthlySavings={monthlySavings} currentNetWorth={metrics?.currentNetWorth} expectedReturnRate={Number(preferences.fireExpectedReturn) || undefined} />
-
-            {/* Accepted Purchases Summary */}
-            {acceptedPurchases.length > 0 && (
-                <div className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl shadow-sm p-5 sm:p-6">
-                    <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em] mb-4 flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Acquisti Accettati
-                    </h3>
-                    <div className="space-y-2">
-                        {acceptedPurchases.map(p => (
-                            <div key={p.id} className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 text-sm p-3 bg-muted/60 rounded-xl">
-                                <div>
-                                    <span className="font-bold text-card-foreground">{p.itemName}</span>
-                                    <span className="text-xs text-muted-foreground sm:ml-2">{p.category}</span>
-                                </div>
-                                <div className="text-right sm:shrink-0">
-                                    <span className="font-bold text-card-foreground tabular-nums">{formatEuro(p.totalPrice)}</span>
-                                    {p.isFinanced && (
-                                        <span className="text-xs text-rose-500 dark:text-rose-400 sm:ml-2">-{formatEuro(p.monthlyPayment)}/m</span>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 mt-4 pt-3 border-t border-border text-sm">
-                        <span className="font-bold text-muted-foreground">Totale Rate Finanziate</span>
-                        <span className="font-extrabold text-rose-600 dark:text-rose-400 tabular-nums">
-                            {formatEuro(acceptedPurchases.filter(p => p.isFinanced).reduce((s, p) => s + p.monthlyPayment, 0))}
-                        </span>/mese
-                    </div>
-                </div>
-            )}
 
             {/* Export Button */}
             {history.length > 0 && (

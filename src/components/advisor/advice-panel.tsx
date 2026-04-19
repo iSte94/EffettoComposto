@@ -1,8 +1,7 @@
 "use client";
 
 import { memo } from "react";
-import { ShieldCheck, ArrowRight, Lightbulb, CheckCircle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ShieldCheck, ArrowRight, Lightbulb } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatEuro } from "@/lib/format";
@@ -29,9 +28,6 @@ interface AdvicePanelProps {
     };
     advices: Advice[];
     hasUser: boolean;
-    onAcceptPurchase?: () => void;
-    isAccepting?: boolean;
-    isAlreadyAccepted?: boolean;
 }
 
 function getLeadSentence(message: string): string {
@@ -109,7 +105,6 @@ function AdviceCard({ advice, compact = false }: { advice: Advice; compact?: boo
 
 export const AdvicePanel = memo(function AdvicePanel({
     showResults, itemName, isFinanced, overallScore, calculations, advices, hasUser,
-    onAcceptPurchase, isAccepting, isAlreadyAccepted,
 }: AdvicePanelProps) {
     const scoreColor = overallScore >= 70 ? "text-emerald-500" : overallScore >= 40 ? "text-amber-500" : "text-red-500";
     const scoreLabel = overallScore >= 70 ? "Buona" : overallScore >= 40 ? "Attenzione" : "Critica";
@@ -381,34 +376,6 @@ export const AdvicePanel = memo(function AdvicePanel({
                     </TabsContent>
                 </Tabs>
             </div>
-
-            {hasUser && onAcceptPurchase && (
-                <div className="rounded-3xl border border-slate-200/80 bg-white/75 p-5 text-center shadow-md backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75 sm:p-6">
-                    {isAlreadyAccepted ? (
-                        <div className="flex items-center justify-center gap-2 text-emerald-600 dark:text-emerald-400">
-                            <CheckCircle className="h-5 w-5" />
-                            <span className="text-sm font-bold">Acquisto gia accettato</span>
-                        </div>
-                    ) : (
-                        <>
-                            <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                                Accettando, il finanziamento verra aggiunto ai tuoi prestiti e l&apos;impatto sara visibile in Patrimonio e FIRE.
-                            </p>
-                            <Button
-                                onClick={onAcceptPurchase}
-                                disabled={isAccepting}
-                                className="mt-3 h-12 w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 font-bold text-white hover:from-indigo-700 hover:to-violet-700"
-                            >
-                                {isAccepting ? (
-                                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvataggio...</>
-                                ) : (
-                                    <><CheckCircle className="mr-2 h-4 w-4" /> Accetta Spesa</>
-                                )}
-                            </Button>
-                        </>
-                    )}
-                </div>
-            )}
         </div>
     );
 });

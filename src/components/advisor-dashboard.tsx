@@ -9,21 +9,30 @@ import {
 } from "lucide-react";
 
 import { formatEuro } from "@/lib/format";
-import type { FinancialSnapshot, PurchaseSimulation, Advice, AcceptedPurchase, ExistingLoan, MonthlyExpense } from "@/types";
+import type {
+  AdvisorReminder,
+  AdvisorSavedScenario,
+  AdvisorSavedScenarioInput,
+  Advice,
+  ExistingLoan,
+  FinancialSnapshot,
+  MonthlyExpense,
+  PurchaseSimulation,
+} from "@/types";
 import { PurchaseForm } from "@/components/advisor/purchase-form";
 import { AdvicePanel } from "@/components/advisor/advice-panel";
+import { AdvisorWorkspace, downloadAdvisorScenarioReport } from "@/components/advisor/advisor-workspace";
 import { PurchaseImpactChart } from "@/components/advisor/purchase-impact-chart";
 import { FireImpactChart } from "@/components/advisor/fire-impact-chart";
 import { CalculationBreakdown } from "@/components/advisor/calculation-breakdown";
 import { ScenarioComparison } from "@/components/advisor/scenario-comparison";
 import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2, Calendar } from "lucide-react";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { computeAdvisorFireComparison } from "@/lib/finance/advisor-fire";
+import { buildAdvisorScenarioFingerprint } from "@/lib/advisor-workspace";
 import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { toast } from "sonner";
 
@@ -72,26 +81,30 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
   });
   const [sim, setSim] = useState<PurchaseSimulation>(defaultSimulation);
   const [showResults, setShowResults] = useState(false);
-  const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
-  const [existingLoans, setExistingLoans] = useState<ExistingLoan[]>([]);
-  const [isAccepting, setIsAccepting] = useState(false);
+  const [savedScenarios, setSavedScenarios] = useState<AdvisorSavedScenario[]>([]);
+  const [reminders, setReminders] = useState<AdvisorReminder[]>([]);
+  const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null);
 
   useEffect(() => { setIsMounted(true); }, []);
 
   // Carica dati patrimoniali dell'utente
   useEffect(() => {
     if (!user) {
+      setSavedScenarios([]);
+      setReminders([]);
       setIsLoading(false);
       return;
     }
     const loadData = async () => {
       try {
-        const [prefRes, patrimonioRes] = await Promise.all([
+        const [prefRes, patrimonioRes, workspaceRes] = await Promise.all([
           fetch("/api/preferences"),
           fetch("/api/patrimonio"),
+          fetch("/api/advisor-workspace"),
         ]);
         const prefData = await prefRes.json();
         const patrimonioData = await patrimonioRes.json();
+        const workspaceData = workspaceRes.ok ? await workspaceRes.json() : { savedScenarios: [], reminders: [] };
 
         let liquidAssets = 0;
         let emergencyFund = 0;
@@ -119,10 +132,8 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         if (p.existingLoansList) {
           try { loans = JSON.parse(p.existingLoansList); } catch { /* empty */ }
         }
-        setExistingLoans(loans);
-        if (p.acceptedPurchases) {
-          try { setAcceptedPurchases(JSON.parse(p.acceptedPurchases)); } catch { /* empty */ }
-        }
+        setSavedScenarios(Array.isArray(workspaceData.savedScenarios) ? workspaceData.savedScenarios : []);
+        setReminders(Array.isArray(workspaceData.reminders) ? workspaceData.reminders : []);
 
         // Spese mensili reali da expensesList (isAnnual => /12)
         let monthlyExpenses = 0;
@@ -210,107 +221,6 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     setSim(prev => ({ ...prev, ...updates }));
     setShowResults(false);
   };
-
-  const handleAcceptPurchase = async () => {
-    if (!user) return toast.error("Devi accedere per accettare una spesa");
-    setIsAccepting(true);
-    try {
-      const loanId = `purchase-${Date.now()}`;
-      const now = new Date();
-      const startDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      const endDate = sim.isFinanced
-        ? `${now.getFullYear() + sim.financingYears}-${String(now.getMonth() + 1).padStart(2, '0')}`
-        : startDate;
-
-      const categoryMap: Record<string, "Auto" | "Casa" | "Personale" | "Arredamento" | "Altro"> = {
-        auto: "Auto", immobile: "Casa", arredamento: "Arredamento", altro: "Altro",
-      };
-
-      // Crea il prestito se finanziato
-      let updatedLoans = [...existingLoans];
-      if (sim.isFinanced && calculations.monthlyPayment > 0) {
-        const newLoan: ExistingLoan = {
-          id: loanId,
-          name: sim.itemName || `${categoryMap[sim.category]} - Acquisto`,
-          category: categoryMap[sim.category],
-          installment: Math.round(calculations.monthlyPayment * 100) / 100,
-          startDate,
-          endDate,
-          originalAmount: sim.totalPrice - sim.downPayment,
-          interestRate: sim.financingRate,
-          currentRemainingDebt: sim.totalPrice - sim.downPayment,
-        };
-        updatedLoans = [...updatedLoans, newLoan];
-      }
-
-      // Crea l'acquisto accettato
-      const newPurchase: AcceptedPurchase = {
-        id: loanId,
-        acceptedAt: now.toISOString(),
-        category: sim.category,
-        itemName: sim.itemName || categoryMap[sim.category],
-        totalPrice: sim.totalPrice,
-        downPayment: sim.downPayment,
-        isFinanced: sim.isFinanced,
-        financingRate: sim.financingRate,
-        financingYears: sim.financingYears,
-        monthlyPayment: calculations.monthlyPayment,
-        totalInterest: calculations.totalInterest,
-        totalTCO: calculations.totalTCO,
-        linkedLoanId: sim.isFinanced ? loanId : undefined,
-      };
-      const updatedPurchases = [...acceptedPurchases, newPurchase];
-
-      // Salva nelle preferenze
-      const res = await fetch("/api/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          existingLoansList: JSON.stringify(updatedLoans),
-          acceptedPurchases: JSON.stringify(updatedPurchases),
-        }),
-      });
-
-      if (res.ok) {
-        setExistingLoans(updatedLoans);
-        setAcceptedPurchases(updatedPurchases);
-        broadcastFinancialDataChanged({ scope: "preferences", source: "advisor-dashboard" });
-        toast.success("Spesa accettata! Il prestito e stato aggiunto al tuo profilo finanziario.");
-      } else {
-        toast.error("Errore nel salvataggio");
-      }
-    } catch {
-      toast.error("Errore di rete");
-    } finally {
-      setIsAccepting(false);
-    }
-  };
-
-  const handleRemovePurchase = async (purchaseId: string) => {
-    if (!user) return;
-    const updatedPurchases = acceptedPurchases.filter(p => p.id !== purchaseId);
-    const updatedLoans = existingLoans.filter(l => l.id !== purchaseId);
-    try {
-      const res = await fetch("/api/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          existingLoansList: JSON.stringify(updatedLoans),
-          acceptedPurchases: JSON.stringify(updatedPurchases),
-        }),
-      });
-      if (res.ok) {
-        setAcceptedPurchases(updatedPurchases);
-        setExistingLoans(updatedLoans);
-        broadcastFinancialDataChanged({ scope: "preferences", source: "advisor-dashboard" });
-        toast.success("Acquisto rimosso");
-      }
-    } catch { toast.error("Errore di rete"); }
-  };
-
-  const isAlreadyAccepted = acceptedPurchases.some(p =>
-    p.itemName === (sim.itemName || sim.category) && p.totalPrice === sim.totalPrice
-  );
 
   // --- CALCOLI ---
   const calculations = useMemo(() => {
@@ -672,6 +582,177 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     return Math.max(0, Math.min(100, score));
   }, [advices]);
 
+  const currentScenarioDraft = useMemo<AdvisorSavedScenarioInput>(() => ({
+    simulation: sim,
+    summary: {
+      overallScore,
+      monthlyPayment: calculations.monthlyPayment,
+      totalInterest: calculations.totalInterest,
+      totalTCO: calculations.totalTCO,
+      cashOutlay: calculations.cashOutlay,
+      liquidityAfter: calculations.liquidityAfter,
+      emergencyMonthsLeft: calculations.emergencyMonthsLeft,
+      fireDelayMonthsValue: calculations.hasFireImpact ? calculations.fireDelayMonthsValue : null,
+      tcoYears: calculations.tcoYears,
+    },
+    note: null,
+    isShortlisted: false,
+    linkedGoalId: null,
+  }), [sim, overallScore, calculations]);
+
+  const currentScenarioFingerprint = useMemo(
+    () => buildAdvisorScenarioFingerprint(sim),
+    [sim],
+  );
+
+  const currentSavedScenario = useMemo(
+    () => savedScenarios.find((scenario) => scenario.fingerprint === currentScenarioFingerprint) ?? null,
+    [savedScenarios, currentScenarioFingerprint],
+  );
+
+  const currentEmergencyMonths = useMemo(() => {
+    const baselineMonthly = Math.max(snapshot.monthlyExpenses + snapshot.existingLoansMonthlyPayment, 1);
+    return (snapshot.liquidAssets + snapshot.emergencyFund) / baselineMonthly;
+  }, [snapshot]);
+
+  const syncWorkspaceFromPayload = (payload: { savedScenarios?: AdvisorSavedScenario[]; reminders?: AdvisorReminder[] }) => {
+    if (Array.isArray(payload.savedScenarios)) setSavedScenarios(payload.savedScenarios);
+    if (Array.isArray(payload.reminders)) setReminders(payload.reminders);
+  };
+
+  const postWorkspaceAction = async (body: Record<string, unknown>, busyAction: string) => {
+    if (!user) {
+      toast.error("Devi accedere per usare il workspace del Consulente");
+      return null;
+    }
+
+    setWorkspaceBusyAction(busyAction);
+    try {
+      const res = await fetch("/api/advisor-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        toast.error(json.error ?? "Errore nel salvataggio");
+        return null;
+      }
+
+      syncWorkspaceFromPayload(json);
+      return json;
+    } catch {
+      toast.error("Errore di rete");
+      return null;
+    } finally {
+      setWorkspaceBusyAction(null);
+    }
+  };
+
+  const handleSaveScenario = async (note?: string | null) => {
+    const payload = await postWorkspaceAction({
+      action: "upsert_scenario",
+      scenario: { ...currentScenarioDraft, note: note ?? null },
+    }, "save_scenario");
+
+    if (payload) {
+      toast.success(currentSavedScenario ? "Scenario aggiornato" : "Scenario salvato nel Consulente");
+    }
+  };
+
+  const handleToggleShortlist = async (desired?: boolean, scenario?: AdvisorSavedScenario) => {
+    const sourceScenario = scenario
+      ? {
+        simulation: scenario.simulation,
+        summary: scenario.summary,
+        note: scenario.note ?? null,
+        isShortlisted: scenario.isShortlisted,
+        linkedGoalId: scenario.linkedGoalId ?? null,
+      }
+      : currentScenarioDraft;
+    const fingerprint = scenario?.fingerprint ?? currentScenarioFingerprint;
+    const payload = await postWorkspaceAction({
+      action: "toggle_shortlist",
+      fingerprint,
+      desired,
+      scenario: sourceScenario,
+    }, "toggle_shortlist");
+
+    if (payload?.savedScenario) {
+      toast.success(payload.savedScenario.isShortlisted ? "Scenario aggiunto alla shortlist" : "Scenario rimosso dalla shortlist");
+    }
+  };
+
+  const handleCreatePlan = async (goal: {
+    name: string;
+    targetAmount: number;
+    currentAmount: number;
+    deadline: string | null;
+    category: "general" | "emergency" | "house" | "investment" | "travel" | "other";
+  }) => {
+    const payload = await postWorkspaceAction({
+      action: "create_plan",
+      scenario: currentScenarioDraft,
+      goal,
+    }, "create_plan");
+
+    if (payload?.goal) {
+      broadcastFinancialDataChanged({ scope: "all", source: "advisor-dashboard" });
+      toast.success("Piano di acquisto creato negli obiettivi");
+    }
+  };
+
+  const handleCreateReminder = async (reminder: {
+    triggerType: "date" | "emergency_fund";
+    reminderAt: string | null;
+    targetEmergencyMonths: number | null;
+    note?: string | null;
+  }) => {
+    const payload = await postWorkspaceAction({
+      action: "create_reminder",
+      scenario: currentScenarioDraft,
+      reminder,
+    }, "create_reminder");
+
+    if (payload?.reminder) {
+      toast.success("Promemoria salvato");
+    }
+  };
+
+  const handleDeleteScenario = async (scenarioId: string) => {
+    const payload = await postWorkspaceAction({
+      action: "delete_scenario",
+      id: scenarioId,
+    }, "delete_scenario");
+
+    if (payload) {
+      toast.success("Scenario rimosso");
+    }
+  };
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    const payload = await postWorkspaceAction({
+      action: "delete_reminder",
+      id: reminderId,
+    }, "delete_reminder");
+
+    if (payload) {
+      toast.success("Promemoria rimosso");
+    }
+  };
+
+  const handleLoadScenario = (scenario: AdvisorSavedScenario) => {
+    setSim(scenario.simulation);
+    setShowResults(true);
+    toast.success("Scenario ricaricato nella simulazione");
+  };
+
+  const handleExportScenario = (scenario: AdvisorSavedScenario) => {
+    downloadAdvisorScenarioReport(scenario);
+    toast.success("Sintesi esportata in Markdown");
+  };
+
   if (!isMounted || isLoading) {
     return (
       <div className="flex justify-center items-center py-20">
@@ -724,72 +805,6 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         </div>
       )}
 
-      {/* Acquisti gia' accettati (in cima, per vedere impegno cumulato prima di simularne un altro) */}
-      {user && acceptedPurchases.length > 0 && (() => {
-        const totalCommitment = acceptedPurchases.reduce((acc, p) => acc + (p.totalTCO || p.totalPrice), 0);
-        const totalMonthlyPayments = acceptedPurchases
-          .filter(p => p.isFinanced)
-          .reduce((acc, p) => acc + p.monthlyPayment, 0);
-        return (
-          <div className="rounded-2xl border border-indigo-200/80 bg-indigo-50/60 p-4 backdrop-blur-xl dark:border-indigo-900/60 dark:bg-indigo-950/30 sm:p-5">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
-                <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                  Acquisti Gia&apos; Accettati ({acceptedPurchases.length})
-                </h3>
-              </div>
-              <div className="flex flex-wrap gap-3 text-[11px]">
-                <span className="rounded-full bg-white/70 px-3 py-1 font-bold text-indigo-700 dark:bg-slate-900/70 dark:text-indigo-300">
-                  Impegno TCO: {formatEuro(totalCommitment)}
-                </span>
-                {totalMonthlyPayments > 0 && (
-                  <span className="rounded-full bg-white/70 px-3 py-1 font-bold text-amber-700 dark:bg-slate-900/70 dark:text-amber-300">
-                    Rate totali: {formatEuro(totalMonthlyPayments)}/mese
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="space-y-2">
-              {acceptedPurchases.map(p => (
-                <div key={p.id} className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/80 p-3 dark:border-slate-700 dark:bg-slate-900/60 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{p.itemName}</span>
-                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-                        {p.category}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(p.acceptedAt).toLocaleDateString("it-IT")}
-                      </span>
-                      <span>Prezzo: {formatEuro(p.totalPrice)}</span>
-                      {p.isFinanced && (
-                        <>
-                          <span>Rata: {formatEuro(p.monthlyPayment)}/m</span>
-                          <span className="text-red-500">Interessi: {formatEuro(p.totalInterest)}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemovePurchase(p.id)}
-                    className="h-9 w-9 shrink-0 rounded-full text-slate-400 hover:text-red-500"
-                    aria-label="Rimuovi acquisto"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
         <PurchaseForm sim={sim} onUpdateSim={updateSim} onAnalyze={() => setShowResults(true)} />
         <div className="lg:col-span-7">
@@ -801,12 +816,29 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
             calculations={calculations}
             advices={advices}
             hasUser={!!user}
-            onAcceptPurchase={handleAcceptPurchase}
-            isAccepting={isAccepting}
-            isAlreadyAccepted={isAlreadyAccepted}
           />
         </div>
       </div>
+
+      {user && (
+        <AdvisorWorkspace
+          showResults={showResults}
+          currentScenario={currentScenarioDraft}
+          currentSavedScenario={currentSavedScenario}
+          savedScenarios={savedScenarios}
+          reminders={reminders}
+          currentEmergencyMonths={currentEmergencyMonths}
+          busyAction={workspaceBusyAction}
+          onSaveScenario={handleSaveScenario}
+          onToggleShortlist={handleToggleShortlist}
+          onCreatePlan={handleCreatePlan}
+          onCreateReminder={handleCreateReminder}
+          onDeleteScenario={handleDeleteScenario}
+          onDeleteReminder={handleDeleteReminder}
+          onLoadScenario={handleLoadScenario}
+          onExportScenario={handleExportScenario}
+        />
+      )}
 
       {/* Grafici e analisi avanzate — ORDINE DIDATTICO: prima i numeri, poi l'impatto, poi i confronti */}
       {showResults && user && (

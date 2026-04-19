@@ -63,7 +63,9 @@ model Preference {
   realEstateList           String   @default("[]") // JSON string of Real Estate Properties
   existingLoansList        String   @default("[]") // JSON string of Existing Loans (Auto, etc.)
   customStocksList         String   @default("[]") // JSON string of Stocks/ETFs {ticker, shares, lastPrice}
-  acceptedPurchases        String   @default("[]") // JSON string of accepted purchase simulations
+  acceptedPurchases        String   @default("[]") // Legacy JSON string of accepted purchase simulations
+  advisorSavedScenarios    String   @default("[]") // JSON string of advisor-only saved scenarios
+  advisorReminders         String   @default("[]") // JSON string of advisor reminders
   careerProgression        String   @default("[]") // JSON string of career progression predictions
   salaryCalculationHistory String   @default("[]") // JSON string of gross-to-net salary simulations
 

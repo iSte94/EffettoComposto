@@ -204,6 +204,49 @@ export interface AcceptedPurchase {
     linkedLoanId?: string;
 }
 
+export interface AdvisorScenarioSummary {
+    overallScore: number;
+    monthlyPayment: number;
+    totalInterest: number;
+    totalTCO: number;
+    cashOutlay: number;
+    liquidityAfter: number;
+    emergencyMonthsLeft: number;
+    fireDelayMonthsValue: number | null;
+    tcoYears: number;
+}
+
+export interface AdvisorSavedScenarioInput {
+    simulation: PurchaseSimulation;
+    summary: AdvisorScenarioSummary;
+    note?: string | null;
+    isShortlisted?: boolean;
+    linkedGoalId?: string | null;
+}
+
+export interface AdvisorSavedScenario extends AdvisorSavedScenarioInput {
+    id: string;
+    fingerprint: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export type AdvisorReminderTrigger = "date" | "emergency_fund";
+
+export interface AdvisorReminder {
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+    scenarioId: string | null;
+    scenarioFingerprint: string | null;
+    itemName: string;
+    category: PurchaseCategory;
+    triggerType: AdvisorReminderTrigger;
+    reminderAt: string | null;
+    targetEmergencyMonths: number | null;
+    note?: string | null;
+}
+
 export type AssistantChannel = "web" | "telegram";
 
 export type PendingActionStatus = "pending" | "confirmed" | "canceled" | "failed";

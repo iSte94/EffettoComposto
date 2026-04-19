@@ -30,6 +30,8 @@ export const preferencesSchema = z.object({
     existingLoansList: z.string().optional(),
     customStocksList: z.string().optional(),
     acceptedPurchases: z.string().optional(),
+    advisorSavedScenarios: z.string().optional(),
+    advisorReminders: z.string().optional(),
     careerProgression: z.string().optional(),
     salaryCalculationHistory: z.string().optional(),
     // FIRE

@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.2.1`
+**Versione corrente:** `v1.3.0`
 
 ---
 
@@ -113,6 +113,15 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.3.0 - 19 aprile 2026 (Consulente acquisti come workspace decisionale)
+
+- **Consulente acquisti separato dai dati reali** - il vecchio flusso `Accetta Spesa` e' stato rimosso: una simulazione non aggiorna piu' automaticamente patrimonio, rate reali o dashboard FIRE/Overview. Il tab Consulente torna a essere uno spazio decisionale, non un punto di registrazione contabile
+- **Nuovo workspace decisionale nel Consulente** - aggiunta un'area persistente dedicata con CTA chiare e gerarchia visiva piu' forte: `Salva scenario`, `Crea piano di acquisto`, `Rivedi piu avanti`, `Confronta con alternative` ed `Esporta sintesi`. Ogni scenario salva nome, prezzo, esborso/rata, score, TCO, impatto FIRE, data e nota operativa, cosi' l'utente puo' costruire una memoria delle decisioni senza sporcare il resto dell'app
+- **Shortlist e promemoria intelligenti** - il Consulente ora permette di marcare scenari come shortlist e di creare promemoria sia a data fissa sia condizionati al ritorno sopra una soglia di fondo emergenza. L'utente puo' quindi dire "rivaluta tra 3 mesi" oppure "rivedi quando torno sopra 6 mesi di cuscinetto" direttamente dal risultato della simulazione
+- **Piano di acquisto collegato agli Obiettivi di Risparmio** - l'azione `Crea piano di acquisto` genera un vero `SavingsGoal` con target, deadline e categoria coerenti allo scenario (es. anticipo per acquisto finanziato), trasformando il consulente da strumento di analisi a strumento di execution planning senza introdurre side effect patrimoniali
+- **Nuova API backend dedicata al workspace Advisor** - introdotta `src/app/api/advisor-workspace/route.ts` con validazioni strutturate e persistenza dedicata in `Preference` tramite i nuovi campi `advisorSavedScenarios` e `advisorReminders`. La release mantiene anche compatibilita' legacy: eventuali `acceptedPurchases` storici vengono letti solo come fallback dentro il nuovo workspace, senza piu' impattare FIRE e Overview
+- **Pulizia inter-tab e coerenza dei numeri** - rimossi i box "Acquisti Accettati" da FIRE e Riepilogo, cosi' i numeri mostrati fuori dal Consulente tornano a rappresentare solo dati realmente registrati dall'utente. A supporto del refactor sono stati aggiunti test unitari dedicati per scenario fingerprinting, import legacy, goal draft e report export; release verificata con `prisma db push`, `eslint`, `vitest` e `next build`
 
 ### v1.2.3 - 19 aprile 2026 (UX — skeleton loader Obiettivi di Risparmio)
 

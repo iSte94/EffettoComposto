@@ -10,7 +10,7 @@ import {
     Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     Area, ComposedChart, Bar, Cell
 } from "recharts";
-import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Loader2, CheckCircle, CreditCard, Map, Flag, Check, Lock } from "lucide-react";
+import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Loader2, CheckCircle, Map, Flag, Check, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computePensionBreakdown } from "@/lib/finance/pension-optimizer";
@@ -28,7 +28,6 @@ import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { addFinancialDataChangedListener, broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { DEFAULT_PENSION_CONFIG, parsePensionConfig, stringifyPensionConfig } from "@/lib/pension-config";
 import type {
-    AcceptedPurchase,
     AssetRecord,
     ExistingLoan,
     MonthlyExpense,
@@ -129,7 +128,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
     // Existing Loans (Fetched from Preferences)
     const [existingLoansList, setExistingLoansList] = useState<ExistingLoan[]>([]);
-    const [acceptedPurchases, setAcceptedPurchases] = useState<AcceptedPurchase[]>([]);
 
     // FIRE Input Variables
     const [birthYear, setBirthYear] = useState<number>(1990);
@@ -232,9 +230,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 if (p.publicPensionAge != null) setPublicPensionAge(p.publicPensionAge);
                 if (p.applyTaxStamp !== undefined) setApplyTaxStamp(p.applyTaxStamp);
                 setExistingLoansList(parsedLoans);
-                if (p.acceptedPurchases) {
-                    try { setAcceptedPurchases(JSON.parse(p.acceptedPurchases)); } catch { /* empty */ }
-                }
             }
 
             if (lastSnapshot) {
@@ -255,7 +250,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
         if (user) {
             fetchData().finally(() => setIsLoadingUser(false));
         } else {
-            setLoading(false);
             setIsLoadingUser(false);
         }
     }, [user, fetchData]);
@@ -370,6 +364,11 @@ export function FireDashboard({ user }: FireDashboardProps) {
     // lancia "Rendered more hooks than during the previous render",
     // facendo scattare l'error boundary ("Qualcosa e' andato storto").
     const mcWorkerRef = useRef<Worker | null>(null);
+    // Parse once; avoids repeated JSON.parse in the simulation hot path (2400+ calls per run)
+    const parsedRealEstateList = useMemo<RealEstateProperty[]>(
+        () => parseJsonArray<RealEstateProperty>(realEstateListStr),
+        [realEstateListStr],
+    );
     useEffect(() => {
         return () => {
             if (mcWorkerRef.current) {
@@ -520,12 +519,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
         });
         return totalInstallment;
     };
-
-    // Parse once; avoids repeated JSON.parse in the simulation hot path (2400+ calls per run)
-    const parsedRealEstateList = useMemo<RealEstateProperty[]>(
-        () => parseJsonArray<RealEstateProperty>(realEstateListStr),
-        [realEstateListStr],
-    );
 
     // Helper to calculate active real estate passive income at a given month in the future
     // Ritorna la rendita passiva ANNUA netta aggregata per il mese target.
@@ -967,45 +960,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
             </div>
 
             {/* Acquisti Accettati — Impatto FIRE */}
-            {acceptedPurchases.length > 0 && (
-                <div className="bg-indigo-50/80 dark:bg-indigo-950/30 backdrop-blur-xl border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 mt-2">
-                    <div className="flex items-center gap-2 mb-3">
-                        <CreditCard className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-                        <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Impatto Acquisti Accettati sul FIRE</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {acceptedPurchases.filter(p => p.isFinanced).map(p => {
-                            const loan = existingLoansList.find(l => l.id === p.linkedLoanId);
-                            const endDate = loan?.endDate ? new Date(loan.endDate + "-01") : null;
-                            const monthsLeft = endDate ? Math.max(0, Math.round((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 30))) : 0;
-                            return (
-                                <div key={p.id} className="bg-white/80 dark:bg-slate-900/80 rounded-xl p-3 border border-indigo-100 dark:border-indigo-900">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="font-bold text-xs text-slate-800 dark:text-slate-200">{p.itemName}</span>
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 font-bold">{p.category}</span>
-                                    </div>
-                                    <div className="text-lg font-extrabold text-red-500">-{formatEuro(p.monthlyPayment)}<span className="text-xs font-normal text-slate-400">/mese</span></div>
-                                    <div className="text-[10px] text-slate-500 mt-1">
-                                        {monthsLeft > 0 ? `${monthsLeft} mesi rimanenti` : "Completato"} &middot; Interessi: {formatEuro(p.totalInterest)}
-                                    </div>
-                                    <div className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-full mt-2 overflow-hidden">
-                                        {(() => {
-                                            if (!loan) return null;
-                                            const start = new Date(loan.startDate + "-01").getTime();
-                                            const end = new Date(loan.endDate + "-01").getTime();
-                                            const pct = Math.min(100, Math.max(0, ((Date.now() - start) / (end - start)) * 100));
-                                            return <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />;
-                                        })()}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                    <p className="text-[10px] text-indigo-500 dark:text-indigo-400 mt-3">
-                        Queste rate riducono il tuo risparmio mensile e rallentano il raggiungimento del FIRE. Una volta estinte, il tuo cashflow aumentera di {formatEuro(acceptedPurchases.filter(p => p.isFinanced).reduce((s, p) => s + p.monthlyPayment, 0))}/mese.
-                    </p>
-                </div>
-            )}
+            
 
             {/* FIRE JOURNEY MAP */}
             {(() => {
