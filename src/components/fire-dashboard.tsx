@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
@@ -119,7 +119,6 @@ function getMonthlyRealEstateCosts(snapshot: AssetRecord | null): number {
 }
 
 export function FireDashboard({ user }: FireDashboardProps) {
-    const [, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [hasPendingSave, setHasPendingSave] = useState(false);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -176,7 +175,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
     const isDerivedFireExpenseRef = useRef(false);
 
     const fetchData = useCallback(async () => {
-        setLoading(true);
         try {
             const prefRes = await fetch('/api/preferences');
             const prefData = await prefRes.json();
@@ -250,8 +248,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
             }
         } catch {
             toast.error("Errore nel caricamento dei dati per il simulatore FIRE.");
-        } finally {
-            setLoading(false);
         }
     }, []);
 
@@ -525,27 +521,26 @@ export function FireDashboard({ user }: FireDashboardProps) {
         return totalInstallment;
     };
 
+    // Parse once; avoids repeated JSON.parse in the simulation hot path (2400+ calls per run)
+    const parsedRealEstateList = useMemo<RealEstateProperty[]>(
+        () => parseJsonArray<RealEstateProperty>(realEstateListStr),
+        [realEstateListStr],
+    );
+
     // Helper to calculate active real estate passive income at a given month in the future
     // Ritorna la rendita passiva ANNUA netta aggregata per il mese target.
     // I callers dividono per 12 per ottenere il valore mensile.
     const getActiveRealEstatePassiveIncomeAtMonth = (monthsFromNow: number) => {
-        if (!realEstateListStr) return 0;
+        if (parsedRealEstateList.length === 0) return 0;
         const targetDate = new Date();
         targetDate.setMonth(targetDate.getMonth() + monthsFromNow);
         const targetYearMonth = format(targetDate, 'yyyy-MM');
 
-        try {
-            const parsedList = JSON.parse(realEstateListStr);
-            return parsedList.reduce(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (acc: number, prop: any) =>
-                    acc + calculatePropertyAnnualNetIncome(prop, targetYearMonth),
-                0,
-            );
-        } catch (e) {
-            console.error("Error parsing real estate list", e);
-            return 0;
-        }
+        return parsedRealEstateList.reduce(
+            (acc: number, prop: RealEstateProperty) =>
+                acc + calculatePropertyAnnualNetIncome(prop, targetYearMonth),
+            0,
+        );
     };
 
     const getSavedPreRetirementPassiveIncomeAtMonth = (monthsFromNow: number) => {
