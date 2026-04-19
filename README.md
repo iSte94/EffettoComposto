@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v0.4.0`
+**Versione corrente:** `v0.4.1`
 
 ---
 
@@ -111,6 +111,11 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v0.4.1 - 19 aprile 2026 (fix critico — calcolo rimborso IRPEF fondo pensione)
+
+- **Bug fix: base imponibile IRPEF errata nel Pension Optimizer** — il calcolo del rimborso fiscale annuo da contribuzione pensionistica usava il RAL grezzo come base imponibile IRPEF, invece della base corretta (RAL − contributi INPS ≈ 9.19%). Per i lavoratori con RAL nella fascia 28.500–33.000€, il reddito veniva posizionato nello scaglione del 33% anziché nel 23% corretto, gonfiando il rimborso stimato fino al **+43%** (es. 396€ invece di 276€ per 1.200€ di versamento annuo). Il fix applica la sottrazione INPS standard prima di chiamare `calculateIrpef`, allineando il calcolo alla reale base imponibile del lavoratore
+- **Regressioni aggiunte** — 2 nuovi test di regressione coprono i casi soglia (RAL 28.500€ e 30.000€) e verificano che il rimborso sia calcolato all'aliquota marginale corretta del 23%, bloccando future regressioni. La suite sale a **230 test** tutti verdi
 
 ### v0.4.0 - 17 aprile 2026 (Fondo pensione strutturato + PAC automatici)
 
