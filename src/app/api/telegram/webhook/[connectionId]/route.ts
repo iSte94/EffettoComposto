@@ -30,6 +30,10 @@ import {
     unlinkTelegramUser,
 } from "@/lib/telegram";
 import {
+    buildTelegramUserFacingErrorMessage,
+    shouldPersistTelegramError,
+} from "@/lib/telegram-format";
+import {
     markTelegramMediaGroupFailed,
     markTelegramMediaGroupProcessed,
     queueTelegramMediaGroupItem,
@@ -114,6 +118,7 @@ const HELP_TEXT = [
 ].join("\n");
 
 const EXPENSE_CAPTURE_ARM_PREFIX = "Modalita /spesa attiva.";
+const EXPENSE_CAPTURE_NOTE_PREFIX = "Nota import salvata:";
 const EXPENSE_CAPTURE_ARM_MESSAGE = [
     `${EXPENSE_CAPTURE_ARM_PREFIX} Mandami ora uno screenshot o un PDF (estratto conto, app banca, scontrino).`,
     "Leggero' le transazioni visibili, le categorizzero', ti mostrero' cosa ho capito e salvero' tutto solo dopo il tuo ok.",
@@ -187,7 +192,7 @@ function formatSignedEuro(value: number): string {
 }
 
 function isValidBudgetMonth(value: string): boolean {
-    return /^\d{4}-\d{2}$/.test(value);
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
 }
 
 function parseRecentExpensesLimit(value: string): number {
@@ -263,8 +268,32 @@ async function replyWithTelegramThreadNote(args: {
     });
 }
 
-async function isExpenseCaptureArmed(connection: TelegramConnection): Promise<boolean> {
-    if (!connection.currentThreadId) return false;
+function buildExpenseCaptureArmMessage(note: string): string {
+    const trimmedNote = note.trim();
+    if (!trimmedNote) {
+        return EXPENSE_CAPTURE_ARM_MESSAGE;
+    }
+
+    return [
+        EXPENSE_CAPTURE_ARM_MESSAGE,
+        "",
+        `${EXPENSE_CAPTURE_NOTE_PREFIX} ${trimmedNote}`,
+    ].join("\n");
+}
+
+function extractExpenseCaptureArmNote(content: string): string {
+    const markerIndex = content.indexOf(EXPENSE_CAPTURE_NOTE_PREFIX);
+    if (markerIndex < 0) return "";
+
+    return content
+        .slice(markerIndex + EXPENSE_CAPTURE_NOTE_PREFIX.length)
+        .trim();
+}
+
+async function getExpenseCaptureArmState(connection: TelegramConnection): Promise<{ armed: boolean; note: string }> {
+    if (!connection.currentThreadId) {
+        return { armed: false, note: "" };
+    }
 
     const latestMessage = await prisma.assistantMessage.findFirst({
         where: { threadId: connection.currentThreadId },
@@ -276,9 +305,20 @@ async function isExpenseCaptureArmed(connection: TelegramConnection): Promise<bo
         },
     });
 
-    if (!latestMessage || latestMessage.role !== "assistant") return false;
-    if (!latestMessage.content.startsWith(EXPENSE_CAPTURE_ARM_PREFIX)) return false;
-    return Date.now() - latestMessage.createdAt.getTime() <= EXPENSE_CAPTURE_TTL_MS;
+    if (!latestMessage || latestMessage.role !== "assistant") {
+        return { armed: false, note: "" };
+    }
+    if (!latestMessage.content.startsWith(EXPENSE_CAPTURE_ARM_PREFIX)) {
+        return { armed: false, note: "" };
+    }
+    if (Date.now() - latestMessage.createdAt.getTime() > EXPENSE_CAPTURE_TTL_MS) {
+        return { armed: false, note: "" };
+    }
+
+    return {
+        armed: true,
+        note: extractExpenseCaptureArmNote(latestMessage.content),
+    };
 }
 
 function buildExpenseCapturePrompt(note: string): string {
@@ -576,15 +616,16 @@ async function handleExpenseCommand(args: {
 
     if (!hasTelegramMedia(args.message)) {
         const thread = await ensureTelegramThread(args.connection);
+        const armMessage = buildExpenseCaptureArmMessage(args.note);
         await appendTelegramAssistantNote({
             threadId: thread.id,
-            content: EXPENSE_CAPTURE_ARM_MESSAGE,
+            content: armMessage,
         });
         await setTelegramCurrentThread(args.connection.id, thread.id);
         await sendTelegramMessage({
             botToken: args.botToken,
             chatId: String(args.message.chat.id),
-            text: EXPENSE_CAPTURE_ARM_MESSAGE,
+            text: armMessage,
         });
         return;
     }
@@ -1019,12 +1060,16 @@ export async function POST(req: Request, ctx: { params: Promise<{ connectionId: 
                 return NextResponse.json({ ok: true });
             }
 
-            if (await isExpenseCaptureArmed(connection)) {
+            const expenseCaptureState = await getExpenseCaptureArmState(connection);
+            if (expenseCaptureState.armed) {
+                const combinedNote = [expenseCaptureState.note, messageText]
+                    .filter((part) => part.trim().length > 0)
+                    .join("\n");
                 await handleExpenseCapture({
                     connection,
                     botToken,
                     message,
-                    note: messageText,
+                    note: combinedNote,
                 });
             } else {
                 await sendTelegramMessage({
@@ -1040,7 +1085,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ connectionId: 
         return NextResponse.json({ ok: true });
     } catch (error) {
         console.error("POST /api/telegram/webhook/[connectionId] error:", error);
-        await setTelegramWebhookError(connection.id, (error as Error).message || "Errore webhook Telegram").catch(() => undefined);
+        const rawErrorMessage = (error as Error).message || "Errore webhook Telegram";
+        await setTelegramWebhookError(
+            connection.id,
+            shouldPersistTelegramError(error) ? rawErrorMessage : null,
+        ).catch(() => undefined);
 
         try {
             const chatId = update?.message?.chat?.id ?? update?.callback_query?.message?.chat?.id;
@@ -1048,7 +1097,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ connectionId: 
                 await sendTelegramMessage({
                     botToken,
                     chatId: String(chatId),
-                    text: `Errore Telegram: ${(error as Error).message}`,
+                    text: buildTelegramUserFacingErrorMessage(error),
                 }).catch(() => undefined);
             }
         } catch {

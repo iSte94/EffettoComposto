@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.1.4`
+**Versione corrente:** `v1.2.0`
 
 ---
 
@@ -113,6 +113,17 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+ 
+### v1.2.0 - 19 aprile 2026 (AI Telegram piu' robusto + Consulente acquisti/FIRE ridisegnato)
+
+- **Telegram piu' affidabile e leggibile lato utente** - il bot ora renderizza una porzione molto piu' ampia del Markdown in HTML compatibile con Telegram (`bold`, `inline code`, link, heading e code block), spezza i messaggi senza superare i limiti effettivi dopo il rendering HTML, evita per quanto possibile di rompere i blocchi di codice a meta' e mantiene la tastiera inline solo sull'ultimo chunk. Se Telegram rifiuta il payload HTML per errori di parsing delle entity, il send torna automaticamente in plain text invece di perdere la risposta
+- **Error handling Telegram/AI meno rumoroso e piu' onesto** - gli errori transienti di Gemini/OpenRouter (429/5xx, overload, internal error, timeout transitori) vengono riconosciuti come temporanei: l'utente riceve un messaggio chiaro e non allarmistico, mentre il webhook non persiste un `lastError` fuorviante. Restano invece visibili e persistiti gli errori realmente correggibili dall'utente, come formati comando invalidi o allegati non validi
+- **Provider Gemini con retry automatico sui transitori** - il bridge server-side verso Gemini ritenta fino a 3 volte sui 429 e 5xx con backoff leggero, riducendo i falsi fallimenti durante i picchi del provider senza cambiare l'interfaccia del runtime AI
+- **Prompt AI specializzato per Telegram** - il system prompt ora differenzia chiaramente il canale web da quello Telegram: su mobile l'assistente deve usare risposte piu' compatte, niente tabelle Markdown superflue, e per le domande FIRE tipo "a che punto sono?" viene istruito a partire da `simulate_fire_scenario` e a restituire sempre un mini-quadro numerico ordinato e leggibile
+- **Flusso `/spesa` piu' robusto** - quando l'utente arma `/spesa` con una nota testuale e invia il file in un messaggio successivo, la nota viene mantenuta e reiniettata nel prompt del turno AI invece di andare persa. In piu' `/ricategorizza` valida davvero il mese in formato `YYYY-MM` con mesi `01-12`, evitando input tipo `2026-13`
+- **Consulente acquisti molto piu' leggibile** - il pannello risultati del tab Advisor e' stato riorganizzato attorno a una lettura guidata: verdetto in testa, KPI chiave subito visibili, sintesi separata da criticita' e approfondimenti, e metriche anonime meno fuorvianti per chi non e' loggato. Le analisi avanzate sono state spostate in tab dedicate (`Decisione`, `FIRE`, `Formule`, `Costo`) per evitare il muro di informazioni tutto in una volta
+- **Blocco "Impatto sul tuo FIRE" completamente ridisegnato** - la parte piu' importante del consulente acquisti e' diventata una vera decision card: hero visuale con ritardo FIRE in evidenza, confronto `Senza acquisto` vs `Con acquisto`, driver del ritardo (target, capitale tolto oggi, freno mensile), grafico molto piu' forte con tema dark dedicato, tooltip custom, marker sui punti di arrivo FIRE e fascia evidenziata che mostra il tempo perso tra i due scenari. L'obiettivo non e' solo "mostrare il grafico", ma far capire a colpo d'occhio quanto tempo di liberta' costa davvero l'acquisto
+- **Copertura test estesa sulle regressioni di canale** - aggiunti test dedicati per il rendering Telegram, il fallback da HTML a plain text, la persistenza della nota `/spesa`, la validazione di `/ricategorizza`, gli errori transienti Gemini nel webhook, le istruzioni canale-specifiche del prompt AI e il retry automatico del provider Gemini. Release verificata anche con `eslint` e `next build`
 
 ### v1.1.4 - 19 aprile 2026 (fix finanziario critico: rimborso IRPEF pensione calcolato sulla base imponibile errata)
 

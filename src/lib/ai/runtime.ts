@@ -272,7 +272,7 @@ export async function runAssistantTurn(args: {
         provider: settings.provider,
         apiKey: settings.apiKey,
         model: settings.model,
-        systemPrompt: buildAssistantSystemPrompt(userProfile, userDataJson, memory),
+        systemPrompt: buildAssistantSystemPrompt(userProfile, userDataJson, memory, args.channel),
         messages: providerMessages,
         tools: getServerAiTools({
             userId: args.userId,

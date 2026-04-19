@@ -18,6 +18,7 @@ import { CalculationBreakdown } from "@/components/advisor/calculation-breakdown
 import { ScenarioComparison } from "@/components/advisor/scenario-comparison";
 import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Trash2, Calendar } from "lucide-react";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
@@ -402,6 +403,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       cashOutlay,
     });
     const fireDelayMonthsValue = fireComparison?.delayMonths ?? 0;
+    const hasFireImpact = Boolean(fireComparison);
 
     return {
       loanAmount, monthlyPayment, totalInterest, totalCostOfPurchase,
@@ -409,7 +411,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       netRealCost, wealthImpact, wealthImpactTotal, emergencyMonthsUsed, dtiPostPurchase, dtiPre,
       liquidityAfter, emergencyMonthsLeft, tcoYears, cashOutlay,
       totalFinancialCommitment, annualRentIncome, netRentYield,
-      realReturnForOpportunity, fireDelayMonthsValue,
+      realReturnForOpportunity, fireDelayMonthsValue, hasFireImpact,
     };
   }, [sim, snapshot]);
 
@@ -808,16 +810,43 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
 
       {/* Grafici e analisi avanzate — ORDINE DIDATTICO: prima i numeri, poi l'impatto, poi i confronti */}
       {showResults && user && (
-        <div className="space-y-6">
-          <CalculationBreakdown sim={sim} snapshot={snapshot} calculations={calculations} />
-          <FireImpactChart sim={sim} calculations={calculations} snapshot={snapshot} />
-          <ScenarioComparison sim={sim} snapshot={snapshot} calculations={calculations} />
-          <SensitivityChart sim={sim} snapshot={snapshot} calculations={calculations} />
-          <PurchaseImpactChart
-            sim={sim}
-            calculations={calculations}
-            snapshot={snapshot}
-          />
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Approfondimenti</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Apri solo la vista che ti serve: confronto decisionale, impatto FIRE, formule o costo del finanziamento.
+            </p>
+          </div>
+
+          <Tabs defaultValue="decisione" className="gap-4">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+              <TabsTrigger value="decisione">Decisione</TabsTrigger>
+              <TabsTrigger value="fire">FIRE</TabsTrigger>
+              <TabsTrigger value="formule">Formule</TabsTrigger>
+              <TabsTrigger value="costo">Costo</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="decisione" className="space-y-6">
+              <ScenarioComparison sim={sim} snapshot={snapshot} calculations={calculations} />
+              <SensitivityChart sim={sim} snapshot={snapshot} calculations={calculations} />
+            </TabsContent>
+
+            <TabsContent value="fire" className="space-y-6">
+              <FireImpactChart sim={sim} calculations={calculations} snapshot={snapshot} />
+            </TabsContent>
+
+            <TabsContent value="formule" className="space-y-6">
+              <CalculationBreakdown sim={sim} snapshot={snapshot} calculations={calculations} />
+            </TabsContent>
+
+            <TabsContent value="costo" className="space-y-6">
+              <PurchaseImpactChart
+                sim={sim}
+                calculations={calculations}
+                snapshot={snapshot}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
       )}
     </div>

@@ -42,6 +42,17 @@ export interface AiModel {
 }
 
 const DEFAULT_MAX_TOOL_ROUNDTRIPS = 6;
+const GEMINI_RETRY_DELAY_MS = 700;
+
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(resolve, ms);
+    });
+}
+
+function isRetryableGeminiStatus(status: number): boolean {
+    return status === 429 || status >= 500;
+}
 
 export async function listModels(provider: AiProvider, apiKey: string): Promise<AiModel[]> {
     if (provider === "openrouter") {
@@ -327,21 +338,42 @@ async function chatGemini(req: AiChatRequest): Promise<AiChatResult> {
         };
         if (toolsDecl) body.tools = toolsDecl;
 
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(req.model)}:generateContent`,
-            {
-                method: "POST",
-                headers: {
-                    "x-goog-api-key": req.apiKey,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify(body),
-            },
-        );
-        if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
-        const json = await res.json();
+        let json: Record<string, unknown> | null = null;
+        let lastError: Error | null = null;
 
-        const candidate = json.candidates?.[0];
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(req.model)}:generateContent`,
+                {
+                    method: "POST",
+                    headers: {
+                        "x-goog-api-key": req.apiKey,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(body),
+                },
+            );
+
+            if (res.ok) {
+                json = await res.json() as Record<string, unknown>;
+                lastError = null;
+                break;
+            }
+
+            const error = new Error(`Gemini ${res.status}: ${await res.text()}`);
+            if (attempt < 2 && isRetryableGeminiStatus(res.status)) {
+                lastError = error;
+                await sleep(GEMINI_RETRY_DELAY_MS * (attempt + 1));
+                continue;
+            }
+            throw error;
+        }
+
+        if (!json) {
+            throw lastError ?? new Error("Gemini: nessuna risposta");
+        }
+
+        const candidate = (json as { candidates?: Array<{ content?: { parts?: GeminiPart[] } }> }).candidates?.[0];
         const parts: GeminiPart[] = candidate?.content?.parts ?? [];
         const functionCalls = parts.filter((p): p is GeminiPart & { functionCall: NonNullable<GeminiPart["functionCall"]> } => !!p.functionCall);
 

@@ -1,3 +1,5 @@
+import type { AssistantChannel } from "@/types";
+
 export interface MemoryPromptEntry {
     category: string;
     fact: string;
@@ -14,7 +16,7 @@ REGOLE OPERATIVE:
 - Puoi incatenare tool (fino a 6 round) se serve.
 - Base ogni consiglio sui dati reali dell'utente + risultati tool + fatti in MEMORIA (sotto).
 - Se mancano dati rilevanti, indica all'utente la sezione da compilare (Patrimonio, FIRE, Budget, Obiettivi, "Parlami di te").
-- Usa formattazione Markdown: grassetto per cifre chiave, tabelle per confronti, liste per azioni.
+- Usa formattazione leggibile e adatta il formato al canale: grassetto per cifre chiave, tabelle solo quando il canale le supporta e aiutano davvero, liste per azioni.
 - Non inventare cifre non supportate dai dati/tool.
 - Non sei consulenza vincolante: avvisalo brevemente solo se fornisci raccomandazioni concrete di acquisto/vendita.
 - Quando l'utente rivela un fatto stabile su di se' (eta', obiettivi, decisioni, preferenze), non commentarlo esplicitamente: verra' memorizzato automaticamente per le conversazioni future.
@@ -28,7 +30,33 @@ REGOLE OPERATIVE:
   - non usare OCR o pipeline alternative: lavora solo con il provider multimodale e sii esplicito quando una riga e' poco leggibile.
 `;
 
-export function buildAssistantSystemPrompt(userProfile: string, dataJson: string, memory: MemoryPromptEntry[]): string {
+function buildChannelInstructions(channel: AssistantChannel): string {
+    if (channel === "telegram") {
+        return `
+--- REGOLE CANALE TELEGRAM ---
+- Scrivi per mobile: risposta compatta, subito utile, con sezioni brevi.
+- Evita tabelle Markdown, heading con #, blocchi troppo lunghi e frasi enfatiche o celebrative.
+- Usa solo formattazione semplice: mini titoli, bullet brevi e grassetto sulle cifre chiave.
+- Se l'utente chiede "a che punto sono", "come sono messo", "quanto mi manca" o "quando arrivo al FIRE", usa prima il tool simulate_fire_scenario. Integra con altri tool FIRE solo se aggiungono un dato concreto.
+- Nei check-in FIRE dai sempre un mini-quadro numerico, nell'ordine: target FIRE, capitale considerato oggi, gap residuo, stima tempo/eta' e assunzioni principali.
+- Se il numero esclude o include immobili, pensione o altre componenti illiquide, dichiaralo esplicitamente in una riga dedicata.
+- Distingui chiaramente tra numeri certi, assunzioni e interpretazioni.
+- Non dire che un obiettivo e' realistico, vicino o anticipabile senza un output numerico che lo supporti.
+`;
+    }
+
+    return `
+--- REGOLE CANALE WEB ---
+- Sul web puoi usare Markdown piu' ricco, incluse tabelle quando aiutano davvero.
+`;
+}
+
+export function buildAssistantSystemPrompt(
+    userProfile: string,
+    dataJson: string,
+    memory: MemoryPromptEntry[],
+    channel: AssistantChannel,
+): string {
     const profileBlock = userProfile.trim()
         ? `\n--- PROFILO UTENTE (scritto dall'utente in "Parlami di te") ---\n${userProfile.trim()}\n`
         : `\n--- PROFILO UTENTE ---\n(L'utente non ha compilato "Parlami di te". Invitalo a farlo se serve contesto anagrafico.)\n`;
@@ -39,5 +67,5 @@ export function buildAssistantSystemPrompt(userProfile: string, dataJson: string
         }\n`
         : "";
 
-    return `${SYSTEM_PROMPT_BASE}${profileBlock}${memoryBlock}\n--- DATI UTENTE (snapshot JSON esportato dalla piattaforma, include 'derived' con aggregati pronti) ---\n${dataJson}`;
+    return `${SYSTEM_PROMPT_BASE}${buildChannelInstructions(channel)}${profileBlock}${memoryBlock}\n--- DATI UTENTE (snapshot JSON esportato dalla piattaforma, include 'derived' con aggregati pronti) ---\n${dataJson}`;
 }

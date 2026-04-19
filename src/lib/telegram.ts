@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "crypto";
 import prisma from "@/lib/prisma";
 import { decrypt, encrypt } from "@/lib/crypto";
+import { renderTelegramHtml } from "@/lib/telegram-format";
 import type { PendingAction, TelegramBotState } from "@/types";
 
 const TELEGRAM_API_BASE = "https://api.telegram.org";
@@ -391,22 +392,86 @@ export async function downloadTelegramFile(args: {
     return new Uint8Array(await res.arrayBuffer());
 }
 
+function extractTelegramErrorMessage(error: unknown): string {
+    if (error instanceof Error && error.message.trim()) {
+        return error.message.trim();
+    }
+    if (typeof error === "string" && error.trim()) {
+        return error.trim();
+    }
+    return "";
+}
+
+function isTelegramHtmlParseError(error: unknown): boolean {
+    const message = extractTelegramErrorMessage(error);
+    return /can't parse entities|unsupported start tag|unexpected end tag|entity beginning|tag mismatch/iu.test(message);
+}
+
+function findSentenceBoundary(text: string, limit: number): number {
+    const window = text.slice(0, limit);
+    const matches = [...window.matchAll(/[.!?]\s+/gu)];
+    const lastMatch = matches.at(-1);
+    return lastMatch ? lastMatch.index! + 1 : -1;
+}
+
+function findTelegramSplitBoundary(text: string): number {
+    const preview = text.slice(0, TELEGRAM_MESSAGE_LIMIT);
+    const minimumBoundary = Math.floor(TELEGRAM_MESSAGE_LIMIT * 0.6);
+    const fenceMatches = preview.match(/```/gu) ?? [];
+
+    if (fenceMatches.length % 2 === 1) {
+        const lastFenceStart = preview.lastIndexOf("```");
+        if (lastFenceStart > minimumBoundary) {
+            return lastFenceStart;
+        }
+    }
+
+    const candidates = [
+        preview.lastIndexOf("\n\n"),
+        preview.lastIndexOf("\n"),
+        findSentenceBoundary(text, TELEGRAM_MESSAGE_LIMIT),
+        preview.lastIndexOf(" "),
+    ].filter((candidate) => candidate > minimumBoundary);
+
+    return candidates.length > 0 ? Math.max(...candidates) : TELEGRAM_MESSAGE_LIMIT;
+}
+
+function splitTelegramChunk(text: string): string[] {
+    const normalized = text.trim();
+    if (!normalized) return [];
+
+    const rendered = renderTelegramHtml(normalized);
+    if (normalized.length <= TELEGRAM_MESSAGE_LIMIT && rendered.length <= TELEGRAM_MESSAGE_LIMIT) {
+        return [normalized];
+    }
+
+    let boundary = findTelegramSplitBoundary(normalized);
+    if (boundary <= 0 || boundary >= normalized.length) {
+        boundary = Math.max(1, Math.min(normalized.length - 1, Math.floor(normalized.length / 2)));
+    }
+
+    const head = normalized.slice(0, boundary).trim();
+    const tail = normalized.slice(boundary).trim();
+    if (!head || !tail) {
+        const fallbackBoundary = Math.max(1, Math.min(normalized.length - 1, Math.floor(normalized.length / 2)));
+        const fallbackHead = normalized.slice(0, fallbackBoundary).trim();
+        const fallbackTail = normalized.slice(fallbackBoundary).trim();
+        return [
+            ...splitTelegramChunk(fallbackHead),
+            ...splitTelegramChunk(fallbackTail),
+        ];
+    }
+
+    return [
+        ...splitTelegramChunk(head),
+        ...splitTelegramChunk(tail),
+    ];
+}
+
 export function splitTelegramMessage(text: string): string[] {
     const normalized = text.trim();
     if (!normalized) return ["(nessuna risposta)"];
-
-    const chunks: string[] = [];
-    let current = normalized;
-    while (current.length > TELEGRAM_MESSAGE_LIMIT) {
-        const splitAt = current.lastIndexOf("\n", TELEGRAM_MESSAGE_LIMIT);
-        const boundary = splitAt > TELEGRAM_MESSAGE_LIMIT * 0.6 ? splitAt : TELEGRAM_MESSAGE_LIMIT;
-        chunks.push(current.slice(0, boundary).trim());
-        current = current.slice(boundary).trim();
-    }
-    if (current) {
-        chunks.push(current);
-    }
-    return chunks;
+    return splitTelegramChunk(normalized);
 }
 
 export async function sendTelegramMessage(args: {
@@ -417,12 +482,27 @@ export async function sendTelegramMessage(args: {
 }): Promise<void> {
     const chunks = splitTelegramMessage(args.text);
     for (let index = 0; index < chunks.length; index += 1) {
-        await telegramApiRequest(args.botToken, "sendMessage", {
-            chat_id: args.chatId,
-            text: chunks[index],
-            disable_web_page_preview: true,
-            reply_markup: index === chunks.length - 1 ? args.replyMarkup : undefined,
-        });
+        const replyMarkup = index === chunks.length - 1 ? args.replyMarkup : undefined;
+        try {
+            await telegramApiRequest(args.botToken, "sendMessage", {
+                chat_id: args.chatId,
+                text: renderTelegramHtml(chunks[index]),
+                parse_mode: "HTML",
+                disable_web_page_preview: true,
+                reply_markup: replyMarkup,
+            });
+        } catch (error) {
+            if (!isTelegramHtmlParseError(error)) {
+                throw error;
+            }
+
+            await telegramApiRequest(args.botToken, "sendMessage", {
+                chat_id: args.chatId,
+                text: chunks[index],
+                disable_web_page_preview: true,
+                reply_markup: replyMarkup,
+            });
+        }
     }
 }
 

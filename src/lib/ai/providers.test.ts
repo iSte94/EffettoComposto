@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { extractGeminiVisibleText, geminiSanitizeSchema } from "@/lib/ai/providers";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { chat, extractGeminiVisibleText, geminiSanitizeSchema } from "@/lib/ai/providers";
+
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+});
 
 describe("geminiSanitizeSchema", () => {
     it("converte gli enum numerici in stringhe compatibili con Gemini", () => {
@@ -66,5 +71,47 @@ describe("extractGeminiVisibleText", () => {
         ]);
 
         expect(visible).toBe("Ciao! Come posso aiutarti oggi con la tua pianificazione finanziaria?");
+    });
+});
+
+describe("chat Gemini", () => {
+    it("ritenta automaticamente sui 500 transitori", async () => {
+        vi.useFakeTimers();
+
+        const fetchMock = vi.fn<typeof fetch>()
+            .mockResolvedValueOnce(new Response(JSON.stringify({
+                error: { message: "Internal error encountered." },
+            }), {
+                status: 500,
+                headers: { "Content-Type": "application/json" },
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({
+                candidates: [
+                    {
+                        content: {
+                            parts: [{ text: "Risposta finale" }],
+                        },
+                    },
+                ],
+            }), {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+            }));
+
+        vi.stubGlobal("fetch", fetchMock);
+
+        const promise = chat({
+            provider: "gemini",
+            apiKey: "test-key",
+            model: "gemini-test",
+            systemPrompt: "System",
+            messages: [{ role: "user", content: "Ciao" }],
+        });
+
+        await vi.advanceTimersByTimeAsync(700);
+        const result = await promise;
+
+        expect(result.text).toBe("Risposta finale");
+        expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 });
