@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.4.0`
+**Versione corrente:** `v1.4.1`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.4.1 - 20 aprile 2026 (hardening UX — i formatter valuta/percentuale non mostrano piu' "€NaN" o "Infinity%")
+
+- **Problema iniziale** — i formatter condivisi `formatEuro` e `formatPercent` in `src/lib/format.ts` non proteggevano contro input non-finiti (`NaN`, `Infinity`, `-Infinity`): passando uno di questi valori la UI avrebbe stampato letteralmente "€NaN", "€Infinity" o "NaN%". Questi formatter sono usati in 533 punti in 54 file (tutte le dashboard finanziarie: Patrimonio, FIRE, Mutuo, Advisor, Budget, Obiettivi, Performance, Abbonamenti, ecc.), quindi un singolo calcolo a monte che divide per zero o propaga un campo mancante poteva deturpare qualsiasi KPI. La sorella `formatEuroCompact` era gia' stata protetta con un em-dash ("—") come placeholder ma le due funzioni principali erano rimaste indietro, lasciando una falla difensiva
+- **Cosa e' stato modificato** — (1) entrambi i formatter ora fanno un early return su `!Number.isFinite(value)` restituendo lo stesso placeholder em-dash (`"\u2014"`) gia' adottato da `formatEuroCompact`, estratto in una costante condivisa `NON_FINITE_PLACEHOLDER` per coerenza tipografica in tutta l'app. (2) `formatEuroCompact` e' stato allineato a `Number.isFinite` (prima usava il globale `isFinite`, che fa coercion: `isFinite("foo")` puo' restituire `true` in alcuni edge case; `Number.isFinite` no). (3) Aggiunti 7 nuovi test di regressione in `format.test.ts` che coprono `NaN`, `POSITIVE_INFINITY`, `NEGATIVE_INFINITY` per entrambi i formatter piu' il caso `formatPercent(NaN, 3)` per verificare che il placeholder ignori correttamente il parametro `decimals`
+- **Perche' migliora l'esperienza utente** — e' una difesa in profondita' coerente con lo spirito del fix v1.3.5 (rata mutuo NaN/Infinity): anche se un bug futuro a monte dovesse aggirare i guard matematici, la UI degraderebbe in modo elegante a "—" invece di mostrare stringhe tecniche incomprensibili a un utente finale italiano non-dev. Inoltre l'em-dash e' gia' lo standard visivo dell'app per "valore mancante", quindi il lettore lo interpreta immediatamente senza confusione
+- **Manutenibilita'** — modifica chirurgica (9 righe di codice produttivo + 16 di test), zero impatto sul formato dei valori finiti esistenti, zero dipendenze nuove. Suite totale: 293/293 verdi (+7), `eslint` pulito
+
 ### v1.4.0 - 20 aprile 2026 (nuovo comparatore dettagliato "Da auto termica a elettrica")
 
 - **Nuovo strumento di nicchia dentro `Strumenti`** - aggiunta la sottosezione discreta `Vari calcolatori` con il nuovo comparatore `Da auto termica a elettrica`, pensato per chi vuole capire se conviene vendere la propria auto termica e passare a una Tesla. La sezione resta volutamente fuori dal percorso principale della dashboard, ma e' ora disponibile on demand con lazy loading dedicato
