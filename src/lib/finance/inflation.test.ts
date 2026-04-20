@@ -115,4 +115,43 @@ describe("projectInflation", () => {
         // floor(5.7) = 5, quindi 6 punti.
         expect(r.points).toHaveLength(6);
     });
+
+    describe("purchasingPowerHalvingYears", () => {
+        it("al 2% annuo il potere d'acquisto si dimezza in ~35 anni (formula esatta)", () => {
+            // ln(2) / ln(1.02) ≈ 35.003 anni (piu' preciso della Regola del 72 che darebbe 36).
+            const r = projectInflation({ amount: 100000, inflationRatePct: 2, years: 10, nominalReturnPct: 5 });
+            expect(r.purchasingPowerHalvingYears).not.toBeNull();
+            expect(r.purchasingPowerHalvingYears!).toBeCloseTo(35.003, 1);
+        });
+
+        it("al 7% annuo il potere d'acquisto si dimezza in ~10 anni", () => {
+            // ln(2) / ln(1.07) ≈ 10.245 anni.
+            const r = projectInflation({ amount: 1000, inflationRatePct: 7, years: 5, nominalReturnPct: 0 });
+            expect(r.purchasingPowerHalvingYears!).toBeCloseTo(10.245, 1);
+        });
+
+        it("coerenza con il modello: dopo N anni di dimezzamento, purchasingPower = amount/2", () => {
+            const inflationRatePct = 3;
+            const halving = projectInflation({ amount: 10000, inflationRatePct, years: 0, nominalReturnPct: 0 })
+                .purchasingPowerHalvingYears!;
+            // Verifica indipendente: (1+i)^halving = 2.
+            expect(Math.pow(1 + inflationRatePct / 100, halving)).toBeCloseTo(2, 6);
+        });
+
+        it("inflazione zero: nessun dimezzamento (null)", () => {
+            const r = projectInflation({ amount: 1000, inflationRatePct: 0, years: 20, nominalReturnPct: 5 });
+            expect(r.purchasingPowerHalvingYears).toBeNull();
+        });
+
+        it("deflazione (inflazione negativa): potere d'acquisto non si dimezza mai (null)", () => {
+            const r = projectInflation({ amount: 1000, inflationRatePct: -1, years: 10, nominalReturnPct: 3 });
+            expect(r.purchasingPowerHalvingYears).toBeNull();
+        });
+
+        it("non dipende da amount ne' da years", () => {
+            const a = projectInflation({ amount: 100, inflationRatePct: 4, years: 5, nominalReturnPct: 0 });
+            const b = projectInflation({ amount: 999_999, inflationRatePct: 4, years: 50, nominalReturnPct: 10 });
+            expect(a.purchasingPowerHalvingYears).toBeCloseTo(b.purchasingPowerHalvingYears!, 6);
+        });
+    });
 });

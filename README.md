@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.3.3`
+**Versione corrente:** `v1.3.4`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.3.4 - 20 aprile 2026 (UX — nuova KPI "Tempo di Dimezzamento" nel Calcolatore Inflazione)
+
+- **Problema iniziale** — il Calcolatore Inflazione (`src/components/inflation-calculator.tsx`) mostrava gia' potere d'acquisto finale, capitale equivalente futuro, valore nominale e reale dell'investimento, piu' una callout di erosione. Mancava pero' la domanda piu' intuitiva e didattica che gli utenti si pongono davanti a un'inflazione annuale ("a quel ritmo, fra quanti anni i miei soldi varranno la meta'?"): per saperlo bisognava mentalmente applicare la Regola del 72 sulla % inserita, operazione che il calcolatore dovrebbe fare al posto dell'utente
+- **Cosa e' stato modificato** — (1) nuovo campo `purchasingPowerHalvingYears: number | null` nel risultato di `projectInflation` (`src/lib/finance/inflation.ts`), calcolato con la formula esatta `ln(2) / ln(1 + i)` invece della Regola del 72 approssimata (tolleranza: a 7% la Regola del 72 restituisce 10.29 anni, la formula esatta 10.245 → differenza inferiore all'1% ma coerente col resto del codice finanziario gia' basato su formule esatte come Fisher). (2) Restituisce `null` per inflazione ≤ 0, in modo che il caso "deflazione o tasso zero" non generi un numero fuorviante (il potere d'acquisto in quei casi non si dimezza mai). (3) Nuova card UI compatta con icona `Hourglass` che mostra il valore formattato come intero sopra i 10 anni ("35 anni") o con una cifra decimale sotto ("7.3 anni") per distinguere inflazioni alte. La card e' affiancata alla callout di erosione esistente in un grid 3+2, ha colori rose/tonalita' critiche coerenti con il tema "inflazione = erosione", e un `title` HTML descrittivo per l'accessibilita'
+- **Perche' migliora l'esperienza utente** — trasforma una percentuale astratta in un orizzonte temporale tangibile: "inflazione al 5%" diventa "il tuo potere d'acquisto si dimezza in 14 anni", rendendo molto piu' viscerale l'urgenza di investire invece di tenere liquidita'. E' una metrica finanziaria nota (half-life del potere d'acquisto) ampiamente usata nella divulgazione economica, e completa il trittico narrativo gia' presente nel calcolatore (quanto perdi / quanto ti serve / quanto tempo impiega a dimezzarsi)
+- **Manutenibilita'** — aggiunti 6 test di regressione in `inflation.test.ts` che verificano valori noti (2% → ~35 anni, 7% → ~10 anni), coerenza con il modello (`(1+i)^halving = 2`), gestione di inflazione zero e deflazione (`null`), e indipendenza da `amount` e `years`. La nuova metrica e' pura funzione dell'inflazione, quindi il calcolo e' O(1) e non appesantisce il `useMemo` esistente. Suite completa: 270/270 verdi (+6), `eslint` pulito
 
 ### v1.3.3 - 20 aprile 2026 (UX — KPI header piu' leggibili su mobile con delta compatto)
 

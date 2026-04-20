@@ -55,6 +55,13 @@ export interface InflationProjectionResult {
      * realistici nei piani di accumulo.
      */
     equivalentFutureCapital: number;
+    /**
+     * Tempo (in anni) necessario perche' l'inflazione dimezzi il potere
+     * d'acquisto del capitale fermo. `null` se inflazione <= 0 (il potere
+     * d'acquisto non si dimezza mai). Formula esatta: ln(2) / ln(1+i),
+     * piu' accurata della Regola del 72 (che approssima a 72/i%).
+     */
+    purchasingPowerHalvingYears: number | null;
 }
 
 function sanitize(value: number, fallback = 0): number {
@@ -108,6 +115,8 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
     const lostPercent = amount > 0 ? (lostValue / amount) * 100 : 0;
     const equivalentFutureCapital = Math.round(amount * inflationFactor(years));
     const realReturnPct = computeRealReturn(nominalReturnPct, inflationRatePct) * 100;
+    const purchasingPowerHalvingYears =
+        inflationRatePct > 0 ? Math.log(2) / Math.log(1 + inflationRatePct / 100) : null;
 
     return {
         points,
@@ -118,5 +127,6 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         lostValue,
         lostPercent,
         equivalentFutureCapital,
+        purchasingPowerHalvingYears,
     };
 }

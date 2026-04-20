@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingDown, Euro, Calendar, Percent } from "lucide-react";
+import { TrendingDown, Euro, Calendar, Percent, Hourglass } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { projectInflation } from "@/lib/finance/inflation";
 import {
@@ -48,7 +48,17 @@ export function InflationCalculator() {
         lostPercent,
         equivalentFutureCapital,
         realReturnPct,
+        purchasingPowerHalvingYears,
     } = projection;
+
+    // Etichetta compatta per il tempo di dimezzamento: intero se >= 10 anni
+    // (la precisione sub-annuale e' trascurabile sulla scala decennale),
+    // una cifra decimale sotto per differenziare inflazioni alte (es. 7.3 anni).
+    const halvingLabel = purchasingPowerHalvingYears === null
+        ? null
+        : purchasingPowerHalvingYears >= 10
+            ? `${Math.round(purchasingPowerHalvingYears)} anni`
+            : `${purchasingPowerHalvingYears.toFixed(1)} anni`;
 
     return (
         <div className="space-y-6">
@@ -149,11 +159,30 @@ export function InflationCalculator() {
                 </div>
             </div>
 
-            {lostValue > 0 && (
-                <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-                    <span className="font-semibold text-foreground">Erosione inflazionistica</span>: tenendo {formatEuro(amount)} fermi
-                    perdi {formatEuro(lostValue)} di potere d&apos;acquisto in {years} anni
-                    ({formatPercent(lostPercent, 0)}).
+            {(lostValue > 0 || halvingLabel) && (
+                <div className="grid gap-3 sm:grid-cols-5">
+                    {lostValue > 0 && (
+                        <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:col-span-3">
+                            <span className="font-semibold text-foreground">Erosione inflazionistica</span>: tenendo {formatEuro(amount)} fermi
+                            perdi {formatEuro(lostValue)} di potere d&apos;acquisto in {years} anni
+                            ({formatPercent(lostPercent, 0)}).
+                        </div>
+                    )}
+                    {halvingLabel && (
+                        <div
+                            className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50/60 px-4 py-3 text-xs text-rose-700 dark:border-rose-900 dark:bg-rose-950/30 dark:text-rose-300 sm:col-span-2"
+                            title={`Al ${formatPercent(inflationRate)} annuo, 1 € oggi vale 0,50 € di potere d'acquisto dopo circa ${halvingLabel}.`}
+                        >
+                            <Hourglass className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-rose-500">Tempo di Dimezzamento</p>
+                                <p className="mt-0.5 text-sm font-extrabold">{halvingLabel}</p>
+                                <p className="mt-0.5 text-[11px] text-rose-600/80 dark:text-rose-400/80">
+                                    per perdere meta&apos; del potere d&apos;acquisto al {formatPercent(inflationRate)} annuo
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
