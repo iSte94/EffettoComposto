@@ -1,6 +1,6 @@
 import { memo } from "react";
-import { TrendingUp, TrendingDown, Flame, PiggyBank, Rocket } from "lucide-react";
-import { formatEuro } from "@/lib/format";
+import { TrendingUp, TrendingDown, Minus, Flame, PiggyBank, Rocket } from "lucide-react";
+import { formatEuro, formatEuroCompact } from "@/lib/format";
 import type { HeaderKpis } from "@/hooks/useHeaderKpis";
 
 interface HeaderKpisBarProps {
@@ -9,7 +9,23 @@ interface HeaderKpisBarProps {
 }
 
 export const HeaderKpisBar = memo(function HeaderKpisBar({ kpis, onNavigate }: HeaderKpisBarProps) {
-    const isPositive = kpis.netWorthChange >= 0;
+    // Soglia di 0,5€ per evitare che rumore di arrotondamento su centesimi
+    // finisca per colorare il delta come variazione reale.
+    const changeDirection: "up" | "down" | "flat" =
+        kpis.netWorthChange > 0.5 ? "up" : kpis.netWorthChange < -0.5 ? "down" : "flat";
+    const changeIcon = changeDirection === "up"
+        ? <TrendingUp className="size-3.5 text-emerald-500" />
+        : changeDirection === "down"
+            ? <TrendingDown className="size-3.5 text-rose-500" />
+            : <Minus className="size-3.5 text-muted-foreground" />;
+    const changeColor = changeDirection === "up"
+        ? "text-emerald-600"
+        : changeDirection === "down"
+            ? "text-rose-600"
+            : "text-muted-foreground";
+    const changeLabel = changeDirection === "flat"
+        ? "\u20AC0"
+        : `${changeDirection === "up" ? "+" : ""}${formatEuroCompact(kpis.netWorthChange)}`;
 
     return (
         <div className="flex flex-wrap items-center gap-2">
@@ -17,15 +33,12 @@ export const HeaderKpisBar = memo(function HeaderKpisBar({ kpis, onNavigate }: H
             <button
                 onClick={() => onNavigate("overview")}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-border bg-secondary/80 px-3 min-h-10 text-sm font-semibold transition-colors hover:bg-accent cursor-pointer"
-                title="Vai al Riepilogo"
+                title={`Patrimonio netto ${formatEuro(kpis.netWorth)} — variazione ${formatEuro(kpis.netWorthChange)}`}
             >
-                {isPositive
-                    ? <TrendingUp className="size-3.5 text-emerald-500" />
-                    : <TrendingDown className="size-3.5 text-rose-500" />
-                }
+                {changeIcon}
                 <span className="tabular-nums">{formatEuro(kpis.netWorth)}</span>
-                <span className={`text-xs tabular-nums ${isPositive ? "text-emerald-600" : "text-rose-600"}`}>
-                    {isPositive ? "+" : ""}{formatEuro(kpis.netWorthChange)}
+                <span className={`text-xs tabular-nums ${changeColor}`}>
+                    {changeLabel}
                 </span>
             </button>
 

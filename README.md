@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.3.2`
+**Versione corrente:** `v1.3.3`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.3.3 - 20 aprile 2026 (UX — KPI header piu' leggibili su mobile con delta compatto)
+
+- **Problema iniziale** — la barra KPI in testa all'app (`src/components/header-kpis.tsx`) mostrava sia il patrimonio netto sia la variazione vs snapshot precedente con `formatEuro` completo (es. `€1.234.567` + `+€125.000`). Su mobile questo produceva bottoni molto larghi che andavano facilmente a capo e competevano visivamente con il valore principale; inoltre la direzione del trend usava `netWorthChange >= 0`, quindi anche una variazione nulla mostrava freccia verde verso l'alto, visivamente fuorviante
+- **Cosa e' stato modificato** — (1) nuova utility `formatEuroCompact(value)` in `src/lib/format.ts` che usa formato K/M sopra i 10.000 € (es. `€125K`, `€1.2M`) mantenendo la forma completa per importi minori per non perdere precisione sui centesimi. Include gestione segno, `NaN`/`Infinity` → em-dash e strip dello zero decimale finale. (2) `HeaderKpisBar` applica il compact solo al delta secondario (il patrimonio principale resta in formato completo per massima leggibilita'), introduce uno stato `flat` con icona `Minus` grigia e etichetta neutra quando la variazione e' tra -0.5 e +0.5 € (rumore di arrotondamento), e sposta il dato completo nel `title` HTML cosi' l'utente puo' comunque leggere il valore preciso in hover
+- **Perche' migliora l'esperienza utente** — su mobile la barra KPI smette di andare a capo per portafogli a 6-7 cifre, l'occhio coglie subito il valore principale senza essere distratto da un delta molto lungo, e il caso di variazione nulla non viene piu' falsamente colorato di verde con freccia up. L'accessibilita' aumenta grazie al titolo descrittivo sul bottone che include sia patrimonio sia variazione nel formato esteso
+- **Manutenibilita'** — `formatEuroCompact` e' riutilizzabile negli altri 57 file che importano `formatEuro` ogni volta che serve una rappresentazione sintetica (es. tooltip grafici, card KPI affollate). Aggiunti 6 test unitari dedicati in `src/lib/format.test.ts` che coprono soglie K/M, segno negativo, strip dello zero decimale e valori non finiti. Suite completa `vitest`: 264/264 verdi; `eslint` pulito
 
 ### v1.3.2 - 20 aprile 2026 (migration di produzione per il workspace Consulente)
 
