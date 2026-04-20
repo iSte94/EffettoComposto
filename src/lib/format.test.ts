@@ -30,6 +30,12 @@ describe('formatEuro', () => {
         const result = formatEuro(-5000);
         expect(result).toContain('5');
     });
+
+    it('returns em-dash for non-finite values', () => {
+        expect(formatEuro(Number.NaN)).toBe('\u2014');
+        expect(formatEuro(Number.POSITIVE_INFINITY)).toBe('\u2014');
+        expect(formatEuro(Number.NEGATIVE_INFINITY)).toBe('\u2014');
+    });
 });
 
 describe('formatEuroCompact', () => {
@@ -92,5 +98,13 @@ describe('formatPercent', () => {
 
     it('handles negative percentages', () => {
         expect(formatPercent(-5.5)).toBe('-5.5%');
+    });
+
+    it('returns em-dash for non-finite values', () => {
+        expect(formatPercent(Number.NaN)).toBe('\u2014');
+        expect(formatPercent(Number.POSITIVE_INFINITY)).toBe('\u2014');
+        expect(formatPercent(Number.NEGATIVE_INFINITY)).toBe('\u2014');
+        // Placeholder coerente anche cambiando la precisione richiesta
+        expect(formatPercent(Number.NaN, 3)).toBe('\u2014');
     });
 });
