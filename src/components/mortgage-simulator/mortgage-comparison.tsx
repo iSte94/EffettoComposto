@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Scale } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import { calculateMortgagePayment } from "@/lib/finance/loans";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
     LineChart, Line
@@ -44,19 +45,11 @@ function createDefaultScenario(id: number): MortgageScenario {
 
 function calculateScenario(s: MortgageScenario): ScenarioResult {
     const loanAmount = Math.max(0, s.propertyPrice - s.downpayment);
-    const monthlyRate = (s.rate / 100) / 12;
-    const numPayments = Math.max(0, s.years * 12);
-    let monthlyPayment = 0;
-    if (loanAmount > 0 && numPayments > 0) {
-        if (monthlyRate > 0) {
-            const factor = Math.pow(1 + monthlyRate, numPayments);
-            monthlyPayment = (loanAmount * monthlyRate * factor) / (factor - 1);
-        } else {
-            monthlyPayment = loanAmount / numPayments;
-        }
-    }
-    const totalPaid = monthlyPayment * numPayments;
-    const totalInterest = Math.max(0, totalPaid - loanAmount);
+    const { monthlyPayment, totalPaid, totalInterest } = calculateMortgagePayment({
+        loanAmount,
+        annualRatePct: s.rate,
+        years: s.years,
+    });
     return { ...s, loanAmount, monthlyPayment, totalPaid, totalInterest };
 }
 

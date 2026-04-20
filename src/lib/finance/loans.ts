@@ -12,6 +12,109 @@ export interface ExistingLoan {
     owner?: "person1" | "person2";
 }
 
+export interface MortgagePaymentParams {
+    /** Capitale finanziato in euro (>= 0). */
+    loanAmount: number;
+    /** Tasso annuo nominale in percentuale (>= 0). Es. 3.5 per 3,5%. */
+    annualRatePct: number;
+    /** Durata del mutuo in anni (>= 0). Valori frazionari ammessi. */
+    years: number;
+}
+
+export interface MortgagePaymentResult {
+    /** Rata mensile costante (ammortamento francese) in euro. */
+    monthlyPayment: number;
+    /** Totale versato a fine piano in euro. */
+    totalPaid: number;
+    /** Totale interessi pagati in euro. */
+    totalInterest: number;
+    /** Numero totale di rate. */
+    numPayments: number;
+    /** Tasso mensile effettivo (decimale). */
+    monthlyRate: number;
+}
+
+/**
+ * Calcolo della rata di un mutuo a tasso fisso con ammortamento francese.
+ *
+ * Formula standard:
+ *   R = P * i * (1+i)^n / ((1+i)^n - 1)
+ *
+ * Edge-case che la formula diretta NON gestisce (e che invece qui sono coperti):
+ *   - `annualRatePct = 0` → la formula diretta restituisce 0/0 = NaN.
+ *     Il mutuo a tasso zero e' un caso reale (prestiti agevolati, tra
+ *     familiari, promozioni auto) e la rata corretta e' `loanAmount / n`.
+ *   - `years = 0` o `numPayments = 0` → denominatore 0, risultato Infinity.
+ *     Un mutuo di durata zero non ha senso finanziario: ritorniamo 0 invece
+ *     di inquinare i calcoli a valle con Infinity.
+ *   - Input NaN/negativi → normalizzati a 0 per evitare che un campo form
+ *     vuoto propaghi NaN in tutta la dashboard.
+ *
+ * Senza questi guard la dashboard del Simulatore Mutuo mostrava "€NaN" al
+ * primo utente che digitava `rate = 0` (consentito dall'HTML `min="0"` sul
+ * campo input), e "€Infinity" con `years = 0`, invalidando DTI, profittabilita'
+ * e confronto costo opportunita' in un colpo solo.
+ */
+export function calculateMortgagePayment(params: MortgagePaymentParams): MortgagePaymentResult {
+    const loanAmount = Number.isFinite(params.loanAmount) ? Math.max(0, params.loanAmount) : 0;
+    const annualRatePct = Number.isFinite(params.annualRatePct) ? Math.max(0, params.annualRatePct) : 0;
+    const years = Number.isFinite(params.years) ? Math.max(0, params.years) : 0;
+
+    const monthlyRate = (annualRatePct / 100) / 12;
+    const numPayments = years * 12;
+
+    if (loanAmount === 0 || numPayments === 0) {
+        return { monthlyPayment: 0, totalPaid: 0, totalInterest: 0, numPayments, monthlyRate };
+    }
+
+    let monthlyPayment: number;
+    if (monthlyRate === 0) {
+        // Mutuo a tasso zero: rata = capitale / n.
+        monthlyPayment = loanAmount / numPayments;
+    } else {
+        const factor = Math.pow(1 + monthlyRate, numPayments);
+        monthlyPayment = (loanAmount * monthlyRate * factor) / (factor - 1);
+    }
+
+    const totalPaid = monthlyPayment * numPayments;
+    const totalInterest = Math.max(0, totalPaid - loanAmount);
+
+    return { monthlyPayment, totalPaid, totalInterest, numPayments, monthlyRate };
+}
+
+/**
+ * Debito residuo al mese `monthsPassed` di un mutuo a tasso fisso francese.
+ *
+ * Formula chiusa: D_k = P * ((1+i)^n - (1+i)^k) / ((1+i)^n - 1)
+ *
+ * Gestisce gli stessi edge-case di `calculateMortgagePayment`:
+ * tasso zero (ammortamento lineare), durata zero, input invalidi.
+ */
+export function calculateMortgageRemainingDebt(params: {
+    loanAmount: number;
+    annualRatePct: number;
+    years: number;
+    monthsPassed: number;
+}): number {
+    const loanAmount = Number.isFinite(params.loanAmount) ? Math.max(0, params.loanAmount) : 0;
+    const annualRatePct = Number.isFinite(params.annualRatePct) ? Math.max(0, params.annualRatePct) : 0;
+    const years = Number.isFinite(params.years) ? Math.max(0, params.years) : 0;
+    const monthsPassed = Number.isFinite(params.monthsPassed) ? Math.max(0, params.monthsPassed) : 0;
+
+    const numPayments = years * 12;
+    if (loanAmount === 0 || numPayments === 0) return loanAmount;
+    if (monthsPassed >= numPayments) return 0;
+
+    const monthlyRate = (annualRatePct / 100) / 12;
+    if (monthlyRate === 0) {
+        return Math.max(0, loanAmount - (loanAmount / numPayments) * monthsPassed);
+    }
+
+    const factorN = Math.pow(1 + monthlyRate, numPayments);
+    const factorK = Math.pow(1 + monthlyRate, monthsPassed);
+    return Math.max(0, loanAmount * (factorN - factorK) / (factorN - 1));
+}
+
 export const calculateRemainingDebt = (loan?: ExistingLoan): number => {
     if (!loan) return 0;
     if (!loan.startDate || !loan.endDate) return 0;

@@ -1,3 +1,5 @@
+import { calculateMortgagePayment } from "@/lib/finance/loans";
+
 /**
  * Genera un file CSV e lo scarica nel browser.
  */
@@ -72,11 +74,11 @@ export function exportAmortizationCSV(params: {
     years: number;
 }) {
     const { loanAmount, rate, years } = params;
-    const monthlyRate = (rate / 100) / 12;
-    const numPayments = years * 12;
-    const payment = loanAmount > 0
-        ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
-        : 0;
+    const { monthlyPayment: payment, numPayments, monthlyRate } = calculateMortgagePayment({
+        loanAmount,
+        annualRatePct: rate,
+        years,
+    });
 
     const headers = ['Mese', 'Rata', 'Quota Capitale', 'Quota Interessi', 'Debito Residuo'];
     const rows: (string | number)[][] = [];

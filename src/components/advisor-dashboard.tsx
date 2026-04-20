@@ -28,7 +28,7 @@ import { CalculationBreakdown } from "@/components/advisor/calculation-breakdown
 import { ScenarioComparison } from "@/components/advisor/scenario-comparison";
 import { SensitivityChart } from "@/components/advisor/sensitivity-chart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { calculateMortgagePayment, getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { computeAdvisorFireComparison } from "@/lib/finance/advisor-fire";
@@ -233,17 +233,14 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
 
   // --- CALCOLI ---
   const calculations = useMemo(() => {
-    const loanAmount = sim.isFinanced ? sim.totalPrice - sim.downPayment : 0;
-    const monthlyRate = (sim.financingRate / 100) / 12;
-    const numPayments = sim.financingYears * 12;
+    const loanAmount = sim.isFinanced ? Math.max(0, sim.totalPrice - sim.downPayment) : 0;
 
-    // Rata mensile finanziamento
-    const monthlyPayment = loanAmount > 0 && monthlyRate > 0
-      ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
-      : loanAmount > 0 ? loanAmount / numPayments : 0;
-
-    // Totale interessi
-    const totalInterest = monthlyPayment * numPayments - loanAmount;
+    // Rata mensile finanziamento (ammortamento francese, guard contro rate=0 e years=0)
+    const { monthlyPayment, totalInterest } = calculateMortgagePayment({
+      loanAmount,
+      annualRatePct: sim.financingRate,
+      years: sim.financingYears,
+    });
 
     // Costo totale reale dell'acquisto
     const totalCostOfPurchase = sim.totalPrice + totalInterest;

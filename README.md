@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.3.4`
+**Versione corrente:** `v1.3.5`
 
 ---
 
@@ -113,6 +113,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.3.5 - 20 aprile 2026 (bugfix finanziario — rata mutuo: NaN con tasso 0% e Infinity con durata 0)
+
+- **Falla logica scovata** — nel Simulatore Mutuo (`src/components/mortgage-simulator/index.tsx`), nel Consulente Acquisti (`src/components/advisor-dashboard.tsx`) e nell'export del piano di ammortamento (`src/lib/export/csv.ts`) la rata mensile era calcolata inline con la formula francese diretta `R = P·i·(1+i)^n / ((1+i)^n − 1)`. Questa formula ha due singolarita' matematiche che NON erano protette: (1) con `tasso = 0%` il numeratore e il denominatore sono entrambi zero e il risultato e' `0/0 = NaN`; (2) con `durata = 0 anni` il denominatore e' zero e il numeratore e' positivo, il risultato e' `Infinity`. Il campo HTML del tasso aveva `min="0"`, quindi 0% era un input legittimo (prestiti familiari, promozioni auto a tasso zero): bastava digitarlo per vedere "€NaN" propagarsi in DTI, profittabilita', cashflow, costo opportunita' e confronto mutui in un colpo solo. La stessa formula, duplicata in 4 file, era andata fuori sincrono — solo il tab "Confronto" (`mortgage-comparison.tsx`) aveva i guard giusti
+- **Soluzione applicata** — estratta la logica in un'unica funzione pura `calculateMortgagePayment` in `src/lib/finance/loans.ts`, con tre guard espliciti: (a) `annualRatePct = 0` ⇒ rata = `loanAmount / n` (ammortamento lineare, matematicamente corretto per un prestito a tasso zero); (b) `loanAmount = 0` o `numPayments = 0` ⇒ rata = 0 (no esplosione a Infinity); (c) input `NaN`, `Infinity` o negativi ⇒ normalizzati a 0 con `Number.isFinite` + `Math.max(0, …)`. Aggiunta anche `calculateMortgageRemainingDebt` per il debito residuo con gli stessi guard (chiusa della French amortization `D_k = P·((1+i)^n − (1+i)^k) / ((1+i)^n − 1)`). I 4 call-site (Simulatore Mutuo, Confronto offerte, Consulente Acquisti, export CSV) ora importano l'unica implementazione condivisa, eliminando la duplicazione e la possibilita' di divergenze future
+- **Perche' l'app e' piu' robusta** — nessun utente puo' piu' far rendere "€NaN" o "€Infinity" alla dashboard semplicemente digitando un tasso legale sul campo input; la suite di test protegge i casi degeneri con 15 nuovi test di regressione in `loans.test.ts` che verificano valori di rata su un mutuo standard (160k @ 3.5% / 25a ≈ 800€/mese), il caso `tasso=0%` (1000€/mese lineari), `durata=0`, `loanAmount=0`, combinazioni di input invalidi (`NaN`, `Infinity`, negativi) e decrescenza monotona del debito residuo lungo il piano. Totale suite: 285/285 verdi (+15), `eslint` pulito
 
 ### v1.3.4 - 20 aprile 2026 (UX — nuova KPI "Tempo di Dimezzamento" nel Calcolatore Inflazione)
 

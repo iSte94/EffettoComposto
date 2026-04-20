@@ -11,7 +11,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { usePreferences, type MortgagePreferences } from "@/hooks/usePreferences";
-import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import { calculateMortgagePayment, getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { exportAmortizationCSV } from "@/lib/export/csv";
 import { Button } from "@/components/ui/button";
 import type { ExistingLoan } from "@/types";
@@ -154,18 +154,12 @@ export function MortgageSimulator() {
             }, 0);
         }
 
-        const loanAmount = propertyPrice - downpayment;
+        const loanAmount = Math.max(0, propertyPrice - downpayment);
         const ancillaryCosts = purchaseTaxes + notaryFees + agencyFees;
         const totalCashNeeded = downpayment + ancillaryCosts;
 
-        const monthlyRate = (rate / 100) / 12;
-        const numPayments = years * 12;
-        const mortgagePayment = loanAmount > 0
-            ? (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, numPayments)) / (Math.pow(1 + monthlyRate, numPayments) - 1)
-            : 0;
-
-        const totalPaymentsMade = mortgagePayment * numPayments;
-        const totalInterestPaid = Math.max(0, totalPaymentsMade - loanAmount);
+        const { monthlyPayment: mortgagePayment, totalInterest: totalInterestPaid } =
+            calculateMortgagePayment({ loanAmount, annualRatePct: rate, years });
 
         const totalMonthlyDebt = mortgagePayment + calculatedExistingInstallment;
         const maxInstallment = netIncome * 0.33;

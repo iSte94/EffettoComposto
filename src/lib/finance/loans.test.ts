@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { calculateRemainingDebt, getInstallmentAmountForMonth, calculateGrowthRate } from './loans';
+import {
+    calculateMortgagePayment,
+    calculateMortgageRemainingDebt,
+    calculateRemainingDebt,
+    getInstallmentAmountForMonth,
+    calculateGrowthRate,
+} from './loans';
 import type { ExistingLoan } from './loans';
 
 function makeLoan(overrides: Partial<ExistingLoan> = {}): ExistingLoan {
@@ -107,6 +113,112 @@ describe('getInstallmentAmountForMonth', () => {
     it('returns 0 when installment is 0 and no principal/rate info', () => {
         const loan = makeLoan({ installment: 0 });
         expect(getInstallmentAmountForMonth(loan, 0, 60, 0)).toBe(0);
+    });
+});
+
+describe('calculateMortgagePayment', () => {
+    it('calcola correttamente un mutuo standard (francese)', () => {
+        // 160k @ 3.5% per 25 anni -> rata ~800€/mese
+        const r = calculateMortgagePayment({ loanAmount: 160000, annualRatePct: 3.5, years: 25 });
+        expect(r.monthlyPayment).toBeGreaterThan(790);
+        expect(r.monthlyPayment).toBeLessThan(810);
+        expect(Number.isFinite(r.monthlyPayment)).toBe(true);
+        expect(r.totalInterest).toBeGreaterThan(0);
+        expect(r.numPayments).toBe(300);
+    });
+
+    it('BUGFIX: rate=0% produce rata = capitale/n (non NaN)', () => {
+        // Mutuo a tasso zero (prestito familiare / promozione). Prima produceva
+        // 0/0 = NaN inquinando l'intera dashboard.
+        const r = calculateMortgagePayment({ loanAmount: 120000, annualRatePct: 0, years: 10 });
+        expect(Number.isFinite(r.monthlyPayment)).toBe(true);
+        expect(r.monthlyPayment).toBeCloseTo(1000, 6); // 120000 / 120
+        expect(r.totalInterest).toBe(0);
+    });
+
+    it('BUGFIX: years=0 ritorna zero invece di Infinity', () => {
+        // Durata zero è un input edge; prima produceva numeratore positivo / 0
+        // = Infinity, che mostrava "€Infinity" in UI.
+        const r = calculateMortgagePayment({ loanAmount: 160000, annualRatePct: 3.5, years: 0 });
+        expect(Number.isFinite(r.monthlyPayment)).toBe(true);
+        expect(r.monthlyPayment).toBe(0);
+        expect(r.totalPaid).toBe(0);
+        expect(r.totalInterest).toBe(0);
+    });
+
+    it('BUGFIX: rate=0% e years=0 insieme non producono NaN', () => {
+        const r = calculateMortgagePayment({ loanAmount: 160000, annualRatePct: 0, years: 0 });
+        expect(r.monthlyPayment).toBe(0);
+        expect(Number.isFinite(r.monthlyPayment)).toBe(true);
+    });
+
+    it('loanAmount = 0 ritorna tutto zero', () => {
+        const r = calculateMortgagePayment({ loanAmount: 0, annualRatePct: 3.5, years: 25 });
+        expect(r.monthlyPayment).toBe(0);
+        expect(r.totalPaid).toBe(0);
+        expect(r.totalInterest).toBe(0);
+    });
+
+    it('input negativi vengono normalizzati a 0', () => {
+        const r = calculateMortgagePayment({ loanAmount: -10000, annualRatePct: -1, years: -5 });
+        expect(r.monthlyPayment).toBe(0);
+        expect(Number.isFinite(r.monthlyPayment)).toBe(true);
+    });
+
+    it('input NaN/Infinity vengono normalizzati a 0', () => {
+        const r = calculateMortgagePayment({
+            loanAmount: Number.NaN,
+            annualRatePct: Number.POSITIVE_INFINITY,
+            years: Number.NaN,
+        });
+        expect(Number.isFinite(r.monthlyPayment)).toBe(true);
+        expect(r.monthlyPayment).toBe(0);
+    });
+
+    it('totalPaid = monthlyPayment * numPayments', () => {
+        const r = calculateMortgagePayment({ loanAmount: 200000, annualRatePct: 4, years: 30 });
+        expect(r.totalPaid).toBeCloseTo(r.monthlyPayment * r.numPayments, 6);
+    });
+
+    it('rata mutuo > capitale/n quando il tasso e\' positivo', () => {
+        const r = calculateMortgagePayment({ loanAmount: 100000, annualRatePct: 5, years: 20 });
+        // A tasso positivo la rata deve essere sempre maggiore della rata a tasso zero.
+        expect(r.monthlyPayment).toBeGreaterThan(100000 / 240);
+    });
+});
+
+describe('calculateMortgageRemainingDebt', () => {
+    it('debito al mese 0 = loanAmount', () => {
+        const d = calculateMortgageRemainingDebt({ loanAmount: 160000, annualRatePct: 3.5, years: 25, monthsPassed: 0 });
+        expect(d).toBe(160000);
+    });
+
+    it('debito a fine piano = 0', () => {
+        const d = calculateMortgageRemainingDebt({ loanAmount: 160000, annualRatePct: 3.5, years: 25, monthsPassed: 300 });
+        expect(d).toBe(0);
+    });
+
+    it('debito decresce nel tempo', () => {
+        const d60 = calculateMortgageRemainingDebt({ loanAmount: 160000, annualRatePct: 3.5, years: 25, monthsPassed: 60 });
+        const d180 = calculateMortgageRemainingDebt({ loanAmount: 160000, annualRatePct: 3.5, years: 25, monthsPassed: 180 });
+        expect(d60).toBeLessThan(160000);
+        expect(d180).toBeLessThan(d60);
+    });
+
+    it('tasso zero: ammortamento lineare', () => {
+        const d = calculateMortgageRemainingDebt({ loanAmount: 120000, annualRatePct: 0, years: 10, monthsPassed: 60 });
+        expect(d).toBeCloseTo(60000, 6);
+    });
+
+    it('years=0 ritorna loanAmount (nessuna rata prevista)', () => {
+        const d = calculateMortgageRemainingDebt({ loanAmount: 160000, annualRatePct: 3.5, years: 0, monthsPassed: 0 });
+        expect(Number.isFinite(d)).toBe(true);
+        expect(d).toBe(160000);
+    });
+
+    it('monthsPassed oltre la durata ritorna 0, non numeri negativi', () => {
+        const d = calculateMortgageRemainingDebt({ loanAmount: 100000, annualRatePct: 4, years: 10, monthsPassed: 500 });
+        expect(d).toBe(0);
     });
 });
 
