@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.3.5`
+**Versione corrente:** `v1.4.0`
 
 ---
 
@@ -113,6 +113,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.4.0 - 20 aprile 2026 (nuovo comparatore dettagliato "Da auto termica a elettrica")
+
+- **Nuovo strumento di nicchia dentro `Strumenti`** - aggiunta la sottosezione discreta `Vari calcolatori` con il nuovo comparatore `Da auto termica a elettrica`, pensato per chi vuole capire se conviene vendere la propria auto termica e passare a una Tesla. La sezione resta volutamente fuori dal percorso principale della dashboard, ma e' ora disponibile on demand con lazy loading dedicato
+- **Confronto auto davvero completo** - il nuovo calcolatore considera in un unico flusso: valore attuale dell'auto posseduta, differenza tra vendita privata e permuta concessionario, costi di vendita dell'usato, prezzo Tesla, incentivi, spese di immatricolazione e messa su strada, wallbox/setup domestico, costi annui di assicurazione/manutenzione/bollo, consumi reali e quota di ricarica in casa vs fuori casa, valore residuo futuro di entrambe le auto e costo totale di possesso sull'orizzonte scelto
+- **Modalita finanziamento integrata** - oltre all'acquisto cash, il comparatore ora gestisce anche il caso con finanziamento Tesla: anticipo, tasso, durata e spese pratica vengono tradotti in capitale finanziato, rata mensile, interessi pagati entro l'orizzonte di analisi e debito residuo finale, mantenendo separati il `cash da mettere oggi` e il `costo economico totale` per evitare confronti fuorvianti
+- **Modello economico piu' rigoroso e testato** - estratta una nuova utility finanziaria dedicata in `src/lib/finance/thermal-to-electric-car.ts` con breakdown annuale, pareggio economico interpolato, sensibilita' della ricarica e supporto a crescita futura di benzina/elettricita/costi fissi. A supporto sono stati aggiunti test unitari dedicati in `thermal-to-electric-car.test.ts` che coprono consumi EV reali con perdite di ricarica, permuta vs vendita privata, costi iniziali e comportamento del finanziamento
+- **UI guidata per la decisione** - il comparatore mostra KPI immediati su ricavo netto dell'usato, costo netto del cambio, cash richiesto oggi, rate/interessi, rivendita futura, soglia km annui, scenario solo-casa vs solo-colonnina, grafico cumulato dei costi e tabella anno-per-anno con energia, costi annui, interessi e debito residuo. L'obiettivo e' trasformare una scelta complessa in un percorso leggibile e simulabile senza fogli Excel esterni
+
 
 ### v1.3.5 - 20 aprile 2026 (bugfix finanziario — rata mutuo: NaN con tasso 0% e Infinity con durata 0)
 
