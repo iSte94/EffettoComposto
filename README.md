@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.5.0`
+**Versione corrente:** `v1.5.1`
 
 ---
 
@@ -113,6 +113,11 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.5.1 - 21 aprile 2026 (hotfix migration eventi futuri)
+
+- **Fix produzione** - aggiunta la migration Prisma versionata `20260421224500_add_planned_financial_events` per creare la tabella `PlannedFinancialEvent` sul database del VPS. La release `v1.5.0` aveva aggiornato correttamente schema e codice, ma mancava la migration da applicare con `prisma migrate deploy`, causando errore server in creazione/lettura degli eventi futuri in produzione
+- **Impatto utente** - la sezione Budgeting -> Eventi Futuri puo' ora salvare e leggere correttamente uscite future, entrate future e spese finanziate anche sul dominio pubblico
+
 ### v1.5.0 - 21 aprile 2026 (nuovo calendario eventi finanziari futuri)
 
 - **Nuovo layer unico di pianificazione finanziaria futura** - introdotto il dominio `PlannedFinancialEvent` con supporto a uscite una tantum, uscite finanziate ed entrate una tantum con precisione `YYYY-MM`. Gli eventi vivono in Prisma, hanno validazione Zod dedicata, API CRUD su `/api/planned-events`, export/import dati utente e hook client condiviso per aggiornare tutta l'app senza logiche duplicate
