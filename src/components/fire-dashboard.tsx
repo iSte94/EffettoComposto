@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
     Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    Area, ComposedChart, Bar, Cell
+    Area, ComposedChart, Bar, Cell, ReferenceLine
 } from "recharts";
-import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Loader2, CheckCircle, Map, Flag, Check, Lock } from "lucide-react";
+import { Flame, TrendingUp, Briefcase, Activity, AlertTriangle, PlayCircle, Loader2, CheckCircle, Map, Flag, Check, Lock, CalendarClock, WalletCards, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computePensionBreakdown } from "@/lib/finance/pension-optimizer";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
-import { buildPlannedEventsTimeline } from "@/lib/finance/planned-events";
+import { buildPlannedEventsTimeline, getPlannedEventMonthlyPayment } from "@/lib/finance/planned-events";
 import {
     allocatePreRetirementPassiveIncomeAnnual,
     buildDynamicFireTargetSchedule,
@@ -34,6 +34,7 @@ import type {
     ExistingLoan,
     MonthlyExpense,
     PensionConfig,
+    PlannedFinancialEvent,
     PreRetirementPassiveIncomeAllocationMode,
     RealEstateProperty,
 } from "@/types";
@@ -59,6 +60,31 @@ const LOST_DECADE_RETURNS = [
     -37.0, // 2008
     26.5   // 2009
 ];
+
+const FIRE_EVENTS_MIN_CHART_MONTHS = 60;
+const FIRE_EVENTS_MAX_CHART_MONTHS = 360;
+const FIRE_EVENTS_PREVIEW_COUNT = 6;
+
+function formatYearMonthShort(value: string): string {
+    const [yearRaw, monthRaw] = value.split("-");
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return value;
+
+    return new Intl.DateTimeFormat("it-IT", { month: "short", year: "2-digit" })
+        .format(new Date(year, month - 1, 1))
+        .replace(".", "");
+}
+
+function formatSignedEuro(value: number): string {
+    if (Math.abs(value) < 0.5) return formatEuro(0);
+    return `${value > 0 ? "+" : "-"}${formatEuro(Math.abs(value))}`;
+}
+
+function getPlannedEventTypeLabel(event: PlannedFinancialEvent): string {
+    if (event.direction === "inflow") return "Entrata una tantum";
+    return event.kind === "financed" ? "Uscita finanziata" : "Uscita cash";
+}
 
 function parseJsonArray<T>(raw: unknown): T[] {
     if (typeof raw !== "string" || raw.trim() === "") return [];
@@ -397,6 +423,94 @@ export function FireDashboard({ user }: FireDashboardProps) {
         () => plannedEventsTimeline.monthly.map((month) => month.netCashflowDelta),
         [plannedEventsTimeline],
     );
+    const plannedEventsFireView = useMemo(() => {
+        const activeEvents = plannedEvents.filter((event) => event.status === "planned");
+        const upcomingEvents = [...activeEvents]
+            .filter((event) => event.eventMonth >= plannedEventsTimeline.startMonth)
+            .sort((a, b) => a.eventMonth.localeCompare(b.eventMonth));
+        const lastImpactIndex = plannedEventsTimeline.monthly.reduce((lastIndex, month, index) => {
+            const netImpact = month.capitalDelta + month.netCashflowDelta;
+            return Math.abs(netImpact) > 0.5 || month.debtServiceDelta > 0.5 ? index : lastIndex;
+        }, -1);
+        const chartMonths = Math.min(
+            plannedEventsTimeline.months,
+            Math.max(
+                FIRE_EVENTS_MIN_CHART_MONTHS,
+                Math.min(FIRE_EVENTS_MAX_CHART_MONTHS, lastImpactIndex + 13),
+            ),
+        );
+        const visibleMonths = plannedEventsTimeline.monthly.slice(0, chartMonths);
+        let cumulativeImpact = 0;
+        const chartData = visibleMonths.map((month) => {
+            const netImpact = month.capitalDelta + month.netCashflowDelta;
+            cumulativeImpact += netImpact;
+
+            return {
+                month: month.month,
+                label: formatYearMonthShort(month.month),
+                netImpact,
+                cumulativeImpact,
+                capitalDelta: month.capitalDelta,
+                cashflowDelta: month.netCashflowDelta,
+                debtService: month.debtServiceDelta,
+                inflows: month.inflows,
+                outflows: month.outflows,
+                activeFinancedCount: month.activeFinancedCount,
+                eventCount: month.eventIds.length,
+                hasEvent: month.eventIds.length > 0,
+            };
+        });
+        const netImpact12m = chartData.slice(0, 12).reduce((acc, month) => acc + month.netImpact, 0);
+        const netImpact36m = chartData.slice(0, 36).reduce((acc, month) => acc + month.netImpact, 0);
+        const peakMonthlyDrag = chartData.reduce(
+            (worst, month) => month.netImpact < worst.netImpact ? month : worst,
+            chartData[0] ?? {
+                month: plannedEventsTimeline.startMonth,
+                label: formatYearMonthShort(plannedEventsTimeline.startMonth),
+                netImpact: 0,
+                cumulativeImpact: 0,
+                capitalDelta: 0,
+                cashflowDelta: 0,
+                debtService: 0,
+                inflows: 0,
+                outflows: 0,
+                activeFinancedCount: 0,
+                eventCount: 0,
+                hasEvent: false,
+            },
+        );
+        const peakDebtService = chartData.reduce(
+            (peak, month) => month.debtService > peak.debtService ? month : peak,
+            chartData[0] ?? {
+                month: plannedEventsTimeline.startMonth,
+                label: formatYearMonthShort(plannedEventsTimeline.startMonth),
+                netImpact: 0,
+                cumulativeImpact: 0,
+                capitalDelta: 0,
+                cashflowDelta: 0,
+                debtService: 0,
+                inflows: 0,
+                outflows: 0,
+                activeFinancedCount: 0,
+                eventCount: 0,
+                hasEvent: false,
+            },
+        );
+
+        return {
+            activeEventsCount: activeEvents.length,
+            upcomingEvents,
+            chartData,
+            chartMonths,
+            netImpact12m,
+            netImpact36m,
+            totalNetImpact: cumulativeImpact,
+            peakMonthlyDrag,
+            peakDebtService,
+            maxConcurrentFinancedEvents: chartData.reduce((max, month) => Math.max(max, month.activeFinancedCount), 0),
+            hasEvents: activeEvents.length > 0,
+        };
+    }, [plannedEvents, plannedEventsTimeline]);
     useEffect(() => {
         return () => {
             if (mcWorkerRef.current) {
@@ -598,6 +712,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
     let pensionAnnuity = 0; // Monthly annuity from pension fund (activated at access age)
     let pensionFundAccessed = false; // Idempotent flag: liquidation must happen at most once
     let yearsToFire = startingCapital >= fireTarget ? 0 : -1;
+    let plannedEventsCumulativeImpact = 0;
     const chartData = [];
 
     // Adjust return for Bollo tax (0.2%) — applied on real return
@@ -615,6 +730,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
         // Calculate dynamic savings rate for this specific month
         const activeDebtThisMonth = getActiveDebtAtMonth(m);
+        const plannedEventNetDelta = (plannedNetCashflowDeltaByMonth[m] ?? 0) + (plannedCapitalDeltaByMonth[m] ?? 0);
         const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth; // Money no longer going to the bank
         const savedPassiveIncomeThisMonth = getSavedPreRetirementPassiveIncomeAtMonth(m);
         const currentMonthlySavings = monthlyPacBudget + Math.max(0, freedUpCashFlow) + savedPassiveIncomeThisMonth;
@@ -635,7 +751,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 Capital: tempCap,
                 PensionFund: pensionCap,
                 Target: currentFireTarget,
-                ActiveDebtAnnual: activeDebtThisMonth * 12 // Annualized burden for the chart area
+                ActiveDebtAnnual: activeDebtThisMonth * 12, // Annualized burden for the chart area
+                PlannedEventsCumulative: plannedEventsCumulativeImpact,
             });
         }
         // Inject Pension Fund IRPEF Tax Refund in July (Month 6)
@@ -677,10 +794,11 @@ export function FireDashboard({ user }: FireDashboardProps) {
         }
 
         if (isRetired) {
-            tempCap = tempCap * (1 + monthlyReturnRate) - currentMonthlyExpenses + (plannedNetCashflowDeltaByMonth[m] ?? 0) + (plannedCapitalDeltaByMonth[m] ?? 0);
+            tempCap = tempCap * (1 + monthlyReturnRate) - currentMonthlyExpenses + plannedEventNetDelta;
         } else {
-            tempCap = tempCap * (1 + monthlyReturnRate) + currentMonthlySavings + (plannedNetCashflowDeltaByMonth[m] ?? 0) + (plannedCapitalDeltaByMonth[m] ?? 0);
+            tempCap = tempCap * (1 + monthlyReturnRate) + currentMonthlySavings + plannedEventNetDelta;
         }
+        plannedEventsCumulativeImpact += plannedEventNetDelta;
 
         if (tempCap < 0) tempCap = 0;
         if (yearsToFire < 0 && tempCap >= currentFireTarget) {
@@ -1157,9 +1275,12 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                         <CardTitle className="text-2xl font-bold text-slate-900 dark:text-slate-100">Analisi Avanzata</CardTitle>
                                         <CardDescription className="text-slate-500">Esplora il tuo futuro con modelli deterministici o stocastici.</CardDescription>
                                     </div>
-            <TabsList className="self-start rounded-full border border-slate-200 bg-white/60 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 md:self-auto">
+            <TabsList className="flex h-auto flex-wrap self-start rounded-full border border-slate-200 bg-white/60 p-1 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 md:self-auto">
                                         <TabsTrigger value="standard" className="rounded-full text-xs font-bold px-4 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-slate-900 dark:text-slate-100 text-slate-500 transition-all data-[state=active]:shadow-sm">
                                             Modello Fisso
+                                        </TabsTrigger>
+                                        <TabsTrigger value="events" className="rounded-full text-xs font-bold px-4 data-[state=active]:bg-blue-600 data-[state=active]:text-white text-slate-500 transition-all data-[state=active]:shadow-sm">
+                                            Eventi Futuri
                                         </TabsTrigger>
                                         <TabsTrigger value="montecarlo" className="rounded-full text-xs font-bold px-4 data-[state=active]:bg-purple-600 data-[state=active]:text-white text-slate-500 transition-all data-[state=active]:shadow-sm">
                                             Monte Carlo
@@ -1175,6 +1296,42 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
                                 {/* 1. STANDARD TAB */}
                                 <TabsContent value="standard" className="h-full flex flex-col m-0 animate-in fade-in-50">
+                                    {plannedEventsFireView.hasEvents && (
+                                        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                            <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-4 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/30">
+                                                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-blue-700 dark:text-blue-300">
+                                                    <CalendarClock className="h-4 w-4" />
+                                                    Eventi nel piano
+                                                </div>
+                                                <div className="mt-2 text-2xl font-black text-slate-950 dark:text-slate-50">{plannedEventsFireView.activeEventsCount}</div>
+                                                <div className="text-xs font-medium text-slate-500">Solo eventi ancora pianificati</div>
+                                            </div>
+                                            <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900/70">
+                                                <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-500">Impatto 12 mesi</div>
+                                                <div className={`mt-2 text-2xl font-black ${plannedEventsFireView.netImpact12m < 0 ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+                                                    {formatSignedEuro(plannedEventsFireView.netImpact12m)}
+                                                </div>
+                                                <div className="text-xs font-medium text-slate-500">Entrate, uscite e rate incluse</div>
+                                            </div>
+                                            <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 shadow-sm dark:border-rose-900/60 dark:bg-rose-950/30">
+                                                <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-rose-700 dark:text-rose-300">Peggior mese</div>
+                                                <div className="mt-2 text-2xl font-black text-rose-600 dark:text-rose-400">
+                                                    {formatSignedEuro(plannedEventsFireView.peakMonthlyDrag.netImpact)}
+                                                </div>
+                                                <div className="text-xs font-medium text-slate-500">{plannedEventsFireView.peakMonthlyDrag.label}</div>
+                                            </div>
+                                            <div className="rounded-2xl border border-orange-100 bg-orange-50/70 p-4 shadow-sm dark:border-orange-900/60 dark:bg-orange-950/30">
+                                                <div className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-[0.18em] text-orange-700 dark:text-orange-300">
+                                                    <WalletCards className="h-4 w-4" />
+                                                    Rate future max
+                                                </div>
+                                                <div className="mt-2 text-2xl font-black text-orange-600 dark:text-orange-400">
+                                                    {formatEuro(plannedEventsFireView.peakDebtService.debtService)}
+                                                </div>
+                                                <div className="text-xs font-medium text-slate-500">{plannedEventsFireView.peakDebtService.label}</div>
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="h-[400px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={displayChartData} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
@@ -1187,25 +1344,37 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                         <stop offset="5%" stopColor="#ef4444" stopOpacity={0.6} />
                                                         <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
                                                     </linearGradient>
+                                                    <linearGradient id="colorPlannedEvents" x1="0" y1="0" x2="1" y2="0">
+                                                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.9} />
+                                                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.9} />
+                                                    </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
                                                 <XAxis dataKey="age" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} name="Età" />
                                                 <YAxis yAxisId="left" tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-5} />
-                                                <YAxis yAxisId="right" orientation="right" tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#ef4444', fontSize: 12 }} dx={5} />
+                                                <YAxis yAxisId="right" orientation="right" tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#2563eb', fontSize: 12 }} dx={5} />
                                                 <Tooltip
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any, name: any) => {
                                                         if (name === 'Target') return [formatEuro(Number(value)), targetLineLabel];
                                                         if (name === 'ActiveDebtAnnual') return [formatEuro(Number(value)), 'Costo Annuo Prestiti'];
+                                                        if (name === 'PlannedEventsCumulative') return [formatSignedEuro(Number(value)), 'Impatto eventi cumulato'];
+                                                        if (name === 'PensionFund') return [formatEuro(Number(value)), 'Fondo pensione'];
                                                         return [formatEuro(Number(value)), 'Capitale Stimato'];
                                                     }}
                                                     labelFormatter={(label) => `Età: ${label} anni`}
                                                     contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
                                                     labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
                                                 />
+                                                {plannedEventsFireView.hasEvents && (
+                                                    <ReferenceLine yAxisId="right" y={0} stroke="#94a3b8" strokeOpacity={0.35} strokeDasharray="2 4" />
+                                                )}
                                                 <Line yAxisId="left" type="monotone" dataKey="Target" stroke="#f97316" strokeDasharray="5 5" strokeWidth={2} dot={false} activeDot={false} />
                                                 <Area yAxisId="left" type="monotone" dataKey="Capital" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorCapital)" activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981', style: { filter: 'drop-shadow(0px 0px 8px rgba(16,185,129,0.5))' } }} />
                                                 <Area yAxisId="right" type="stepAfter" dataKey="ActiveDebtAnnual" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorDebt)" activeDot={{ r: 4, strokeWidth: 0, fill: '#ef4444', style: { filter: 'drop-shadow(0px 0px 6px rgba(239,68,68,0.5))' } }} />
+                                                {plannedEventsFireView.hasEvents && (
+                                                    <Line yAxisId="right" type="monotone" dataKey="PlannedEventsCumulative" stroke="url(#colorPlannedEvents)" strokeDasharray="4 6" strokeWidth={3} dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#ffffff', stroke: '#2563eb' }} />
+                                                )}
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>
@@ -1247,7 +1416,199 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                     </div>
                                 </TabsContent>
 
-                                {/* 2. MONTE CARLO TAB */}
+                                {/* 2. PLANNED EVENTS TAB */}
+                                <TabsContent value="events" className="h-full flex flex-col m-0 animate-in fade-in-50">
+                                    <div className="space-y-6">
+                                        <div className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-6 text-white shadow-xl">
+                                            <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-blue-500/25 blur-3xl" />
+                                            <div className="absolute -bottom-24 left-10 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl" />
+                                            <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+                                                <div>
+                                                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.2em] text-blue-100">
+                                                        <CalendarClock className="h-4 w-4" />
+                                                        Timeline eventi futuri
+                                                    </div>
+                                                    <h3 className="text-2xl font-black tracking-tight md:text-3xl">Quanto cambiano davvero il tuo percorso FIRE</h3>
+                                                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                                                        Qui gli eventi pianificati vengono letti mese per mese: entrate e uscite una tantum muovono il capitale nel mese esatto, mentre gli eventi finanziati aggiungono rate fino a fine durata.
+                                                    </p>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                                                        <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">Impatto 36M</div>
+                                                        <div className={`mt-2 text-2xl font-black ${plannedEventsFireView.netImpact36m < 0 ? "text-rose-300" : "text-emerald-300"}`}>
+                                                            {formatSignedEuro(plannedEventsFireView.netImpact36m)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                                                        <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">Orizzonte grafico</div>
+                                                        <div className="mt-2 text-2xl font-black text-blue-200">{Math.round(plannedEventsFireView.chartMonths / 12)} anni</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                                                        <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">Cumulato visibile</div>
+                                                        <div className={`mt-2 text-2xl font-black ${plannedEventsFireView.totalNetImpact < 0 ? "text-rose-300" : "text-emerald-300"}`}>
+                                                            {formatSignedEuro(plannedEventsFireView.totalNetImpact)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur">
+                                                        <div className="text-[10px] font-extrabold uppercase tracking-[0.18em] text-slate-300">Finanziamenti max</div>
+                                                        <div className="mt-2 text-2xl font-black text-orange-200">{plannedEventsFireView.maxConcurrentFinancedEvents}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {plannedEventsFireView.hasEvents ? (
+                                            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(280px,0.55fr)]">
+                                                <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+                                                    <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                                                        <div>
+                                                            <h3 className="text-lg font-black text-slate-950 dark:text-slate-50">Impatto mensile e cumulato</h3>
+                                                            <p className="text-xs font-medium text-slate-500">
+                                                                Barre = impatto netto del mese. Linea blu = effetto cumulato sulla curva FIRE. Linea arancio = rate mensili.
+                                                            </p>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 text-[11px] font-bold">
+                                                            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Entrate</span>
+                                                            <span className="rounded-full bg-rose-100 px-3 py-1 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">Uscite</span>
+                                                            <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">Cumulato</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className="sr-only">
+                                                        Il grafico mostra l&apos;impatto mensile degli eventi futuri, l&apos;impatto cumulato sul FIRE e le rate mensili previste.
+                                                    </p>
+                                                    <div className="h-[430px] w-full">
+                                                        <ResponsiveContainer width="100%" height="100%">
+                                                            <ComposedChart data={plannedEventsFireView.chartData} margin={{ top: 16, right: 18, left: 6, bottom: 18 }}>
+                                                                <defs>
+                                                                    <linearGradient id="eventsCumulativeLine" x1="0" y1="0" x2="1" y2="0">
+                                                                        <stop offset="0%" stopColor="#2563eb" stopOpacity={1} />
+                                                                        <stop offset="100%" stopColor="#38bdf8" stopOpacity={1} />
+                                                                    </linearGradient>
+                                                                </defs>
+                                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.18)" />
+                                                                <XAxis
+                                                                    dataKey="label"
+                                                                    interval={Math.max(0, Math.floor(plannedEventsFireView.chartData.length / 9))}
+                                                                    tickLine={false}
+                                                                    axisLine={false}
+                                                                    tick={{ fill: '#64748b', fontSize: 11 }}
+                                                                    dy={10}
+                                                                />
+                                                                <YAxis yAxisId="left" tickFormatter={(val) => `€${Math.round(Number(val) / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 11 }} dx={-4} />
+                                                                <YAxis yAxisId="right" orientation="right" tickFormatter={(val) => `€${Math.round(Number(val) / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#2563eb', fontSize: 11 }} dx={4} />
+                                                                <ReferenceLine yAxisId="left" y={0} stroke="#94a3b8" strokeOpacity={0.5} strokeDasharray="2 4" />
+                                                                <Tooltip
+                                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                                                    content={({ active, payload }: any) => {
+                                                                        const point = payload?.[0]?.payload;
+                                                                        if (!active || !point) return null;
+                                                                        return (
+                                                                            <div className="min-w-[220px] rounded-2xl border border-slate-700/70 bg-slate-950/95 p-4 text-slate-100 shadow-2xl backdrop-blur-xl">
+                                                                                <div className="mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-blue-200">{point.label}</div>
+                                                                                <div className="space-y-2 text-xs">
+                                                                                    <div className="flex items-center justify-between gap-6">
+                                                                                        <span className="text-slate-400">Impatto netto mese</span>
+                                                                                        <span className={`font-black ${point.netImpact < 0 ? "text-rose-300" : "text-emerald-300"}`}>{formatSignedEuro(point.netImpact)}</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center justify-between gap-6">
+                                                                                        <span className="text-slate-400">Una tantum</span>
+                                                                                        <span className="font-bold">{formatSignedEuro(point.capitalDelta)}</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center justify-between gap-6">
+                                                                                        <span className="text-slate-400">Rate/cashflow</span>
+                                                                                        <span className="font-bold">{formatSignedEuro(point.cashflowDelta)}</span>
+                                                                                    </div>
+                                                                                    <div className="flex items-center justify-between gap-6">
+                                                                                        <span className="text-slate-400">Rate mensili</span>
+                                                                                        <span className="font-bold text-orange-200">{formatEuro(point.debtService)}</span>
+                                                                                    </div>
+                                                                                    <div className="border-t border-slate-700/70 pt-2 flex items-center justify-between gap-6">
+                                                                                        <span className="text-slate-400">Cumulato FIRE</span>
+                                                                                        <span className={`font-black ${point.cumulativeImpact < 0 ? "text-rose-300" : "text-emerald-300"}`}>{formatSignedEuro(point.cumulativeImpact)}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    }}
+                                                                />
+                                                                <Bar yAxisId="left" dataKey="netImpact" radius={[6, 6, 6, 6]} barSize={10}>
+                                                                    {plannedEventsFireView.chartData.map((entry) => (
+                                                                        <Cell
+                                                                            key={`planned-impact-${entry.month}`}
+                                                                            fill={entry.netImpact >= 0 ? '#10b981' : '#f43f5e'}
+                                                                            fillOpacity={Math.abs(entry.netImpact) > 0.5 ? 0.9 : 0.18}
+                                                                        />
+                                                                    ))}
+                                                                </Bar>
+                                                                <Line yAxisId="right" type="monotone" dataKey="cumulativeImpact" stroke="url(#eventsCumulativeLine)" strokeWidth={4} dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#ffffff', stroke: '#2563eb' }} />
+                                                                <Line yAxisId="left" type="monotone" dataKey="debtService" stroke="#f97316" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: '#ffffff', stroke: '#f97316' }} />
+                                                            </ComposedChart>
+                                                        </ResponsiveContainer>
+                                                    </div>
+                                                </div>
+
+                                                <div className="rounded-3xl border border-slate-200 bg-white/80 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800 dark:bg-slate-900/75">
+                                                    <div className="mb-4">
+                                                        <h3 className="text-lg font-black text-slate-950 dark:text-slate-50">Prossimi eventi</h3>
+                                                        <p className="text-xs font-medium text-slate-500">Dettaglio leggibile delle mosse che entrano nel grafico.</p>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {plannedEventsFireView.upcomingEvents.length === 0 && (
+                                                            <div className="rounded-2xl border border-dashed border-slate-300 p-4 text-center text-xs font-bold text-slate-500 dark:border-slate-700">
+                                                                Nessun evento con data futura da mostrare in lista.
+                                                            </div>
+                                                        )}
+                                                        {plannedEventsFireView.upcomingEvents.slice(0, FIRE_EVENTS_PREVIEW_COUNT).map((event) => {
+                                                            const monthlyPayment = getPlannedEventMonthlyPayment(event);
+                                                            const isInflow = event.direction === "inflow";
+                                                            return (
+                                                                <div key={event.id} className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-950/40">
+                                                                    <div className="flex items-start justify-between gap-3">
+                                                                        <div className="min-w-0">
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isInflow ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" : "bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300"}`}>
+                                                                                    {isInflow ? <ArrowUpCircle className="h-4 w-4" /> : <ArrowDownCircle className="h-4 w-4" />}
+                                                                                </span>
+                                                                                <div className="truncate text-sm font-black text-slate-900 dark:text-slate-100">{event.title}</div>
+                                                                            </div>
+                                                                            <div className="mt-2 text-xs font-bold text-slate-500">{formatYearMonthShort(event.eventMonth)} - {getPlannedEventTypeLabel(event)}</div>
+                                                                        </div>
+                                                                        <div className={`shrink-0 text-right text-sm font-black ${isInflow ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                                                                            {isInflow ? "+" : "-"}{formatEuro(event.amount)}
+                                                                        </div>
+                                                                    </div>
+                                                                    {event.kind === "financed" && (
+                                                                        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
+                                                                            Anticipo {formatEuro(Math.max(0, event.upfrontAmount ?? 0))} + rata {formatEuro(monthlyPayment)}/mese per {event.durationMonths ?? 0} mesi
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {plannedEventsFireView.upcomingEvents.length > FIRE_EVENTS_PREVIEW_COUNT && (
+                                                            <div className="rounded-2xl border border-dashed border-slate-300 p-3 text-center text-xs font-bold text-slate-500 dark:border-slate-700">
+                                                                +{plannedEventsFireView.upcomingEvents.length - FIRE_EVENTS_PREVIEW_COUNT} altri eventi nel piano
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50/80 p-10 text-center dark:border-slate-700 dark:bg-slate-900/60">
+                                                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                                                    <CalendarClock className="h-7 w-7" />
+                                                </div>
+                                                <h3 className="text-xl font-black text-slate-950 dark:text-slate-50">Nessun evento futuro nel piano FIRE</h3>
+                                                <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">
+                                                    Aggiungi spese future, finanziamenti o entrate una tantum dal tab Budgeting: appena salvati, appariranno qui e verranno inclusi nella simulazione.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </TabsContent>
+
+                                {/* 3. MONTE CARLO TAB */}
                                 <TabsContent value="montecarlo" className="h-full flex flex-col m-0 animate-in fade-in-50">
                                     <div className="flex justify-between items-center mb-6">
                                         <div className="space-y-1">
@@ -1331,7 +1692,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                     )}
                                 </TabsContent>
 
-                                {/* 3. STRESS TEST TAB */}
+                                {/* 4. STRESS TEST TAB */}
                                 <TabsContent value="stress" className="h-full flex flex-col m-0 animate-in fade-in-50">
                                     <div className="flex justify-between items-center mb-6">
                                         <div className="space-y-1">

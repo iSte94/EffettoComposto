@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.5.1`
+**Versione corrente:** `v1.6.0`
 
 ---
 
@@ -113,6 +113,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.6.0 - 21 aprile 2026 (visualizzazione FIRE degli eventi futuri)
+
+- **Nuovo tab "Eventi Futuri" nel FIRE** - aggiunta una vista dedicata con grafico mensile moderno: barre verdi/rosse per impatto netto del mese, linea cumulata blu per l'effetto sul percorso FIRE e linea arancione per le rate future generate dagli eventi finanziati
+- **Analisi avanzata piu' chiara** - il grafico deterministico FIRE ora mostra anche l'impatto cumulato degli eventi pianificati e aggiunge KPI rapidi su eventi nel piano, impatto 12 mesi, peggior mese e picco rate future
+- **Dettaglio operativo degli eventi** - la nuova vista riepiloga i prossimi eventi con mese, tipo, importo, anticipo, rata e durata, cosi' l'utente capisce subito quando una spesa futura entra nel piano e quanto pesa nel tempo
+
 ### v1.5.1 - 21 aprile 2026 (hotfix migration eventi futuri)
 
 - **Fix produzione** - aggiunta la migration Prisma versionata `20260421224500_add_planned_financial_events` per creare la tabella `PlannedFinancialEvent` sul database del VPS. La release `v1.5.0` aveva aggiornato correttamente schema e codice, ma mancava la migration da applicare con `prisma migrate deploy`, causando errore server in creazione/lettura degli eventi futuri in produzione
