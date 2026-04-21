@@ -14,11 +14,19 @@ export interface AdvisorFireComparison {
     delayMonths: number;
 }
 
+export interface AdvisorFirePlannedAdjustments {
+    plannedCapitalDeltaByMonth?: number[];
+    plannedNetCashflowDeltaByMonth?: number[];
+}
+
 export function hasAdvisorFireContext(snapshot: FinancialSnapshot): boolean {
     return snapshot.currentAge !== null && (snapshot.monthlySavings > 0 || snapshot.fireStartingCapital > 0);
 }
 
-export function buildAdvisorFireBaseParams(snapshot: FinancialSnapshot): FireProjectionParams {
+export function buildAdvisorFireBaseParams(
+    snapshot: FinancialSnapshot,
+    adjustments: AdvisorFirePlannedAdjustments = {},
+): FireProjectionParams {
     return {
         startingCapital: snapshot.fireStartingCapital,
         monthlySavings: snapshot.monthlySavings,
@@ -28,6 +36,8 @@ export function buildAdvisorFireBaseParams(snapshot: FinancialSnapshot): FirePro
         withdrawalRatePct: snapshot.fireWithdrawalRate,
         currentAge: snapshot.currentAge ?? 30,
         retirementAge: snapshot.retirementAge,
+        plannedCapitalDeltaByMonth: adjustments.plannedCapitalDeltaByMonth,
+        plannedNetCashflowDeltaByMonth: adjustments.plannedNetCashflowDeltaByMonth,
     };
 }
 
@@ -48,8 +58,9 @@ export function buildAdvisorFireWithPurchaseParams(
     snapshot: FinancialSnapshot,
     sim: PurchaseSimulation,
     calculations: AdvisorFirePurchaseCalculations,
+    adjustments: AdvisorFirePlannedAdjustments = {},
 ): FireProjectionParams {
-    const baseParams = buildAdvisorFireBaseParams(snapshot);
+    const baseParams = buildAdvisorFireBaseParams(snapshot, adjustments);
     const ownershipMonthlyDelta = getAdvisorOwnershipMonthlyDelta(sim, calculations);
     const fireExpenseDelta = sim.category === "immobile" ? ownershipMonthlyDelta : 0;
 
@@ -68,13 +79,14 @@ export function computeAdvisorFireComparison(
     snapshot: FinancialSnapshot,
     sim: PurchaseSimulation,
     calculations: AdvisorFirePurchaseCalculations,
+    adjustments: AdvisorFirePlannedAdjustments = {},
 ): AdvisorFireComparison | null {
     if (!hasAdvisorFireContext(snapshot)) {
         return null;
     }
 
-    const baseline = projectFire(buildAdvisorFireBaseParams(snapshot));
-    const withPurchase = projectFire(buildAdvisorFireWithPurchaseParams(snapshot, sim, calculations));
+    const baseline = projectFire(buildAdvisorFireBaseParams(snapshot, adjustments));
+    const withPurchase = projectFire(buildAdvisorFireWithPurchaseParams(snapshot, sim, calculations, adjustments));
 
     return {
         baseline,

@@ -62,6 +62,7 @@ const importSchema = z.object({
     pacSchedules: genericRecordArray,
     pacExecutions: genericRecordArray,
     pensionAccruals: genericRecordArray,
+    plannedEvents: genericRecordArray,
 });
 
 function toDate(value: unknown): Date | undefined {
@@ -93,6 +94,7 @@ export async function POST(req: Request) {
         const goalRecords = ((data.savingsGoals ?? data.obiettivi) ?? []) as Record<string, unknown>[];
         const budgetImportBatches = (data.budgetImportBatches ?? []) as Record<string, unknown>[];
         const budgetMerchantRules = (data.budgetMerchantRules ?? []) as Record<string, unknown>[];
+        const plannedEvents = (data.plannedEvents ?? []) as Record<string, unknown>[];
         const results = {
             preferences: false,
             patrimonio: 0,
@@ -105,6 +107,7 @@ export async function POST(req: Request) {
             pacSchedules: 0,
             pacExecutions: 0,
             pensionAccruals: 0,
+            plannedEvents: 0,
         };
 
         if (data.preferences) {
@@ -289,6 +292,19 @@ export async function POST(req: Request) {
                 })) as Prisma.PensionFundAccrualCreateManyInput[],
             });
             results.pensionAccruals = data.pensionAccruals.length;
+        }
+
+        if (plannedEvents.length > 0) {
+            await prisma.plannedFinancialEvent.deleteMany({ where: { userId } });
+            await prisma.plannedFinancialEvent.createMany({
+                data: plannedEvents.map((record) => ({
+                    ...omitImportFields(record),
+                    createdAt: toDate(record.createdAt),
+                    updatedAt: toDate(record.updatedAt),
+                    userId,
+                })) as Prisma.PlannedFinancialEventCreateManyInput[],
+            });
+            results.plannedEvents = plannedEvents.length;
         }
 
         return NextResponse.json({

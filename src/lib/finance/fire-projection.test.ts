@@ -223,6 +223,27 @@ describe('projectFire', () => {
         }
     });
 
+    it('planned delta arrays applicano eredita e spese future nel mese corretto', () => {
+        const base = projectFire(baseParams);
+        const withInheritance = projectFire({
+            ...baseParams,
+            plannedCapitalDeltaByMonth: [0, 0, 0, 50_000],
+        });
+        const withFutureExpense = projectFire({
+            ...baseParams,
+            plannedCapitalDeltaByMonth: [0, 0, 0, -20_000],
+            plannedNetCashflowDeltaByMonth: [0, 0, 0, -500, -500, -500],
+        });
+
+        if (base.monthsToFire >= 0 && withInheritance.monthsToFire >= 0) {
+            expect(withInheritance.monthsToFire).toBeLessThan(base.monthsToFire);
+        }
+        if (base.monthsToFire >= 0 && withFutureExpense.monthsToFire >= 0) {
+            expect(withFutureExpense.monthsToFire).toBeGreaterThan(base.monthsToFire);
+        }
+        expect(withInheritance.chartData[0].capital).toBe(baseParams.startingCapital);
+    });
+
     it('chartData contiene il punto iniziale e almeno un punto per anno simulato', () => {
         const result = projectFire({ ...baseParams, maxYears: 10 });
         expect(result.chartData[0].year).toBe(0);

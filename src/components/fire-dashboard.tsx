@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computePensionBreakdown } from "@/lib/finance/pension-optimizer";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
+import { buildPlannedEventsTimeline } from "@/lib/finance/planned-events";
 import {
     allocatePreRetirementPassiveIncomeAnnual,
     buildDynamicFireTargetSchedule,
@@ -27,6 +28,7 @@ import { liquidatePensionFund, shouldLiquidatePensionFund } from "@/lib/finance/
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
 import { addFinancialDataChangedListener, broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { DEFAULT_PENSION_CONFIG, parsePensionConfig, stringifyPensionConfig } from "@/lib/pension-config";
+import { usePlannedEvents } from "@/hooks/usePlannedEvents";
 import type {
     AssetRecord,
     ExistingLoan,
@@ -118,6 +120,7 @@ function getMonthlyRealEstateCosts(snapshot: AssetRecord | null): number {
 }
 
 export function FireDashboard({ user }: FireDashboardProps) {
+    const { events: plannedEvents } = usePlannedEvents(user);
     const [saving, setSaving] = useState(false);
     const [hasPendingSave, setHasPendingSave] = useState(false);
     const [isLoadingUser, setIsLoadingUser] = useState(true);
@@ -381,6 +384,19 @@ export function FireDashboard({ user }: FireDashboardProps) {
         () => parseJsonArray<RealEstateProperty>(realEstateListStr),
         [realEstateListStr],
     );
+    const maxYearsSim = 100;
+    const plannedEventsTimeline = useMemo(() => buildPlannedEventsTimeline(plannedEvents, {
+        startMonth: format(new Date(), "yyyy-MM"),
+        months: (maxYearsSim + 1) * 12,
+    }), [maxYearsSim, plannedEvents]);
+    const plannedCapitalDeltaByMonth = useMemo(
+        () => plannedEventsTimeline.monthly.map((month) => month.capitalDelta),
+        [plannedEventsTimeline],
+    );
+    const plannedNetCashflowDeltaByMonth = useMemo(
+        () => plannedEventsTimeline.monthly.map((month) => month.netCashflowDelta),
+        [plannedEventsTimeline],
+    );
     useEffect(() => {
         return () => {
             if (mcWorkerRef.current) {
@@ -481,7 +497,6 @@ export function FireDashboard({ user }: FireDashboardProps) {
         : 0;
     const plannedFireTarget = fireMetrics.fireTarget;
     const coastFireTarget = fireMetrics.coastFireTarget;
-    const maxYearsSim = 100;
     const fireTargetsByYear = coastFireInput
         ? buildDynamicFireTargetSchedule({
             currentAge,
@@ -662,9 +677,9 @@ export function FireDashboard({ user }: FireDashboardProps) {
         }
 
         if (isRetired) {
-            tempCap = tempCap * (1 + monthlyReturnRate) - currentMonthlyExpenses;
+            tempCap = tempCap * (1 + monthlyReturnRate) - currentMonthlyExpenses + (plannedNetCashflowDeltaByMonth[m] ?? 0) + (plannedCapitalDeltaByMonth[m] ?? 0);
         } else {
-            tempCap = tempCap * (1 + monthlyReturnRate) + currentMonthlySavings;
+            tempCap = tempCap * (1 + monthlyReturnRate) + currentMonthlySavings + (plannedNetCashflowDeltaByMonth[m] ?? 0) + (plannedCapitalDeltaByMonth[m] ?? 0);
         }
 
         if (tempCap < 0) tempCap = 0;
@@ -699,9 +714,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
         const totalMonths = (mcSimYears + 1) * 12;
         const debtByMonth: number[] = [];
         const passiveIncomeByMonth: number[] = [];
+        const plannedCapitalByMonth: number[] = [];
+        const plannedNetCashflowByMonth: number[] = [];
         for (let m = 0; m < totalMonths; m++) {
             debtByMonth.push(getActiveDebtAtMonth(m));
             passiveIncomeByMonth.push(getActiveRealEstatePassiveIncomeAtMonth(m));
+            plannedCapitalByMonth.push(plannedCapitalDeltaByMonth[m] ?? 0);
+            plannedNetCashflowByMonth.push(plannedNetCashflowDeltaByMonth[m] ?? 0);
         }
 
         const worker = new Worker(new URL('@/workers/monte-carlo.worker.ts', import.meta.url));
@@ -753,6 +772,8 @@ export function FireDashboard({ user }: FireDashboardProps) {
             targetRuns: mcTargetRuns,
             debtByMonth,
             passiveIncomeByMonth,
+            plannedCapitalByMonth,
+            plannedNetCashflowByMonth,
             baseInstallmentNow,
             // Pension Fund Pot
             currentPensionFundValue,
@@ -794,11 +815,14 @@ export function FireDashboard({ user }: FireDashboardProps) {
         if (isRetired) {
             const annualPublicPension = yAge >= publicPensionAge ? expectedPublicPension * 12 : 0;
             let projectedAnnualPassiveIncome = 0;
+            let plannedEventsNetImpactThisYear = 0;
             for (let m = (i * 12); m < ((i + 1) * 12); m++) {
                 projectedAnnualPassiveIncome += getActiveRealEstatePassiveIncomeAtMonth(m) / 12;
+                plannedEventsNetImpactThisYear += (plannedCapitalDeltaByMonth[m] ?? 0) + (plannedNetCashflowDeltaByMonth[m] ?? 0);
             }
             const stressNetAnnualExpenses = Math.max(0, annualExpenses - projectedAnnualPassiveIncome);
             stressCap -= Math.max(0, stressNetAnnualExpenses - annualPublicPension - stressPensionAnnuity * 12);
+            stressCap += plannedEventsNetImpactThisYear;
         } else {
             // Check dynamic savings for this year (average over the 12 months)
             let totalSavingsThisYear = 0;
@@ -807,6 +831,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                 const freedUpCashFlow = baseInstallmentNow - activeDebtThisMonth;
                 const savedPassiveIncomeThisMonth = getSavedPreRetirementPassiveIncomeAtMonth(m);
                 totalSavingsThisYear += (monthlyPacBudget + Math.max(0, freedUpCashFlow) + savedPassiveIncomeThisMonth);
+                totalSavingsThisYear += (plannedCapitalDeltaByMonth[m] ?? 0) + (plannedNetCashflowDeltaByMonth[m] ?? 0);
             }
             stressCap += totalSavingsThisYear;
         }

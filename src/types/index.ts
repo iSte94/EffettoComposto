@@ -128,6 +128,28 @@ export interface MonthlyExpense {
     isAnnual?: boolean;
 }
 
+export type PlannedFinancialEventDirection = "outflow" | "inflow";
+export type PlannedFinancialEventKind = "one_time" | "financed";
+export type PlannedFinancialEventStatus = "planned" | "realized" | "canceled";
+
+export interface PlannedFinancialEvent {
+    id: string;
+    title: string;
+    direction: PlannedFinancialEventDirection;
+    kind: PlannedFinancialEventKind;
+    category: string;
+    eventMonth: string;
+    amount: number;
+    upfrontAmount?: number | null;
+    financedAmount?: number | null;
+    interestRate?: number | null;
+    durationMonths?: number | null;
+    status: PlannedFinancialEventStatus;
+    notes?: string | null;
+    createdAt?: string;
+    updatedAt?: string;
+}
+
 export interface FinancialSnapshot {
     totalAssets: number;
     totalDebts: number;

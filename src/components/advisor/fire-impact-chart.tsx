@@ -29,6 +29,10 @@ interface FireImpactChartProps {
         cashOutlay: number;
     };
     snapshot: FinancialSnapshot;
+    plannedAdjustments?: {
+        plannedCapitalDeltaByMonth?: number[];
+        plannedNetCashflowDeltaByMonth?: number[];
+    };
 }
 
 interface FireChartPoint {
@@ -126,7 +130,7 @@ function FireTooltipContent({
 }
 
 export const FireImpactChart = memo(function FireImpactChart({
-    sim, calculations, snapshot,
+    sim, calculations, snapshot, plannedAdjustments,
 }: FireImpactChartProps) {
 
     const { baseline, withPurchase, delay, data, hasFireData, isCoastMode, ownershipMonthlyDelta } = useMemo(() => {
@@ -144,7 +148,7 @@ export const FireImpactChart = memo(function FireImpactChart({
             };
         }
 
-        const comparison = computeAdvisorFireComparison(snapshot, sim, calculations);
+        const comparison = computeAdvisorFireComparison(snapshot, sim, calculations, plannedAdjustments);
         if (!comparison) {
             return {
                 baseline: null,
@@ -176,9 +180,8 @@ export const FireImpactChart = memo(function FireImpactChart({
                 gap: Math.max(0, senza - con),
             };
         });
-
         return { baseline, withPurchase, delay, data, hasFireData: true, isCoastMode, ownershipMonthlyDelta };
-    }, [sim, calculations, snapshot]);
+    }, [sim, calculations, plannedAdjustments, snapshot]);
 
     if (!hasFireData || !baseline || !withPurchase) {
         return (
@@ -211,6 +214,10 @@ export const FireImpactChart = memo(function FireImpactChart({
     const timingBase = baseline.yearsToFire > 0 ? `fra ${baseline.yearsToFire.toFixed(1)}a` : baseline.alreadyFire ? "gia' raggiunto" : "non raggiunto";
     const timingWith = withPurchase.yearsToFire > 0 ? `fra ${withPurchase.yearsToFire.toFixed(1)}a` : withPurchase.alreadyFire ? "gia' raggiunto" : "non raggiunto";
     const hasDynamicTargetChange = Math.abs(withPurchase.fireTarget - baseline.fireTarget) > 1;
+    const hasPlannedAdjustments = Boolean(
+        plannedAdjustments?.plannedCapitalDeltaByMonth?.some((value) => value !== 0)
+        || plannedAdjustments?.plannedNetCashflowDeltaByMonth?.some((value) => value !== 0),
+    );
     const delayNarrative = delay > 0
         ? `Questo acquisto sposta la tua indipendenza da ${fireAgeBase} a ${fireAgeWith}. La fascia evidenziata nel grafico mostra il tempo extra che stai pagando.`
         : delay < 0
@@ -445,7 +452,7 @@ export const FireImpactChart = memo(function FireImpactChart({
                     <div className="flex items-start gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
                         <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-indigo-500" />
                         <span className="leading-relaxed">
-                            La proiezione usa i <strong>tuoi parametri FIRE</strong> (rendimento {snapshot.fireExpectedReturn}%, inflazione {snapshot.expectedInflation}%, SWR {snapshot.fireWithdrawalRate}%, risparmio {formatEuro(snapshot.monthlySavings)}/mese). Lo scenario &quot;con acquisto&quot; sottrae l&apos;esborso iniziale dal capitale FIRE, applica la rata{sim.isFinanced ? ` per ${sim.financingYears} anni` : ""} e considera un delta mensile netto di {monthlyDragValue} {ownershipMonthlyDelta >= 0 ? "di costi" : "di cashflow positivo"}.
+                            La proiezione usa i <strong>tuoi parametri FIRE</strong> (rendimento {snapshot.fireExpectedReturn}%, inflazione {snapshot.expectedInflation}%, SWR {snapshot.fireWithdrawalRate}%, risparmio {formatEuro(snapshot.monthlySavings)}/mese). Lo scenario &quot;con acquisto&quot; sottrae l&apos;esborso iniziale dal capitale FIRE, applica la rata{sim.isFinanced ? ` per ${sim.financingYears} anni` : ""} e considera un delta mensile netto di {monthlyDragValue} {ownershipMonthlyDelta >= 0 ? "di costi" : "di cashflow positivo"}{hasPlannedAdjustments ? ". Nel baseline sono gia' inclusi anche gli eventi futuri pianificati." : ""}.
                         </span>
                     </div>
                 </div>

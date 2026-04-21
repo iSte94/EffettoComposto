@@ -1,8 +1,15 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank } from "lucide-react";
+import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank, CalendarClock } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import {
+    buildPlannedEventsSummary,
+    buildPlannedEventsTimeline,
+    monthsBetweenYearMonths,
+    simulateLiquidityPath,
+} from "@/lib/finance/planned-events";
+import type { PlannedFinancialEvent } from "@/types";
 
 export interface FinancialData {
     netWorth?: number;
@@ -14,6 +21,8 @@ export interface FinancialData {
     savingsGoals?: { name: string; currentAmount: number; targetAmount: number; deadline: string | null }[];
     fireTarget?: number;
     fireProgress?: number;
+    plannedEvents?: PlannedFinancialEvent[];
+    plannedLiquidityStart?: number;
 }
 
 interface Alert {
@@ -27,7 +36,19 @@ interface Alert {
 export function useFinancialAlerts(data: FinancialData): Alert[] {
     return useMemo(() => {
         const alerts: Alert[] = [];
-        const { netWorth, monthlyIncome, monthlyInstallment, emergencyFund, monthlyExpenses, monthlySavings, savingsGoals, fireTarget, fireProgress } = data;
+        const {
+            netWorth,
+            monthlyIncome,
+            monthlyInstallment,
+            emergencyFund,
+            monthlyExpenses,
+            monthlySavings,
+            savingsGoals,
+            fireTarget,
+            fireProgress,
+            plannedEvents,
+            plannedLiquidityStart,
+        } = data;
 
         if (monthlyIncome && monthlyIncome > 0 && monthlyInstallment && monthlyInstallment > 0) {
             const dti = monthlyInstallment / monthlyIncome;
@@ -165,6 +186,51 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                 title: "Patrimonio netto negativo",
                 message: "I tuoi debiti superano i tuoi asset. Prioritizza la riduzione del debito.",
             });
+        }
+
+        if (plannedEvents && plannedEvents.length > 0) {
+            const now = new Date();
+            const currentMonth = `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
+            const summary = buildPlannedEventsSummary(plannedEvents, [12], currentMonth);
+            const liquidity = simulateLiquidityPath({
+                startingLiquidity: plannedLiquidityStart ?? (emergencyFund ?? 0),
+                baseMonthlyNetFlow: monthlySavings ?? 0,
+                timeline: buildPlannedEventsTimeline(plannedEvents, {
+                    startMonth: currentMonth,
+                    months: 12,
+                }),
+            });
+
+            if (summary.nextEvent) {
+                const monthsToNextEvent = monthsBetweenYearMonths(currentMonth, summary.nextEvent.eventMonth) ?? 0;
+                if (monthsToNextEvent <= 3) {
+                    alerts.push({
+                        id: `planned-event-next-${summary.nextEvent.id}`,
+                        severity: summary.nextEvent.direction === "outflow" ? "warning" : "success",
+                        icon: <CalendarClock className="w-4 h-4" />,
+                        title: `Evento futuro in arrivo: ${summary.nextEvent.title}`,
+                        message: `${summary.nextEvent.direction === "inflow" ? "Entrata prevista" : "Uscita prevista"} a ${summary.nextEvent.eventMonth} per ${formatEuro(summary.nextEvent.amount)}.`,
+                    });
+                }
+            }
+
+            if (liquidity.firstNegativeMonth) {
+                alerts.push({
+                    id: "planned-event-liquidity-gap",
+                    severity: "danger",
+                    icon: <AlertTriangle className="w-4 h-4" />,
+                    title: "Eventi futuri non coperti dalla liquidita'",
+                    message: `Con gli eventi pianificati la liquidita' stimata scende sotto zero da ${liquidity.firstNegativeMonth}. Gap minimo: ${formatEuro(Math.abs(liquidity.minLiquidity))}.`,
+                });
+            } else if ((summary.windows[12]?.outflows ?? 0) > 0) {
+                alerts.push({
+                    id: "planned-event-12m-impact",
+                    severity: "warning",
+                    icon: <CalendarClock className="w-4 h-4" />,
+                    title: "Impegni futuri nei prossimi 12 mesi",
+                    message: `Hai ${formatEuro(summary.windows[12]?.outflows ?? 0)} di uscite pianificate e ${formatEuro(summary.windows[12]?.inflows ?? 0)} di entrate previste nei prossimi 12 mesi.`,
+                });
+            }
         }
 
         return alerts;

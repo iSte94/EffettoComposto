@@ -97,4 +97,42 @@ describe("advisor-fire helpers", () => {
         expect(withoutRent).not.toBeNull();
         expect((withRent?.delayMonths ?? 0)).toBeLessThan(withoutRent?.delayMonths ?? 0);
     });
+
+    it("include gli eventi futuri pianificati nel baseline e nel confronto con acquisto", () => {
+        const adjustments = {
+            plannedCapitalDeltaByMonth: [-20_000, 0, 0, 0, 0, 50_000],
+            plannedNetCashflowDeltaByMonth: [0, -400, -400, -400, 0, 0],
+        };
+
+        const baseParams = buildAdvisorFireBaseParams(snapshot, adjustments);
+        expect(baseParams.plannedCapitalDeltaByMonth).toEqual(adjustments.plannedCapitalDeltaByMonth);
+        expect(baseParams.plannedNetCashflowDeltaByMonth).toEqual(adjustments.plannedNetCashflowDeltaByMonth);
+
+        const withPurchaseParams = buildAdvisorFireWithPurchaseParams(snapshot, propertySim, {
+            monthlyPayment: 900,
+            annualRecurringCosts: (propertySim.condominiumFees + propertySim.imuTax) * 12,
+            tcoYears: propertySim.financingYears,
+            cashOutlay: propertySim.downPayment,
+        }, adjustments);
+        expect(withPurchaseParams.plannedCapitalDeltaByMonth).toEqual(adjustments.plannedCapitalDeltaByMonth);
+        expect(withPurchaseParams.plannedNetCashflowDeltaByMonth).toEqual(adjustments.plannedNetCashflowDeltaByMonth);
+
+        const comparisonWithAdjustments = computeAdvisorFireComparison(snapshot, propertySim, {
+            monthlyPayment: 900,
+            annualRecurringCosts: (propertySim.condominiumFees + propertySim.imuTax) * 12,
+            tcoYears: propertySim.financingYears,
+            cashOutlay: propertySim.downPayment,
+        }, adjustments);
+        const comparisonWithoutAdjustments = computeAdvisorFireComparison(snapshot, propertySim, {
+            monthlyPayment: 900,
+            annualRecurringCosts: (propertySim.condominiumFees + propertySim.imuTax) * 12,
+            tcoYears: propertySim.financingYears,
+            cashOutlay: propertySim.downPayment,
+        });
+
+        expect(comparisonWithAdjustments).not.toBeNull();
+        expect(comparisonWithoutAdjustments).not.toBeNull();
+        expect(comparisonWithAdjustments?.baseline.chartData[0]?.capital).toBe(snapshot.fireStartingCapital);
+        expect(comparisonWithAdjustments?.baseline.monthsToFire).not.toBe(comparisonWithoutAdjustments?.baseline.monthsToFire);
+    });
 });

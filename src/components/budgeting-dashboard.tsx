@@ -1,6 +1,7 @@
 "use client";
 
 import { BudgetTracker } from "@/components/budget-tracker";
+import { PlannedEventsManager } from "@/components/planned-events-manager";
 import { SubscriptionTracker } from "@/components/subscription-tracker";
 import { SavingsGoals } from "@/components/savings-goals";
 import { Wallet } from "lucide-react";
@@ -20,6 +21,7 @@ export function BudgetingDashboard({ user = null }: BudgetingDashboardProps) {
                 <p className="text-sm text-muted-foreground max-w-xl mx-auto leading-relaxed">Gestisci il tuo budget mensile e traccia gli abbonamenti ricorrenti.</p>
             </div>
 
+            <PlannedEventsManager user={user} />
             <SavingsGoals user={user} />
             <BudgetTracker />
             <SubscriptionTracker />

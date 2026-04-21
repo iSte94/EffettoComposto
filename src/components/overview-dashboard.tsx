@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
     BarChart3, Home, Wallet, Bitcoin, Package,
     Flame, Target, ShieldAlert, TrendingDown, FileDown,
-    LineChart, Activity,
+    LineChart, Activity, CalendarClock,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { computeHistoryStats } from "@/lib/finance/history-stats";
@@ -18,7 +18,13 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
+import {
+    buildPlannedEventsSummary,
+    buildPlannedEventsTimeline,
+    simulateLiquidityPath,
+} from "@/lib/finance/planned-events";
 import { addFinancialDataChangedListener } from "@/lib/client-data-events";
+import { usePlannedEvents } from "@/hooks/usePlannedEvents";
 import type { AssetRecord } from "@/types";
 
 interface OverviewDashboardProps {
@@ -26,7 +32,7 @@ interface OverviewDashboardProps {
 }
 
 function MetricCard({ icon, label, value, subtitle, color = "slate" }: {
-    icon: React.ReactNode; label: string; value: string; subtitle?: string; color?: string;
+    icon: ReactNode; label: string; value: string; subtitle?: string; color?: string;
 }) {
     const colorMap: Record<string, string> = {
         slate: "bg-card/80 border-border/70",
@@ -56,6 +62,7 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     const [history, setHistory] = useState<AssetRecord[]>([]);
     const [preferences, setPreferences] = useState<Record<string, unknown>>({});
     const [loading, setLoading] = useState(true);
+    const { events: plannedEvents } = usePlannedEvents(user);
 
     const loadOverviewData = useCallback(async (showLoading = true) => {
         if (!user) return;
@@ -195,6 +202,26 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
         // Fallback: nessun netIncome salvato, l'utente non ha ancora compilato il profilo
         return undefined;
     }, [preferences]);
+
+    const plannedEventsInsights = useMemo(() => {
+        if (!metrics) return null;
+        const startMonth = new Date();
+        const currentMonth = `${startMonth.getFullYear()}-${`${startMonth.getMonth() + 1}`.padStart(2, "0")}`;
+        const summary = buildPlannedEventsSummary(plannedEvents, [12], currentMonth);
+        const liquidityPath = simulateLiquidityPath({
+            startingLiquidity: metrics.liquidValue,
+            baseMonthlyNetFlow: monthlySavings ?? 0,
+            timeline: buildPlannedEventsTimeline(plannedEvents, {
+                startMonth: currentMonth,
+                months: 12,
+            }),
+        });
+
+        return {
+            summary,
+            liquidityPath,
+        };
+    }, [metrics, monthlySavings, plannedEvents]);
 
     if (!user) {
         return <WelcomeOnboarding />;
@@ -407,6 +434,28 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                         color="teal"
                     />
                 )}
+                {plannedEvents.length > 0 && plannedEventsInsights && (
+                    <MetricCard
+                        icon={<CalendarClock className="w-4 h-4 text-violet-500" />}
+                        label="Eventi Futuri 12M"
+                        value={formatEuro(plannedEventsInsights.summary.windows[12]?.netImpact ?? 0)}
+                        subtitle={plannedEventsInsights.summary.nextEvent
+                            ? `Prossimo: ${plannedEventsInsights.summary.nextEvent.title}`
+                            : "Nessun evento imminente"}
+                        color="purple"
+                    />
+                )}
+                {plannedEvents.length > 0 && plannedEventsInsights && (
+                    <MetricCard
+                        icon={<ShieldAlert className="w-4 h-4 text-amber-500" />}
+                        label="Min Liquidita' 12M"
+                        value={formatEuro(plannedEventsInsights.liquidityPath.minLiquidity)}
+                        subtitle={plannedEventsInsights.liquidityPath.firstNegativeMonth
+                            ? `Rischio da ${plannedEventsInsights.liquidityPath.firstNegativeMonth}`
+                            : "Copertura stimata ok"}
+                        color="amber"
+                    />
+                )}
             </div>
 
             {/* Financial Alerts */}
@@ -419,6 +468,8 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                 monthlySavings,
                 fireTarget: metrics.fireTarget || undefined,
                 fireProgress: metrics.fireProgress || undefined,
+                plannedEvents,
+                plannedLiquidityStart: metrics.liquidValue,
             }} />
 
             {/* Asset Allocation Bar */}
@@ -451,7 +502,13 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             </div>
 
             {/* Net Worth Projection */}
-            <NetWorthProjection history={history} monthlySavings={monthlySavings} currentNetWorth={metrics?.currentNetWorth} expectedReturnRate={Number(preferences.fireExpectedReturn) || undefined} />
+            <NetWorthProjection
+                history={history}
+                monthlySavings={monthlySavings}
+                currentNetWorth={metrics?.currentNetWorth}
+                expectedReturnRate={Number(preferences.fireExpectedReturn) || undefined}
+                plannedEvents={plannedEvents}
+            />
 
             {/* Export Button */}
             {history.length > 0 && (

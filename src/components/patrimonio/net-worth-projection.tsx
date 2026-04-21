@@ -11,6 +11,8 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, ReferenceLine,
 } from "recharts";
+import { buildPlannedEventsTimeline } from "@/lib/finance/planned-events";
+import type { PlannedFinancialEvent } from "@/types";
 
 interface HistoryPoint {
     date: string;
@@ -24,9 +26,21 @@ interface NetWorthProjectionProps {
     monthlySavings?: number;
     currentNetWorth?: number;
     expectedReturnRate?: number; // rendimento annuo atteso (%) dal FIRE
+    plannedEvents?: PlannedFinancialEvent[];
 }
 
-export const NetWorthProjection = memo(function NetWorthProjection({ history, monthlySavings, currentNetWorth: currentNetWorthProp, expectedReturnRate }: NetWorthProjectionProps) {
+function currentYearMonth(): string {
+    const now = new Date();
+    return `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}`;
+}
+
+export const NetWorthProjection = memo(function NetWorthProjection({
+    history,
+    monthlySavings,
+    currentNetWorth: currentNetWorthProp,
+    expectedReturnRate,
+    plannedEvents = [],
+}: NetWorthProjectionProps) {
     const [projectionYears, setProjectionYears] = useState(10);
     const [projectionMode, setProjectionMode] = useState<ProjectionMode>("savings");
 
@@ -64,6 +78,24 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
         const isCompound = projectionMode === "compound";
         const effectiveMonthlyGrowth = projectionMode === "trend" ? historicalMonthlyGrowth : (monthlySavings ?? historicalMonthlyGrowth);
         const monthlyReturn = (expectedReturnRate ?? 0) / 100 / 12; // tasso mensile
+        const plannedTimeline = buildPlannedEventsTimeline(plannedEvents, {
+            startMonth: currentYearMonth(),
+            months: projectionYears * 12,
+        });
+
+        const simulateProjection = (args: { months: number; monthlyGrowth: number; monthlyReturnRate: number; compound: boolean }) => {
+            let capital = baseValue;
+            for (let monthIndex = 0; monthIndex < args.months; monthIndex++) {
+                const monthAdjustment = (plannedTimeline.monthly[monthIndex]?.capitalDelta ?? 0) + (plannedTimeline.monthly[monthIndex]?.netCashflowDelta ?? 0);
+                if (args.compound) {
+                    capital = capital * (1 + args.monthlyReturnRate) + args.monthlyGrowth + monthAdjustment;
+                } else {
+                    capital = capital + args.monthlyGrowth + monthAdjustment;
+                }
+                capital = Math.max(0, capital);
+            }
+            return capital;
+        };
 
         // Build historical + projected data
         const chartData: { label: string; Storico?: number; Proiezione?: number; "Caso Ottimista"?: number; "Caso Pessimista"?: number }[] = [];
@@ -96,11 +128,6 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
         chartData[chartData.length - 1]["Caso Pessimista"] = Math.round(baseValue);
 
         // Funzione per calcolo composto: FV = PV*(1+r)^n + PMT*((1+r)^n - 1)/r
-        const compoundFV = (pv: number, pmt: number, r: number, n: number) => {
-            if (r === 0) return pv + pmt * n;
-            return pv * Math.pow(1 + r, n) + pmt * (Math.pow(1 + r, n) - 1) / r;
-        };
-
         for (let y = 1; y <= projectionYears; y++) {
             const futureDate = new Date(baseDate);
             futureDate.setFullYear(futureDate.getFullYear() + y);
@@ -109,14 +136,14 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
             let projected: number, optimistic: number, pessimistic: number;
             if (isCompound) {
                 const pmt = monthlySavings ?? 0;
-                projected = compoundFV(baseValue, pmt, monthlyReturn, months);
+                projected = simulateProjection({ months, monthlyGrowth: pmt, monthlyReturnRate: monthlyReturn, compound: true });
                 // Ottimista: rendimento +50%, Pessimista: rendimento -50%
-                optimistic = compoundFV(baseValue, pmt, monthlyReturn * 1.5, months);
-                pessimistic = compoundFV(baseValue, pmt, monthlyReturn * 0.5, months);
+                optimistic = simulateProjection({ months, monthlyGrowth: pmt, monthlyReturnRate: monthlyReturn * 1.5, compound: true });
+                pessimistic = simulateProjection({ months, monthlyGrowth: pmt, monthlyReturnRate: monthlyReturn * 0.5, compound: true });
             } else {
-                projected = baseValue + effectiveMonthlyGrowth * months;
-                optimistic = baseValue + effectiveMonthlyGrowth * months * 1.5;
-                pessimistic = baseValue + effectiveMonthlyGrowth * months * 0.5;
+                projected = simulateProjection({ months, monthlyGrowth: effectiveMonthlyGrowth, monthlyReturnRate: 0, compound: false });
+                optimistic = simulateProjection({ months, monthlyGrowth: effectiveMonthlyGrowth * 1.5, monthlyReturnRate: 0, compound: false });
+                pessimistic = simulateProjection({ months, monthlyGrowth: effectiveMonthlyGrowth * 0.5, monthlyReturnRate: 0, compound: false });
             }
 
             chartData.push({
@@ -128,12 +155,13 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
         }
 
         const totalMonths = projectionYears * 12;
-        const projectedFinal = isCompound
-            ? compoundFV(baseValue, monthlySavings ?? 0, monthlyReturn, totalMonths)
-            : baseValue + effectiveMonthlyGrowth * totalMonths;
-        const annualizedGrowth = isCompound
-            ? (projectedFinal - baseValue) / projectionYears
-            : effectiveMonthlyGrowth * 12;
+        const projectedFinal = simulateProjection({
+            months: totalMonths,
+            monthlyGrowth: isCompound ? (monthlySavings ?? 0) : effectiveMonthlyGrowth,
+            monthlyReturnRate: isCompound ? monthlyReturn : 0,
+            compound: isCompound,
+        });
+        const annualizedGrowth = (projectedFinal - baseValue) / projectionYears;
 
         // Info per spiegazione trend storico
         const historySpanMonths = hasHistory
@@ -151,7 +179,7 @@ export const NetWorthProjection = memo(function NetWorthProjection({ history, mo
             historyPointsCount: points.length,
             historySpanMonths,
         };
-    }, [history, projectionYears, projectionMode, monthlySavings, currentNetWorthProp, expectedReturnRate]);
+    }, [history, projectionYears, projectionMode, monthlySavings, currentNetWorthProp, expectedReturnRate, plannedEvents]);
 
     if (!data) return null;
 

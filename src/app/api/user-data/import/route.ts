@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         const raw = await req.json();
         const payload = isRecord(raw) && isRecord(raw.data) ? raw.data : raw;
 
-        if (!isRecord(payload) || (payload.version !== 2 && payload.version !== 3)) {
+        if (!isRecord(payload) || (payload.version !== 2 && payload.version !== 3 && payload.version !== 4)) {
             return NextResponse.json({ error: "Backup non valido o versione non supportata" }, { status: 400 });
         }
 
@@ -47,6 +47,7 @@ export async function POST(req: Request) {
         const pacSchedules = recordsFrom(payload.pacSchedules);
         const pacExecutions = recordsFrom(payload.pacExecutions);
         const pensionAccruals = recordsFrom(payload.pensionAccruals);
+        const plannedEvents = recordsFrom(payload.plannedEvents);
 
         const result = await prisma.$transaction(async (tx) => {
             await tx.budgetTransaction.deleteMany({ where: { userId } });
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
             await tx.dividendRecord.deleteMany({ where: { userId } });
             await tx.savingsGoal.deleteMany({ where: { userId } });
             await tx.assetRecord.deleteMany({ where: { userId } });
+            await tx.plannedFinancialEvent.deleteMany({ where: { userId } });
 
             if (preferences) {
                 const preferenceData = sanitizeForCreate(preferences);
@@ -186,6 +188,17 @@ export async function POST(req: Request) {
                 });
             }
 
+            if (plannedEvents.length > 0) {
+                await tx.plannedFinancialEvent.createMany({
+                    data: plannedEvents.map((record) => ({
+                        ...sanitizeForCreate(record),
+                        createdAt: toDate(record.createdAt),
+                        updatedAt: toDate(record.updatedAt),
+                        userId,
+                    })) as Prisma.PlannedFinancialEventCreateManyInput[],
+                });
+            }
+
             return {
                 assets: assets.length,
                 savingsGoals: savingsGoals.length,
@@ -196,6 +209,7 @@ export async function POST(req: Request) {
                 pacSchedules: scheduleIdMap.size,
                 pacExecutions: importedExecutions,
                 pensionAccruals: pensionAccruals.length,
+                plannedEvents: plannedEvents.length,
             };
         });
 

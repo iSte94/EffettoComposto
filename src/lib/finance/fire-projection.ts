@@ -52,7 +52,9 @@ export interface FireProjectionParams {
     recurringMonthlyCost?: number;    // Delta mensile temporaneo (+ costo, - entrata)
     recurringMonths?: number;         // Durata rata (mesi)
     ongoingMonthlyCost?: number;      // Delta mensile continuativo (+ costo, - entrata)
-    ongoingMonths?: number;           // Durata costi ongoing (mesi) — 0/undefined = tutta la vita utile
+    ongoingMonths?: number;           // Durata costi ongoing (mesi) - 0/undefined = tutta la vita utile
+    plannedCapitalDeltaByMonth?: number[]; // Delta di capitale futuri (es. eredita, caparra)
+    plannedNetCashflowDeltaByMonth?: number[]; // Delta futuri di cashflow (+ migliora, - peggiora)
 }
 
 export interface FireProjectionPoint {
@@ -98,6 +100,8 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
         recurringMonths = 0,
         ongoingMonthlyCost = 0,
         ongoingMonths = 0,
+        plannedCapitalDeltaByMonth = [],
+        plannedNetCashflowDeltaByMonth = [],
     } = params;
 
     const annualExpenses = Math.max(0, monthlyExpensesAtFire) * 12;
@@ -147,7 +151,11 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
             cashflow = net;
         }
 
-        capital = capital * (1 + monthlyRate) + cashflow;
+        const plannedMonthIndex = m - 1;
+        const plannedDelta = (plannedCapitalDeltaByMonth[plannedMonthIndex] ?? 0)
+            + (plannedNetCashflowDeltaByMonth[plannedMonthIndex] ?? 0);
+
+        capital = capital * (1 + monthlyRate) + cashflow + plannedDelta;
         if (capital < 0) capital = 0;
 
         if (monthsToFire < 0 && capital >= fireTarget) {
@@ -201,14 +209,14 @@ export function fireDelayMonths(withoutPurchase: FireProjectionResult, withPurch
     return withPurchase.monthsToFire - withoutPurchase.monthsToFire;
 }
 
-/** Format helper: "2 anni e 4 mesi" oppure "–3 mesi" */
+/** Format helper: "2 anni e 4 mesi" oppure "-3 mesi" */
 export function formatDelay(months: number): string {
     if (!Number.isFinite(months)) return months > 0 ? "mai raggiunto" : "subito";
     if (months === 0) return "Nessun impatto";
     const abs = Math.abs(Math.round(months));
     const y = Math.floor(abs / 12);
     const m = abs % 12;
-    const sign = months > 0 ? "+" : "−";
+    const sign = months > 0 ? "+" : "-";
     if (y === 0) return `${sign}${m} mes${m === 1 ? "e" : "i"}`;
     if (m === 0) return `${sign}${y} ann${y === 1 ? "o" : "i"}`;
     return `${sign}${y}a ${m}m`;

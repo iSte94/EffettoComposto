@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.4.1`
+**Versione corrente:** `v1.5.0`
 
 ---
 
@@ -113,6 +113,15 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.5.0 - 21 aprile 2026 (nuovo calendario eventi finanziari futuri)
+
+- **Nuovo layer unico di pianificazione finanziaria futura** - introdotto il dominio `PlannedFinancialEvent` con supporto a uscite una tantum, uscite finanziate ed entrate una tantum con precisione `YYYY-MM`. Gli eventi vivono in Prisma, hanno validazione Zod dedicata, API CRUD su `/api/planned-events`, export/import dati utente e hook client condiviso per aggiornare tutta l'app senza logiche duplicate
+- **Nuova sezione "Eventi Futuri" nel tab Budgeting** - aggiunta una UI dedicata sopra gli obiettivi di risparmio con creazione/modifica/eliminazione, filtri rapidi, KPI sul prossimo evento, impatto netto 12 mesi e numero massimo di rate future concorrenti. La sezione e' pensata solo per la pianificazione prospettica: gli eventi entrano nei calcoli futuri, ma i dati reali continuano a essere inseriti manualmente nelle sezioni corrette
+- **Motore finanziario condiviso per delta mensili** - nuova utility `src/lib/finance/planned-events.ts` che espande ogni evento in impatto mensile su capitale, cashflow e servizio del debito, riusando la matematica dell'ammortamento gia' presente in `loans.ts`. Espone timeline mensile, summary a 12/24/36 mesi e simulazione del percorso di liquidita' per evitare implementazioni divergenti tra le dashboard
+- **Integrazione con FIRE, Consulente, Patrimonio e Riepilogo** - gli eventi pianificati entrano ora nella proiezione patrimonio, negli alert forward-looking, nella simulazione FIRE deterministica e Monte Carlo e nel Consulente Acquisti. Il Consulente usa il baseline gia' corretto dagli eventi futuri e aggiunge controlli prospettici su `minLiquidityNext36m` e `peakDTINext36m`, cosi' un nuovo acquisto viene valutato anche rispetto agli impegni che si sovrapporranno nei prossimi 36 mesi
+- **Read-only summary nei tab operativi** - nel tab Patrimonio e nel Riepilogo compaiono card sintetiche sugli eventi in arrivo, sull'impatto netto atteso e sui casi in cui la liquidita' futura rischia di andare sotto zero. Lo storico del patrimonio e i dati attuali non vengono alterati: l'effetto si applica solo alle proiezioni future, coerentemente con il fatto che gli eventi rappresentano pianificazione e non movimenti gia' avvenuti
+- **Qualita' e regressioni** - aggiunti test su validazione, motore eventi, integrazione FIRE e advisor helpers. Verifica completa locale superata con `prisma generate`, `prisma db push`, `npm run lint`, `npm test` e `npm run build`
+
 ### v1.4.1 - 20 aprile 2026 (hardening UX — i formatter valuta/percentuale non mostrano piu' "€NaN" o "Infinity%")
 
 - **Problema iniziale** — i formatter condivisi `formatEuro` e `formatPercent` in `src/lib/format.ts` non proteggevano contro input non-finiti (`NaN`, `Infinity`, `-Infinity`): passando uno di questi valori la UI avrebbe stampato letteralmente "€NaN", "€Infinity" o "NaN%". Questi formatter sono usati in 533 punti in 54 file (tutte le dashboard finanziarie: Patrimonio, FIRE, Mutuo, Advisor, Budget, Obiettivi, Performance, Abbonamenti, ecc.), quindi un singolo calcolo a monte che divide per zero o propaga un campo mancante poteva deturpare qualsiasi KPI. La sorella `formatEuroCompact` era gia' stata protetta con un em-dash ("—") come placeholder ma le due funzioni principali erano rimaste indietro, lasciando una falla difensiva

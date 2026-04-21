@@ -31,9 +31,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { calculateMortgagePayment, getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
-import { computeAdvisorFireComparison } from "@/lib/finance/advisor-fire";
+import { computeAdvisorFireComparison, getAdvisorOwnershipMonthlyDelta } from "@/lib/finance/advisor-fire";
+import {
+  buildPlannedEventsSummary,
+  buildPlannedEventsTimeline,
+  formatYearMonth,
+  simulateLiquidityPath,
+} from "@/lib/finance/planned-events";
 import { buildAdvisorScenarioFingerprint } from "@/lib/advisor-workspace";
 import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
+import { usePlannedEvents } from "@/hooks/usePlannedEvents";
 import { toast } from "sonner";
 
 interface AdvisorDashboardProps {
@@ -67,6 +74,7 @@ function formatMonthsCoverage(months: number): string {
 export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [existingLoans, setExistingLoans] = useState<ExistingLoan[]>([]);
   const [snapshot, setSnapshot] = useState<FinancialSnapshot>({
     totalAssets: 0, totalDebts: 0, netWorth: 0, liquidAssets: 0,
     emergencyFund: 0, monthlyIncome: 0, realEstateValue: 0,
@@ -84,12 +92,14 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
   const [savedScenarios, setSavedScenarios] = useState<AdvisorSavedScenario[]>([]);
   const [reminders, setReminders] = useState<AdvisorReminder[]>([]);
   const [workspaceBusyAction, setWorkspaceBusyAction] = useState<string | null>(null);
+  const { events: plannedEvents } = usePlannedEvents(user);
 
   useEffect(() => { setIsMounted(true); }, []);
 
   // Carica dati patrimoniali dell'utente
   useEffect(() => {
     if (!user) {
+      setExistingLoans([]);
       setSavedScenarios([]);
       setReminders([]);
       setIsLoading(false);
@@ -141,6 +151,7 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         if (p.existingLoansList) {
           try { loans = JSON.parse(p.existingLoansList); } catch { /* empty */ }
         }
+        setExistingLoans(loans);
         setSavedScenarios(Array.isArray(workspaceData.savedScenarios) ? workspaceData.savedScenarios : []);
         setReminders(Array.isArray(workspaceData.reminders) ? workspaceData.reminders : []);
 
@@ -231,6 +242,53 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     setShowResults(false);
   };
 
+  const plannedEventsHorizonMonths = 36;
+
+  const plannedEventsProjection = useMemo(() => {
+    const startMonth = formatYearMonth(new Date());
+    const timeline = buildPlannedEventsTimeline(plannedEvents, {
+      startMonth,
+      months: plannedEventsHorizonMonths,
+    });
+
+    return {
+      startMonth,
+      timeline,
+      summary: buildPlannedEventsSummary(plannedEvents, [plannedEventsHorizonMonths], startMonth),
+      liquidity: simulateLiquidityPath({
+        startingLiquidity: snapshot.liquidAssets + snapshot.emergencyFund,
+        baseMonthlyNetFlow: snapshot.monthlySavings,
+        timeline,
+      }),
+      plannedCapitalDeltaByMonth: timeline.monthly.map((month) => month.capitalDelta),
+      plannedNetCashflowDeltaByMonth: timeline.monthly.map((month) => month.netCashflowDelta),
+    };
+  }, [plannedEvents, snapshot.emergencyFund, snapshot.liquidAssets, snapshot.monthlySavings]);
+
+  const existingLoanPaymentsByMonth = useMemo(() => {
+    const now = new Date();
+
+    return Array.from({ length: plannedEventsHorizonMonths }, (_, monthOffset) => {
+      const targetDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+
+      return existingLoans.reduce((sum, loan) => {
+        if (!loan.startDate || !loan.endDate) return sum;
+
+        const start = new Date(`${loan.startDate}-01`);
+        const end = new Date(`${loan.endDate}-01`);
+        if (targetDate < start || targetDate >= end) return sum;
+
+        const totalMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+        if (totalMonths <= 0) return sum;
+
+        const currentMonthsPassed = Math.max(0, (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth()));
+        const targetMonthsPassed = Math.max(0, (targetDate.getFullYear() - start.getFullYear()) * 12 + (targetDate.getMonth() - start.getMonth()));
+
+        return sum + getInstallmentAmountForMonth(loan, targetMonthsPassed, totalMonths, currentMonthsPassed);
+      }, 0);
+    });
+  }, [existingLoans]);
+
   // --- CALCOLI ---
   const calculations = useMemo(() => {
     const loanAmount = sim.isFinanced ? Math.max(0, sim.totalPrice - sim.downPayment) : 0;
@@ -310,6 +368,50 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
     // Per immobili: rendimento da affitto
     const annualRentIncome = sim.monthlyRent * 12;
     const netRentYield = sim.totalPrice > 0 ? ((annualRentIncome - annualRecurringCosts) / sim.totalPrice) * 100 : 0;
+    const ownershipMonthlyDelta = getAdvisorOwnershipMonthlyDelta(sim, { annualRecurringCosts });
+
+    const purchaseTimeline = {
+      ...plannedEventsProjection.timeline,
+      monthly: plannedEventsProjection.timeline.monthly.map((month, index) => {
+        const purchaseDebtService = sim.isFinanced && index < sim.financingYears * 12 ? monthlyPayment : 0;
+        const purchaseOngoingCost = sim.category === "immobile" || index < tcoYears * 12
+          ? ownershipMonthlyDelta
+          : 0;
+
+        return {
+          ...month,
+          netCashflowDelta: month.netCashflowDelta - purchaseDebtService - purchaseOngoingCost,
+        };
+      }),
+    };
+
+    const liquidityWithPurchase = simulateLiquidityPath({
+      startingLiquidity: liquidityAfter,
+      baseMonthlyNetFlow: snapshot.monthlySavings,
+      timeline: purchaseTimeline,
+    });
+
+    const baselinePeakDTINext36m = snapshot.monthlyIncome > 0
+      ? Math.max(
+        0,
+        ...plannedEventsProjection.timeline.monthly.map((month, index) => (
+          ((existingLoanPaymentsByMonth[index] ?? snapshot.existingLoansMonthlyPayment) + month.debtServiceDelta) / snapshot.monthlyIncome
+        ) * 100),
+      )
+      : 0;
+
+    const peakDTINext36m = snapshot.monthlyIncome > 0
+      ? Math.max(
+        0,
+        ...plannedEventsProjection.timeline.monthly.map((month, index) => {
+          const purchaseDebtService = sim.isFinanced && index < sim.financingYears * 12 ? monthlyPayment : 0;
+          return (
+            ((existingLoanPaymentsByMonth[index] ?? snapshot.existingLoansMonthlyPayment) + month.debtServiceDelta + purchaseDebtService)
+            / snapshot.monthlyIncome
+          ) * 100;
+        }),
+      )
+      : 0;
 
     // Ritardo FIRE (mesi) — calcolato qui per alimentare il verdetto numerico
     const fireComparison = computeAdvisorFireComparison(snapshot, sim, {
@@ -317,9 +419,13 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       annualRecurringCosts,
       tcoYears,
       cashOutlay,
+    }, {
+      plannedCapitalDeltaByMonth: plannedEventsProjection.plannedCapitalDeltaByMonth,
+      plannedNetCashflowDeltaByMonth: plannedEventsProjection.plannedNetCashflowDeltaByMonth,
     });
     const fireDelayMonthsValue = fireComparison?.delayMonths ?? 0;
     const hasFireImpact = Boolean(fireComparison);
+    const nextPlannedEvent = plannedEventsProjection.summary.nextEvent;
 
     return {
       loanAmount, monthlyPayment, totalInterest, totalCostOfPurchase,
@@ -328,8 +434,19 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
       liquidityAfter, emergencyMonthsLeft, tcoYears, cashOutlay,
       totalFinancialCommitment, annualRentIncome, netRentYield,
       realReturnForOpportunity, fireDelayMonthsValue, hasFireImpact,
+      minLiquidityNext36m: liquidityWithPurchase.minLiquidity,
+      baselineMinLiquidityNext36m: plannedEventsProjection.liquidity.minLiquidity,
+      futureLiquidityRiskMonth: liquidityWithPurchase.firstNegativeMonth,
+      peakDTINext36m,
+      baselinePeakDTINext36m,
+      plannedEventsNetImpact36m: plannedEventsProjection.summary.windows[plannedEventsHorizonMonths]?.netImpact ?? 0,
+      hasPlannedEvents: plannedEvents.length > 0,
+      nextPlannedEventTitle: nextPlannedEvent?.title ?? null,
+      nextPlannedEventMonth: nextPlannedEvent?.eventMonth ?? null,
+      plannedCapitalDeltaByMonth: plannedEventsProjection.plannedCapitalDeltaByMonth,
+      plannedNetCashflowDeltaByMonth: plannedEventsProjection.plannedNetCashflowDeltaByMonth,
     };
-  }, [sim, snapshot]);
+  }, [existingLoanPaymentsByMonth, plannedEvents.length, plannedEventsHorizonMonths, plannedEventsProjection, sim, snapshot]);
 
   // --- CONSIGLI PROFESSIONALI ---
   const advices = useMemo((): Advice[] => {
@@ -366,6 +483,29 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
         message: `Dopo l'acquisto manterresti ${formatMonthsCoverage(c.emergencyMonthsLeft)} di copertura. Ottima posizione: puoi affrontare l'acquisto senza compromettere la tua rete di sicurezza finanziaria.`,
         icon: <ShieldCheck className="w-5 h-5 text-emerald-500" />,
       });
+    }
+
+    if (c.hasPlannedEvents) {
+      const safetyLiquidityFloor = Math.max((s.monthlyExpenses + s.existingLoansMonthlyPayment) * 3, 0);
+      const nextEventHint = c.nextPlannedEventTitle && c.nextPlannedEventMonth
+        ? ` Il prossimo evento pianificato e' "${c.nextPlannedEventTitle}" (${c.nextPlannedEventMonth}).`
+        : "";
+
+      if (c.minLiquidityNext36m < 0) {
+        list.push({
+          type: "danger",
+          title: "Sovrapposizione Critica con Eventi Futuri",
+          message: `Considerando anche gli eventi gia' pianificati${nextEventHint} la liquidita' minima nei prossimi 36 mesi scenderebbe a ${formatEuro(c.minLiquidityNext36m)}${c.futureLiquidityRiskMonth ? ` da ${c.futureLiquidityRiskMonth}` : ""}. Senza questo acquisto il minimo stimato sarebbe ${formatEuro(c.baselineMinLiquidityNext36m)}.`,
+          icon: <AlertTriangle className="w-5 h-5 text-red-500" />,
+        });
+      } else if (c.minLiquidityNext36m < safetyLiquidityFloor) {
+        list.push({
+          type: "warning",
+          title: "Cuscinetto Futuro Ridotto",
+          message: `L'acquisto resta gestibile oggi, ma insieme agli eventi futuri pianificati abbasserebbe la liquidita' minima a ${formatEuro(c.minLiquidityNext36m)} nei prossimi 36 mesi.${nextEventHint} Tieni un margine cash piu' alto o valuta un timing diverso.`,
+          icon: <PiggyBank className="w-5 h-5 text-amber-500" />,
+        });
+      }
     }
 
     // 2. Impatto patrimoniale — misurato sul patrimonio INVESTIBILE (esclusi immobili)
@@ -442,6 +582,16 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
           title: "Costo del Denaro Elevato",
           message: `Pagherai ${formatEuro(c.totalInterest)} di interessi, pari al ${interestPercentage.toFixed(0)}% del capitale finanziato. Considera di aumentare l'anticipo, ridurre la durata del finanziamento o confrontare piu offerte per ottenere un tasso migliore.`,
           icon: <BadgePercent className="w-5 h-5 text-amber-500" />,
+        });
+      }
+
+      if (c.hasPlannedEvents && c.peakDTINext36m > c.dtiPostPurchase + 0.5) {
+        const overlapType = c.peakDTINext36m > 33 ? "danger" : "warning";
+        list.push({
+          type: overlapType,
+          title: "Picco DTI nei Prossimi 36 Mesi",
+          message: `Oggi il nuovo finanziamento porterebbe il DTI al ${c.dtiPostPurchase.toFixed(1)}%, ma sovrapponendosi agli impegni futuri gia' pianificati il picco salirebbe al ${c.peakDTINext36m.toFixed(1)}% (baseline senza questo acquisto: ${c.baselinePeakDTINext36m.toFixed(1)}%).${c.nextPlannedEventTitle ? ` Primo snodo: ${c.nextPlannedEventTitle}.` : ""}`,
+          icon: <CreditCard className={`w-5 h-5 ${overlapType === "danger" ? "text-red-500" : "text-amber-500"}`} />,
         });
       }
     }
@@ -870,7 +1020,15 @@ export function AdvisorDashboard({ user }: AdvisorDashboardProps) {
             </TabsContent>
 
             <TabsContent value="fire" className="space-y-6">
-              <FireImpactChart sim={sim} calculations={calculations} snapshot={snapshot} />
+              <FireImpactChart
+                sim={sim}
+                calculations={calculations}
+                snapshot={snapshot}
+                plannedAdjustments={{
+                  plannedCapitalDeltaByMonth: calculations.plannedCapitalDeltaByMonth,
+                  plannedNetCashflowDeltaByMonth: calculations.plannedNetCashflowDeltaByMonth,
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="formule" className="space-y-6">

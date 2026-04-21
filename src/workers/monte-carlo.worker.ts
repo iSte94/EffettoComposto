@@ -25,6 +25,8 @@ interface MonteCarloParams {
     // Pre-computed arrays per evitare closure
     debtByMonth: number[]; // getActiveDebtAtMonth per ogni mese
     passiveIncomeByMonth: number[]; // getActiveRealEstatePassiveIncomeAtMonth per ogni mese
+    plannedCapitalByMonth: number[];
+    plannedNetCashflowByMonth: number[];
     baseInstallmentNow: number;
     // Pension Fund Pot
     currentPensionFundValue: number;
@@ -80,7 +82,7 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
         preRetirementPassiveIncomeMode, preRetirementPassiveIncomeSavingsPct, preRetirementPassiveIncomeSavingsAnnual,
         publicPensionAge, expectedPublicPension,
         enablePensionOptimizer, annualTaxRefund,
-        targetRuns, debtByMonth, passiveIncomeByMonth, baseInstallmentNow,
+        targetRuns, debtByMonth, passiveIncomeByMonth, plannedCapitalByMonth, plannedNetCashflowByMonth, baseInstallmentNow,
         currentPensionFundValue, totalAnnualPensionContribution,
         pensionFundAccessAge, pensionFundExitTaxRate, pensionExitMode, lifeExpectancy
     } = params;
@@ -119,12 +121,16 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                     const annualPublicPension = yAge >= publicPensionAge ? expectedPublicPension * 12 : 0;
 
                     let totalPassiveIncomeThisYear = 0;
+                    let plannedEventsNetImpactThisYear = 0;
                     for (let m = (y * 12); m < ((y + 1) * 12); m++) {
                         const monthIdx = Math.min(m, passiveIncomeByMonth.length - 1);
                         totalPassiveIncomeThisYear += (passiveIncomeByMonth[monthIdx] || 0) / 12;
+                        plannedEventsNetImpactThisYear += (plannedCapitalByMonth[Math.min(m, plannedCapitalByMonth.length - 1)] || 0)
+                            + (plannedNetCashflowByMonth[Math.min(m, plannedNetCashflowByMonth.length - 1)] || 0);
                     }
                     const dynamicNetAnnualExpenses = Math.max(0, annualExpenses - totalPassiveIncomeThisYear);
                     runCap -= Math.max(0, dynamicNetAnnualExpenses - annualPublicPension - runPensionAnnuity * 12);
+                    runCap += plannedEventsNetImpactThisYear;
                 } else {
                     let totalSavingsThisYear = 0;
                     for (let m = (y * 12); m < ((y + 1) * 12); m++) {
@@ -139,6 +145,8 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                             savingsAnnual: preRetirementPassiveIncomeSavingsAnnual,
                         }).savingsAnnual / 12;
                         totalSavingsThisYear += (monthlySavings + Math.max(0, freedUpCashFlow) + savedPassiveIncomeThisMonth);
+                        totalSavingsThisYear += (plannedCapitalByMonth[Math.min(m, plannedCapitalByMonth.length - 1)] || 0)
+                            + (plannedNetCashflowByMonth[Math.min(m, plannedNetCashflowByMonth.length - 1)] || 0);
                     }
                     runCap += totalSavingsThisYear;
                 }

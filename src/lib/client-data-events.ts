@@ -2,7 +2,7 @@
 
 export const FINANCIAL_DATA_CHANGED_EVENT = "effetto-composto:financial-data-changed";
 
-export type FinancialDataChangeScope = "preferences" | "patrimonio" | "all";
+export type FinancialDataChangeScope = "preferences" | "patrimonio" | "planned-events" | "all";
 
 export interface FinancialDataChangedDetail {
     scope: FinancialDataChangeScope;

@@ -34,6 +34,7 @@ export async function fetchUserDataBundle(userId: string) {
         pacSchedules,
         pacExecutions,
         pensionAccruals,
+        plannedEvents,
     ] = await Promise.all([
         prisma.preference.findUnique({ where: { userId } }),
         prisma.assetRecord.findMany({ where: { userId }, orderBy: { date: "asc" } }),
@@ -45,6 +46,7 @@ export async function fetchUserDataBundle(userId: string) {
         prisma.assetPacSchedule.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
         prisma.assetPacExecution.findMany({ where: { userId }, orderBy: { createdAt: "asc" } }),
         prisma.pensionFundAccrual.findMany({ where: { userId }, orderBy: { accrualMonth: "asc" } }),
+        prisma.plannedFinancialEvent.findMany({ where: { userId }, orderBy: [{ eventMonth: "asc" }, { createdAt: "asc" }] }),
     ]);
 
     return {
@@ -58,6 +60,7 @@ export async function fetchUserDataBundle(userId: string) {
         pacSchedules,
         pacExecutions,
         pensionAccruals,
+        plannedEvents,
     };
 }
 
@@ -73,6 +76,7 @@ export async function buildUserExportData(userId: string, includeDerived = false
         pacSchedules,
         pacExecutions,
         pensionAccruals,
+        plannedEvents,
     } = await fetchUserDataBundle(userId);
 
     const cleanPreferences = sanitizePreferenceForClient(preferences);
@@ -89,6 +93,7 @@ export async function buildUserExportData(userId: string, includeDerived = false
     const cleanPacSchedules = pacSchedules.map((record) => stripUserFields(record as unknown as Record<string, unknown>, ["userId"]));
     const cleanPacExecutions = pacExecutions.map((record) => stripUserFields(record as unknown as Record<string, unknown>, ["userId"]));
     const cleanPensionAccruals = pensionAccruals.map((record) => stripUserFields(record as unknown as Record<string, unknown>));
+    const cleanPlannedEvents = plannedEvents.map((record) => stripUserFields(record as unknown as Record<string, unknown>, ["id", "userId"]));
 
     let subscriptions: unknown[] = [];
     if (typeof cleanPreferences?.subscriptionsList === "string") {
@@ -100,7 +105,7 @@ export async function buildUserExportData(userId: string, includeDerived = false
     }
 
     const exportData: Record<string, unknown> = {
-        version: 3,
+        version: 4,
         exportedAt: new Date().toISOString(),
         preferences: cleanPreferences,
         assets: cleanAssets,
@@ -115,6 +120,7 @@ export async function buildUserExportData(userId: string, includeDerived = false
         pacSchedules: cleanPacSchedules,
         pacExecutions: cleanPacExecutions,
         pensionAccruals: cleanPensionAccruals,
+        plannedEvents: cleanPlannedEvents,
     };
 
     if (includeDerived) {

@@ -123,7 +123,8 @@ export function AuthModal({ user, onLogin, onLogout }: AuthModalProps) {
                     `Dati importati! Preferenze: ${result.results.preferences ? "sì" : "no"}, ` +
                     `Snapshot: ${result.results.patrimonio}, Obiettivi: ${result.results.obiettivi}` +
                     (result.results.abbonamenti ? `, Abbonamenti: ${result.results.abbonamenti}` : "") +
-                    (result.results.budgetTransactions ? `, Transazioni: ${result.results.budgetTransactions}` : "")
+                    (result.results.budgetTransactions ? `, Transazioni: ${result.results.budgetTransactions}` : "") +
+                    (result.results.plannedEvents ? `, Eventi futuri: ${result.results.plannedEvents}` : "")
                 );
                 // Ricarica la pagina per riflettere i nuovi dati
                 setTimeout(() => window.location.reload(), 1500);

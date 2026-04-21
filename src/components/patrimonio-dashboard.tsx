@@ -33,6 +33,7 @@ import { PortfolioRebalance } from "@/components/patrimonio/portfolio-rebalance"
 import { RealEstateSection } from "@/components/patrimonio/real-estate-section";
 import { SnapshotHistoryTable } from "@/components/patrimonio/snapshot-history-table";
 import { StockPortfolioSection } from "@/components/patrimonio/stock-portfolio-section";
+import { PlannedEventsSummaryCard } from "@/components/planned-events-summary-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -1208,6 +1209,12 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     onPerson2IncomeChange={setPerson2Income}
                                     onExpensesListChange={setExpensesList}
                                     onBlur={() => savePreferences(existingLoansList)}
+                                />
+                                <PlannedEventsSummaryCard
+                                    user={user}
+                                    startingLiquidity={liquidStockValue + emergencyFund}
+                                    baseMonthlyNetFlow={netIncome}
+                                    className={surfaceCardClass}
                                 />
                             </div>
 

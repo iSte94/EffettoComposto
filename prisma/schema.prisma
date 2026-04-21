@@ -25,6 +25,7 @@ model User {
   pacSchedules       AssetPacSchedule[]
   pacExecutions      AssetPacExecution[]
   pensionAccruals    PensionFundAccrual[]
+  plannedEvents      PlannedFinancialEvent[]
   aiThreads          AssistantThread[]
   aiMemory           AssistantMemory[]
   pendingActions     AssistantPendingAction[]
@@ -170,6 +171,30 @@ model SavingsGoal {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+model PlannedFinancialEvent {
+  id             String   @id @default(uuid())
+  title          String
+  direction      String   @default("outflow") // outflow | inflow
+  kind           String   @default("one_time") // one_time | financed
+  category       String   @default("other")
+  eventMonth     String   // YYYY-MM
+  amount         Float
+  upfrontAmount  Float?
+  financedAmount Float?
+  interestRate   Float?
+  durationMonths Int?
+  status         String   @default("planned") // planned | realized | canceled
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, eventMonth])
+  @@index([userId, status, eventMonth])
 }
 
 model StockHistoryCache {
