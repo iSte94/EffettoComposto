@@ -1,13 +1,28 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Car, Euro, Percent, Calendar, CreditCard, ChevronDown, ChevronUp, Users, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import {
+    AlertTriangle,
+    Calendar,
+    Car,
+    CheckCircle2,
+    ChevronDown,
+    ChevronUp,
+    CreditCard,
+    Euro,
+    Layers3,
+    Percent,
+    Plus,
+    Trash2,
+    Users,
+    XCircle,
+} from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { usePreferences } from "@/hooks/usePreferences";
 import {
@@ -19,8 +34,15 @@ import {
 } from "@/lib/finance/loans";
 import { DTI_THRESHOLD } from "@/lib/constants";
 import {
-    ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    Legend, CartesianGrid,
+    Bar,
+    CartesianGrid,
+    ComposedChart,
+    Legend,
+    Line,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
 } from "recharts";
 
 interface AmortizationRow {
@@ -36,7 +58,27 @@ interface AmortizationResult {
     totalPaid: number;
     totalInterest: number;
     schedule: AmortizationRow[];
-    chartData: { label: string; Capitale: number; Interessi: number; "Debito Residuo": number }[];
+    chartData: {
+        label: string;
+        Capitale: number;
+        Interessi: number;
+        "Debito Residuo": number;
+    }[];
+}
+
+interface FinancingSimulation {
+    id: string;
+    importo: number;
+    anticipo: number;
+    tasso: number;
+    durata: number;
+}
+
+interface FinancingSimulationComputed extends FinancingSimulation {
+    label: string;
+    principal: number;
+    result: AmortizationResult;
+    costoPct: number;
 }
 
 const DTI_SCALE_MAX = 50;
@@ -54,22 +96,28 @@ const DTI_MARKERS = [
 ] as const;
 
 const DTI_TRACK_SEGMENTS = [
-    {
-        start: 0,
-        end: 33,
-        className: "bg-emerald-100/90 dark:bg-emerald-950/40",
-    },
-    {
-        start: 33,
-        end: DTI_WARNING_THRESHOLD,
-        className: "bg-amber-100/90 dark:bg-amber-950/35",
-    },
-    {
-        start: DTI_WARNING_THRESHOLD,
-        end: DTI_SCALE_MAX,
-        className: "bg-red-100/90 dark:bg-red-950/35",
-    },
+    { start: 0, end: 33, className: "bg-emerald-100/90 dark:bg-emerald-950/40" },
+    { start: 33, end: DTI_WARNING_THRESHOLD, className: "bg-amber-100/90 dark:bg-amber-950/35" },
+    { start: DTI_WARNING_THRESHOLD, end: DTI_SCALE_MAX, className: "bg-red-100/90 dark:bg-red-950/35" },
 ] as const;
+
+function createSimulationId() {
+    return Math.random().toString(36).slice(2, 10);
+}
+
+function createFinancingSimulation(prefilled: boolean): FinancingSimulation {
+    return {
+        id: createSimulationId(),
+        importo: prefilled ? 50000 : 0,
+        anticipo: 0,
+        tasso: 2.5,
+        durata: 60,
+    };
+}
+
+function getSimulationLabel(index: number) {
+    return index === 0 ? "Finanziamento principale" : `Finanziamento ${index + 1}`;
+}
 
 function getRecalculationModeLabel(mode: LoanRecalculationMode) {
     switch (mode) {
@@ -85,36 +133,49 @@ function getRecalculationModeLabel(mode: LoanRecalculationMode) {
 }
 
 function computeAmortization(principal: number, annualRatePct: number, months: number): AmortizationResult {
-    const empty: AmortizationResult = { installment: 0, totalPaid: 0, totalInterest: 0, schedule: [], chartData: [] };
+    const empty: AmortizationResult = {
+        installment: 0,
+        totalPaid: 0,
+        totalInterest: 0,
+        schedule: [],
+        chartData: [],
+    };
+
     if (principal <= 0 || months <= 0) return empty;
 
-    const i = annualRatePct / 100 / 12;
+    const monthlyRate = annualRatePct / 100 / 12;
     const installment =
-        i === 0
+        monthlyRate === 0
             ? principal / months
-            : (principal * i * Math.pow(1 + i, months)) / (Math.pow(1 + i, months) - 1);
+            : (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
 
     const schedule: AmortizationRow[] = [];
     let balance = principal;
 
-    for (let k = 1; k <= months; k++) {
-        const interest = balance * i;
+    for (let month = 1; month <= months; month++) {
+        const interest = balance * monthlyRate;
         const capital = installment - interest;
         balance = Math.max(0, balance - capital);
-        schedule.push({ mese: k, rata: installment, capitale: capital, interessi: interest, debito: balance });
+        schedule.push({
+            mese: month,
+            rata: installment,
+            capitale: capital,
+            interessi: interest,
+            debito: balance,
+        });
     }
 
-    // Aggregate per year for chart (12 mesi per anno)
     const yearCount = Math.ceil(months / 12);
-    const chartData = Array.from({ length: yearCount }, (_, yi) => {
-        const rows = schedule.slice(yi * 12, (yi + 1) * 12);
-        const capSum = rows.reduce((s, r) => s + r.capitale, 0);
-        const intSum = rows.reduce((s, r) => s + r.interessi, 0);
+    const chartData = Array.from({ length: yearCount }, (_, yearIndex) => {
+        const rows = schedule.slice(yearIndex * 12, (yearIndex + 1) * 12);
+        const capitalSum = rows.reduce((sum, row) => sum + row.capitale, 0);
+        const interestSum = rows.reduce((sum, row) => sum + row.interessi, 0);
         const lastRow = rows[rows.length - 1];
+
         return {
-            label: yearCount <= 10 ? `Anno ${yi + 1}` : `A${yi + 1}`,
-            Capitale: Math.round(capSum),
-            Interessi: Math.round(intSum),
+            label: yearCount <= 10 ? `Anno ${yearIndex + 1}` : `A${yearIndex + 1}`,
+            Capitale: Math.round(capitalSum),
+            Interessi: Math.round(interestSum),
             "Debito Residuo": Math.round(lastRow?.debito ?? 0),
         };
     });
@@ -128,12 +189,61 @@ function computeAmortization(principal: number, annualRatePct: number, months: n
     };
 }
 
+function aggregateAmortizationResults(results: AmortizationResult[]): AmortizationResult {
+    const empty: AmortizationResult = {
+        installment: 0,
+        totalPaid: 0,
+        totalInterest: 0,
+        schedule: [],
+        chartData: [],
+    };
+
+    if (results.length === 0) return empty;
+
+    const maxMonths = Math.max(...results.map((result) => result.schedule.length));
+    if (maxMonths <= 0) return empty;
+
+    const schedule = Array.from({ length: maxMonths }, (_, monthIndex) => {
+        const rows = results
+            .map((result) => result.schedule[monthIndex])
+            .filter((row): row is AmortizationRow => Boolean(row));
+
+        return {
+            mese: monthIndex + 1,
+            rata: rows.reduce((sum, row) => sum + row.rata, 0),
+            capitale: rows.reduce((sum, row) => sum + row.capitale, 0),
+            interessi: rows.reduce((sum, row) => sum + row.interessi, 0),
+            debito: rows.reduce((sum, row) => sum + row.debito, 0),
+        };
+    });
+
+    const yearCount = Math.ceil(maxMonths / 12);
+    const chartData = Array.from({ length: yearCount }, (_, yearIndex) => {
+        const rows = schedule.slice(yearIndex * 12, (yearIndex + 1) * 12);
+        const capitalSum = rows.reduce((sum, row) => sum + row.capitale, 0);
+        const interestSum = rows.reduce((sum, row) => sum + row.interessi, 0);
+        const lastRow = rows[rows.length - 1];
+
+        return {
+            label: yearCount <= 10 ? `Anno ${yearIndex + 1}` : `A${yearIndex + 1}`,
+            Capitale: Math.round(capitalSum),
+            Interessi: Math.round(interestSum),
+            "Debito Residuo": Math.round(lastRow?.debito ?? 0),
+        };
+    });
+
+    return {
+        installment: schedule[0]?.rata ?? 0,
+        totalPaid: results.reduce((sum, result) => sum + result.totalPaid, 0),
+        totalInterest: results.reduce((sum, result) => sum + result.totalInterest, 0),
+        schedule,
+        chartData,
+    };
+}
+
 export function LoanCalculator() {
-    const [importo, setImporto] = useState(50000);
-    const [anticipo, setAnticipo] = useState(0);
-    const [tasso, setTasso] = useState(2.5);
-    const [durata, setDurata] = useState(60);
-    const [showTable, setShowTable] = useState(false);
+    const [simulations, setSimulations] = useState<FinancingSimulation[]>(() => [createFinancingSimulation(true)]);
+    const [showOverallTable, setShowOverallTable] = useState(false);
     const [intestatario, setIntestatario] = useState<"person1" | "person2" | "both">("person1");
     const [enableDebtReductionSimulation, setEnableDebtReductionSimulation] = useState(false);
     const [selectedExistingLoanId, setSelectedExistingLoanId] = useState("");
@@ -141,28 +251,56 @@ export function LoanCalculator() {
 
     const { preferences } = usePreferences();
 
-    const principal = Math.max(0, importo - anticipo);
-
-    const result = useMemo(
-        () => computeAmortization(principal, tasso, durata),
-        [principal, tasso, durata],
-    );
-
-    const costoPct = principal > 0 ? (result.totalInterest / principal) * 100 : 0;
-
     const person1Name = preferences.person1Name || "Persona 1";
     const person2Name = preferences.person2Name || "Persona 2";
 
+    const simulationEntries = useMemo<FinancingSimulationComputed[]>(
+        () =>
+            simulations.map((simulation, index) => {
+                const principal = Math.max(0, simulation.importo - simulation.anticipo);
+                const result = computeAmortization(principal, simulation.tasso, simulation.durata);
+
+                return {
+                    ...simulation,
+                    label: getSimulationLabel(index),
+                    principal,
+                    result,
+                    costoPct: principal > 0 ? (result.totalInterest / principal) * 100 : 0,
+                };
+            }),
+        [simulations],
+    );
+
+    const activeSimulationEntries = useMemo(
+        () => simulationEntries.filter((entry) => entry.principal > 0 && entry.result.installment > 0),
+        [simulationEntries],
+    );
+
+    const aggregatePrincipal = useMemo(
+        () => activeSimulationEntries.reduce((sum, entry) => sum + entry.principal, 0),
+        [activeSimulationEntries],
+    );
+
+    const aggregateResult = useMemo(
+        () => aggregateAmortizationResults(activeSimulationEntries.map((entry) => entry.result)),
+        [activeSimulationEntries],
+    );
+
+    const aggregateCostPct = aggregatePrincipal > 0 ? (aggregateResult.totalInterest / aggregatePrincipal) * 100 : 0;
+
     const existingLoans: ExistingLoan[] = useMemo(() => {
-        try { return JSON.parse(preferences.existingLoansList); } catch { return []; }
+        try {
+            return JSON.parse(preferences.existingLoansList);
+        } catch {
+            return [];
+        }
     }, [preferences.existingLoansList]);
 
     const relevantLoanEntries = useMemo(() => {
-        const scopedLoans = intestatario === "both"
-            ? existingLoans
-            : existingLoans.filter((loan) =>
-                intestatario === "person1" ? loan.owner !== "person2" : loan.owner !== "person1",
-            );
+        const scopedLoans =
+            intestatario === "both"
+                ? existingLoans
+                : existingLoans.filter((loan) => (intestatario === "person1" ? loan.owner !== "person2" : loan.owner !== "person1"));
 
         return scopedLoans.map((loan) => ({
             loan,
@@ -200,31 +338,36 @@ export function LoanCalculator() {
             : null;
 
     const dtiData = useMemo(() => {
-        const existingInstallment = activeLoanEntries.reduce((acc, { snapshot }) => acc + snapshot.currentInstallment, 0);
-        const adjustedExistingInstallment = activeLoanEntries.reduce((acc, entry) => {
+        const existingInstallment = activeLoanEntries.reduce((sum, { snapshot }) => sum + snapshot.currentInstallment, 0);
+        const adjustedExistingInstallment = activeLoanEntries.reduce((sum, entry) => {
             if (activeDebtReductionSimulation && entry.loan.id === selectedLoanEntry?.loan.id) {
-                return acc + activeDebtReductionSimulation.newInstallment;
+                return sum + activeDebtReductionSimulation.newInstallment;
             }
-            return acc + entry.snapshot.currentInstallment;
+
+            return sum + entry.snapshot.currentInstallment;
         }, 0);
 
         const income =
-            intestatario === "person1" ? (preferences.person1Income || 0)
-            : intestatario === "person2" ? (preferences.person2Income || 0)
-            : (preferences.person1Income || 0) + (preferences.person2Income || 0);
+            intestatario === "person1"
+                ? preferences.person1Income || 0
+                : intestatario === "person2"
+                ? preferences.person2Income || 0
+                : (preferences.person1Income || 0) + (preferences.person2Income || 0);
 
-        const totalInstallment = adjustedExistingInstallment + result.installment;
-        const baselineTotalInstallment = existingInstallment + result.installment;
+        const totalNewInstallment = activeSimulationEntries.reduce((sum, entry) => sum + entry.result.installment, 0);
+        const totalInstallment = adjustedExistingInstallment + totalNewInstallment;
+        const baselineTotalInstallment = existingInstallment + totalNewInstallment;
         const dti = income > 0 ? totalInstallment / income : 0;
         const baselineDti = income > 0 ? baselineTotalInstallment / income : 0;
         const maxNewInstallment = Math.max(0, income * DTI_THRESHOLD - adjustedExistingInstallment);
         const baselineMaxNewInstallment = Math.max(0, income * DTI_THRESHOLD - existingInstallment);
 
         return {
-            activeCount: activeLoanEntries.length,
+            activeExistingCount: activeLoanEntries.length,
             existingInstallment,
             adjustedExistingInstallment,
             income,
+            totalNewInstallment,
             totalInstallment,
             baselineTotalInstallment,
             dti,
@@ -246,45 +389,21 @@ export function LoanCalculator() {
     }, [
         activeDebtReductionSimulation,
         activeLoanEntries,
+        activeSimulationEntries,
         intestatario,
         preferences.person1Income,
         preferences.person2Income,
-        result.installment,
         selectedLoanEntry,
     ]);
 
-    const dtiProgressPct = Math.min(100, (dtiData.dtiPct / DTI_SCALE_MAX) * 100);
-    const dtiIndicatorValue = Math.min(DTI_SCALE_MAX, Math.max(0, dtiData.dtiPct));
-    const dtiIndicatorTransform =
-        dtiIndicatorValue <= 4
-            ? "translateX(0)"
-            : dtiIndicatorValue >= DTI_SCALE_MAX - 4
-            ? "translateX(-100%)"
-            : "translateX(-50%)";
-    const dtiAccentClasses = dtiData.isOk
-        ? {
-            badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/80 dark:bg-emerald-950/60 dark:text-emerald-300",
-            fill: "bg-emerald-500",
-            marker: "bg-emerald-500 ring-emerald-500/25",
-        }
-        : dtiData.isWarning
-        ? {
-            badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/80 dark:bg-amber-950/60 dark:text-amber-300",
-            fill: "bg-amber-500",
-            marker: "bg-amber-500 ring-amber-500/25",
-        }
-        : {
-            badge: "border-red-200 bg-red-50 text-red-700 dark:border-red-900/80 dark:bg-red-950/60 dark:text-red-300",
-            fill: "bg-red-500",
-            marker: "bg-red-500 ring-red-500/25",
-        };
     const suggestedPrepaymentForThreshold = useMemo(() => {
         if (!selectedLoanEntry || dtiData.income <= 0) return 0;
 
-        const otherInstallments = activeLoanEntries.reduce((acc, entry) => (
-            entry.loan.id === selectedLoanEntry.loan.id ? acc : acc + entry.snapshot.currentInstallment
-        ), 0);
-        const targetSelectedLoanInstallment = dtiData.income * DTI_THRESHOLD - result.installment - otherInstallments;
+        const otherInstallments = activeLoanEntries.reduce((sum, entry) => {
+            return entry.loan.id === selectedLoanEntry.loan.id ? sum : sum + entry.snapshot.currentInstallment;
+        }, 0);
+
+        const targetSelectedLoanInstallment = dtiData.income * DTI_THRESHOLD - dtiData.totalNewInstallment - otherInstallments;
 
         if (targetSelectedLoanInstallment <= 0) {
             return selectedLoanEntry.snapshot.remainingDebt;
@@ -309,7 +428,35 @@ export function LoanCalculator() {
         }
 
         return Math.min(selectedLoanEntry.snapshot.remainingDebt, high);
-    }, [activeLoanEntries, dtiData.income, result.installment, selectedLoanEntry]);
+    }, [activeLoanEntries, dtiData.income, dtiData.totalNewInstallment, selectedLoanEntry]);
+
+    const dtiProgressPct = Math.min(100, (dtiData.dtiPct / DTI_SCALE_MAX) * 100);
+    const dtiIndicatorValue = Math.min(DTI_SCALE_MAX, Math.max(0, dtiData.dtiPct));
+    const dtiIndicatorTransform =
+        dtiIndicatorValue <= 4
+            ? "translateX(0)"
+            : dtiIndicatorValue >= DTI_SCALE_MAX - 4
+            ? "translateX(-100%)"
+            : "translateX(-50%)";
+
+    const dtiAccentClasses = dtiData.isOk
+        ? {
+            badge: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/80 dark:bg-emerald-950/60 dark:text-emerald-300",
+            fill: "bg-emerald-500",
+            marker: "bg-emerald-500 ring-emerald-500/25",
+        }
+        : dtiData.isWarning
+        ? {
+            badge: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/80 dark:bg-amber-950/60 dark:text-amber-300",
+            fill: "bg-amber-500",
+            marker: "bg-amber-500 ring-amber-500/25",
+        }
+        : {
+            badge: "border-red-200 bg-red-50 text-red-700 dark:border-red-900/80 dark:bg-red-950/60 dark:text-red-300",
+            fill: "bg-red-500",
+            marker: "bg-red-500 ring-red-500/25",
+        };
+
     const previewNewInstallment = debtReductionSimulation?.newInstallment ?? selectedLoanEntry?.snapshot.currentInstallment ?? 0;
     const previewMonthlySavings = debtReductionSimulation?.monthlySavings ?? 0;
     const debtReductionSliderStep = selectedLoanEntry
@@ -320,6 +467,27 @@ export function LoanCalculator() {
             : 500
         : 100;
 
+    const activeSimulationSummaryLabel =
+        activeSimulationEntries.length === 1 ? "la simulazione attiva" : `le ${activeSimulationEntries.length} simulazioni attive`;
+
+    const updateSimulation = <K extends keyof FinancingSimulation>(
+        simulationId: string,
+        field: K,
+        value: FinancingSimulation[K],
+    ) => {
+        setSimulations((current) =>
+            current.map((simulation) => (simulation.id === simulationId ? { ...simulation, [field]: value } : simulation)),
+        );
+    };
+
+    const addSimulation = () => {
+        setSimulations((current) => [...current, createFinancingSimulation(false)]);
+    };
+
+    const removeSimulation = (simulationId: string) => {
+        setSimulations((current) => (current.length <= 1 ? current : current.filter((simulation) => simulation.id !== simulationId)));
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-start gap-3">
@@ -328,150 +496,250 @@ export function LoanCalculator() {
                 </div>
                 <div>
                     <h2 className="text-xl font-bold text-foreground">Calcolatore Rata Finanziamento</h2>
-                    <p className="text-xs text-muted-foreground">Ammortamento alla francese — auto, moto, arredamento e altri prestiti personali</p>
+                    <p className="text-xs text-muted-foreground">
+                        Ammortamento alla francese - auto, moto, arredamento e altri prestiti personali
+                    </p>
                 </div>
             </div>
 
-            {/* Inputs */}
             <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
-                <CardContent className="p-5 space-y-5">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div className="space-y-1.5">
-                            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Euro className="h-3 w-3" /> Importo Finanziato
-                            </Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                step="500"
-                                value={importo || ""}
-                                onChange={(e) => setImporto(Math.max(0, Number(e.target.value) || 0))}
-                                className="min-h-11 rounded-xl text-sm"
-                            />
+                <CardContent className="space-y-5 p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200/80 bg-orange-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-orange-600 dark:border-orange-900/70 dark:bg-orange-950/30 dark:text-orange-300">
+                                <Layers3 className="h-3.5 w-3.5" />
+                                Simulazioni in parallelo
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-foreground">Aggiungi anche un secondo finanziamento</h3>
+                                <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                                    Puoi costruire piu scenari insieme e vedere sotto l&apos;impatto complessivo di tutte le rate simulate.
+                                </p>
+                            </div>
                         </div>
-                        <div className="space-y-1.5">
-                            <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Euro className="h-3 w-3" /> Anticipo / Acconto
-                            </Label>
-                            <Input
-                                type="number"
-                                min="0"
-                                step="500"
-                                value={anticipo || ""}
-                                onChange={(e) => setAnticipo(Math.max(0, Number(e.target.value) || 0))}
-                                className="min-h-11 rounded-xl text-sm"
-                            />
+
+                        <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-right shadow-sm">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Attive ora</p>
+                            <p className="text-base font-bold text-foreground">
+                                {activeSimulationEntries.length} su {simulations.length}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">{formatEuro(dtiData.totalNewInstallment)}/mese simulati</p>
                         </div>
                     </div>
 
                     <div className="space-y-1.5">
                         <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Users className="h-3 w-3" /> Intestatario
+                            <Users className="h-3 w-3" /> Intestatario per l&apos;analisi generale
                         </Label>
                         <div className="flex gap-2">
                             {([
                                 { value: "person1", label: person1Name },
                                 { value: "person2", label: person2Name },
                                 { value: "both", label: "Entrambi" },
-                            ] as const).map((opt) => (
+                            ] as const).map((option) => (
                                 <button
-                                    key={opt.value}
+                                    key={option.value}
                                     type="button"
-                                    onClick={() => setIntestatario(opt.value)}
+                                    onClick={() => setIntestatario(option.value)}
                                     className={`flex-1 rounded-xl px-3 py-2 text-xs font-semibold transition-colors ${
-                                        intestatario === opt.value
+                                        intestatario === option.value
                                             ? "bg-orange-500 text-white shadow-sm"
                                             : "bg-muted/40 text-muted-foreground hover:bg-muted"
                                     }`}
                                 >
-                                    {opt.label}
+                                    {option.label}
                                 </button>
                             ))}
                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Percent className="h-3 w-3" /> Tasso Annuo (TAN)
-                                </Label>
-                                <span className="text-sm font-bold text-orange-600 dark:text-orange-400">{tasso.toFixed(2)}%</span>
-                            </div>
-                            <Slider
-                                min={0}
-                                max={25}
-                                step={0.01}
-                                value={[tasso]}
-                                onValueChange={([v]) => setTasso(v)}
-                                className="[&_[role=slider]]:bg-orange-500"
-                            />
-                            <div className="flex justify-between text-[10px] text-muted-foreground">
-                                <span>0%</span><span>25%</span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                    <Calendar className="h-3 w-3" /> Durata
-                                </Label>
-                                <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
-                                    {durata} mesi{durata >= 12 ? ` (${(durata / 12).toFixed(1)}a)` : ""}
-                                </span>
-                            </div>
-                            <Slider
-                                min={6}
-                                max={120}
-                                step={6}
-                                value={[durata]}
-                                onValueChange={([v]) => setDurata(v)}
-                                className="[&_[role=slider]]:bg-orange-500"
-                            />
-                            <div className="flex justify-between text-[10px] text-muted-foreground">
-                                <span>6 mesi</span><span>10 anni</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {anticipo > 0 && (
-                        <p className="text-xs text-muted-foreground rounded-xl bg-muted/40 px-3 py-2">
-                            Capitale finanziato: <span className="font-semibold text-foreground">{formatEuro(principal)}</span>
-                            {" "}(importo {formatEuro(importo)} − anticipo {formatEuro(anticipo)})
+                        <p className="text-[11px] text-muted-foreground">
+                            Questa selezione viene applicata al DTI complessivo, alle rate esistenti e alla sostenibilita finale.
                         </p>
-                    )}
-
-                    {/* Live summary */}
-                    {principal > 0 && (
-                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-orange-200/80 bg-orange-50/70 px-4 py-3 dark:border-orange-900/60 dark:bg-orange-950/25">
-                            <div>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Rata mensile</p>
-                                <p className="text-2xl font-extrabold tabular-nums text-orange-600 dark:text-orange-400">
-                                    {formatEuro(result.installment)}
-                                </p>
-                                <p className="text-[10px] text-orange-400">per {durata} mesi</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Interessi totali</p>
-                                <p className="text-2xl font-extrabold tabular-nums text-red-600 dark:text-red-400">
-                                    {formatEuro(result.totalInterest)}
-                                </p>
-                                <p className="text-[10px] text-red-400">costo del credito ({costoPct.toFixed(1)}%)</p>
-                            </div>
-                        </div>
-                    )}
+                    </div>
                 </CardContent>
             </Card>
 
-            {/* DTI Analysis */}
-            {dtiData.hasIncome && result.installment > 0 && (
+            <div className="space-y-4">
+                {simulationEntries.map((simulation, index) => (
+                    <Card key={simulation.id} className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+                        <CardContent className="space-y-5 p-5">
+                            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                                <div className="space-y-2">
+                                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/30 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                                        {simulation.label}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-foreground">
+                                            {index === 0 ? "Prima simulazione" : `Simulazione aggiuntiva ${index + 1}`}
+                                        </h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            {simulation.principal > 0
+                                                ? "La rata entra in automatico nell'analisi generale qui sotto."
+                                                : "Compila i campi per includere questo scenario nel totale complessivo."}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    {simulation.result.installment > 0 && (
+                                        <div className="rounded-2xl border border-orange-200/80 bg-orange-50/80 px-4 py-3 text-right shadow-sm dark:border-orange-900/60 dark:bg-orange-950/25">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Rata</p>
+                                            <p className="text-lg font-extrabold text-orange-600 dark:text-orange-300">
+                                                {formatEuro(simulation.result.installment)}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {simulations.length > 1 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => removeSimulation(simulation.id)}
+                                            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-border/70 bg-background/80 text-muted-foreground transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:hover:border-red-900/70 dark:hover:bg-red-950/30"
+                                            aria-label={`Rimuovi ${simulation.label}`}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Euro className="h-3 w-3" /> Importo Finanziato
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="500"
+                                        value={simulation.importo || ""}
+                                        onChange={(event) =>
+                                            updateSimulation(simulation.id, "importo", Math.max(0, Number(event.target.value) || 0))
+                                        }
+                                        className="min-h-11 rounded-xl text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Euro className="h-3 w-3" /> Anticipo / Acconto
+                                    </Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="500"
+                                        value={simulation.anticipo || ""}
+                                        onChange={(event) =>
+                                            updateSimulation(simulation.id, "anticipo", Math.max(0, Number(event.target.value) || 0))
+                                        }
+                                        className="min-h-11 rounded-xl text-sm"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Percent className="h-3 w-3" /> Tasso Annuo (TAN)
+                                        </Label>
+                                        <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                                            {simulation.tasso.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                    <Slider
+                                        min={0}
+                                        max={25}
+                                        step={0.01}
+                                        value={[simulation.tasso]}
+                                        onValueChange={([value]) => updateSimulation(simulation.id, "tasso", value)}
+                                        className="[&_[role=slider]]:bg-orange-500"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                        <span>0%</span>
+                                        <span>25%</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Calendar className="h-3 w-3" /> Durata
+                                        </Label>
+                                        <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                                            {simulation.durata} mesi{simulation.durata >= 12 ? ` (${(simulation.durata / 12).toFixed(1)}a)` : ""}
+                                        </span>
+                                    </div>
+                                    <Slider
+                                        min={6}
+                                        max={120}
+                                        step={6}
+                                        value={[simulation.durata]}
+                                        onValueChange={([value]) => updateSimulation(simulation.id, "durata", value)}
+                                        className="[&_[role=slider]]:bg-orange-500"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-muted-foreground">
+                                        <span>6 mesi</span>
+                                        <span>10 anni</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {simulation.anticipo > 0 && (
+                                <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                                    Capitale finanziato: <span className="font-semibold text-foreground">{formatEuro(simulation.principal)}</span>
+                                    {" "}(importo {formatEuro(simulation.importo)} - anticipo {formatEuro(simulation.anticipo)})
+                                </p>
+                            )}
+
+                            {simulation.principal > 0 ? (
+                                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                    <div className="rounded-2xl border border-orange-200/80 bg-orange-50/70 px-4 py-3 dark:border-orange-900/60 dark:bg-orange-950/25">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Rata mensile</p>
+                                        <p className="text-2xl font-extrabold tabular-nums text-orange-600 dark:text-orange-300">
+                                            {formatEuro(simulation.result.installment)}
+                                        </p>
+                                        <p className="text-[10px] text-orange-400">per {simulation.durata} mesi</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-red-200/80 bg-red-50/70 px-4 py-3 text-right dark:border-red-900/60 dark:bg-red-950/25">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Interessi totali</p>
+                                        <p className="text-2xl font-extrabold tabular-nums text-red-600 dark:text-red-300">
+                                            {formatEuro(simulation.result.totalInterest)}
+                                        </p>
+                                        <p className="text-[10px] text-red-400">costo del credito ({simulation.costoPct.toFixed(1)}%)</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                                    Questo blocco resta fuori dall&apos;analisi generale finche non inserisci un importo finanziato valido.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                ))}
+
+                <div className="relative flex justify-center py-2">
+                    <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-orange-200/80 dark:border-orange-900/60" />
+                    <button
+                        type="button"
+                        onClick={addSimulation}
+                        className="relative inline-flex items-center gap-3 rounded-full border border-orange-200/80 bg-white px-4 py-2 shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-orange-50 dark:border-orange-900/60 dark:bg-slate-950 dark:hover:bg-orange-950/20"
+                    >
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-sm">
+                            <Plus className="h-4 w-4" />
+                        </span>
+                        <span className="text-sm font-semibold text-foreground">
+                            {simulations.length === 1 ? "Aggiungi un secondo finanziamento" : "Aggiungi un altro finanziamento"}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            {dtiData.hasIncome && activeSimulationEntries.length > 0 && (
                 <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
-                    <CardContent className="p-5 space-y-4">
+                    <CardContent className="space-y-4 p-5">
                         <div className="flex items-center gap-2">
                             <Users className="h-4 w-4 text-muted-foreground" />
-                            <h3 className="text-sm font-bold text-foreground">Analisi Rata / Reddito</h3>
+                            <h3 className="text-sm font-bold text-foreground">Analisi generale delle simulazioni</h3>
                             <span className="ml-auto rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                                {intestatario === "both" ? `${person1Name} + ${person2Name}` : intestatario === "person1" ? person1Name : person2Name}
+                                {activeSimulationEntries.length} finanz. attiv{activeSimulationEntries.length === 1 ? "o" : "i"}
                             </span>
                         </div>
 
@@ -480,16 +748,20 @@ export function LoanCalculator() {
                                 <span className="text-muted-foreground">Reddito netto mensile</span>
                                 <span className="font-semibold">{formatEuro(dtiData.income)}</span>
                             </div>
+
                             {dtiData.existingInstallment > 0 && !dtiData.hasSimulation && (
                                 <div className="flex justify-between text-muted-foreground">
-                                    <span>Rate esistenti ({dtiData.activeCount} prestit{dtiData.activeCount === 1 ? "o" : "i"} attiv{dtiData.activeCount === 1 ? "o" : "i"})</span>
+                                    <span>
+                                        Rate esistenti ({dtiData.activeExistingCount} prestit{dtiData.activeExistingCount === 1 ? "o" : "i"} attiv{dtiData.activeExistingCount === 1 ? "o" : "i"})
+                                    </span>
                                     <span>{formatEuro(dtiData.existingInstallment)}</span>
                                 </div>
                             )}
+
                             {dtiData.hasSimulation && (
                                 <>
                                     <div className="flex justify-between text-muted-foreground">
-                                        <span>Rate esistenti attuali ({dtiData.activeCount} prestiti attivi)</span>
+                                        <span>Rate esistenti attuali ({dtiData.activeExistingCount} prestiti attivi)</span>
                                         <span>{formatEuro(dtiData.existingInstallment)}</span>
                                     </div>
                                     <div className="flex justify-between text-emerald-700 dark:text-emerald-300">
@@ -502,14 +774,26 @@ export function LoanCalculator() {
                                     </div>
                                 </>
                             )}
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">+ Nuova rata finanziamento</span>
-                                <span className="font-semibold text-orange-600 dark:text-orange-400">{formatEuro(result.installment)}</span>
+
+                            {activeSimulationEntries.map((simulation) => (
+                                <div key={simulation.id} className="flex justify-between text-muted-foreground">
+                                    <span>+ {simulation.label}</span>
+                                    <span className="font-semibold text-orange-600 dark:text-orange-400">
+                                        {formatEuro(simulation.result.installment)}
+                                    </span>
+                                </div>
+                            ))}
+
+                            <div className="flex justify-between border-t border-border/60 pt-2">
+                                <span className="font-semibold text-foreground">Nuove rate simulate</span>
+                                <span className="font-bold text-foreground">{formatEuro(dtiData.totalNewInstallment)}</span>
                             </div>
+
                             <div className="flex justify-between border-t border-border/60 pt-2 font-bold">
                                 <span>Totale rate mensili</span>
                                 <span>{formatEuro(dtiData.totalInstallment)}</span>
                             </div>
+
                             {dtiData.hasSimulation && (
                                 <div className="flex justify-between text-[11px] text-muted-foreground">
                                     <span>Prima del versamento simulato</span>
@@ -524,7 +808,7 @@ export function LoanCalculator() {
                                     <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-500">Leva anti-DTI</p>
                                     <h4 className="text-sm font-semibold text-foreground">Simula estinzione anticipata o versamento extra</h4>
                                     <p className="text-xs leading-relaxed text-muted-foreground">
-                                        Riduciamo il debito residuo di un prestito gi&agrave; attivo e ricalcoliamo la rata mantenendo la durata residua.
+                                        Riduciamo il debito residuo di un prestito gia attivo e ricalcoliamo il suo impatto prima di sommare tutte le nuove simulazioni.
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -561,7 +845,7 @@ export function LoanCalculator() {
                                                 <SelectContent>
                                                     {activeLoanEntries.map(({ loan, snapshot }) => (
                                                         <SelectItem key={loan.id} value={loan.id}>
-                                                            {loan.name} • {formatEuro(snapshot.currentInstallment)}/mese
+                                                            {loan.name} - {formatEuro(snapshot.currentInstallment)}/mese
                                                         </SelectItem>
                                                     ))}
                                                 </SelectContent>
@@ -576,7 +860,7 @@ export function LoanCalculator() {
                                                 max={selectedLoanEntry.snapshot.remainingDebt}
                                                 step={debtReductionSliderStep}
                                                 value={clampedPrepaymentAmount || ""}
-                                                onChange={(e) => setSelectedPrepaymentAmount(Math.max(0, Number(e.target.value) || 0))}
+                                                onChange={(event) => setSelectedPrepaymentAmount(Math.max(0, Number(event.target.value) || 0))}
                                                 className="min-h-11 rounded-xl bg-background/80 text-sm"
                                             />
                                         </div>
@@ -593,6 +877,7 @@ export function LoanCalculator() {
                                                 Estingui tutto
                                             </button>
                                         </div>
+
                                         <Slider
                                             min={0}
                                             max={Math.max(selectedLoanEntry.snapshot.remainingDebt, debtReductionSliderStep)}
@@ -601,37 +886,47 @@ export function LoanCalculator() {
                                             onValueChange={([value]) => setSelectedPrepaymentAmount(value)}
                                             className="[&_[role=slider]]:bg-orange-500"
                                         />
+
                                         <div className="flex flex-wrap gap-2">
                                             {[25, 50, 75, 100].map((percentage) => (
                                                 <button
                                                     key={percentage}
                                                     type="button"
-                                                    onClick={() => setSelectedPrepaymentAmount((selectedLoanEntry.snapshot.remainingDebt * percentage) / 100)}
+                                                    onClick={() =>
+                                                        setSelectedPrepaymentAmount((selectedLoanEntry.snapshot.remainingDebt * percentage) / 100)
+                                                    }
                                                     className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-muted/50"
                                                 >
                                                     {percentage}%
                                                 </button>
                                             ))}
-                                            {suggestedPrepaymentForThreshold > 0 && suggestedPrepaymentForThreshold < selectedLoanEntry.snapshot.remainingDebt && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSelectedPrepaymentAmount(suggestedPrepaymentForThreshold)}
-                                                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                                >
-                                                    Portami al 33%: {formatEuro(suggestedPrepaymentForThreshold)}
-                                                </button>
-                                            )}
+                                            {suggestedPrepaymentForThreshold > 0 &&
+                                                suggestedPrepaymentForThreshold < selectedLoanEntry.snapshot.remainingDebt && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSelectedPrepaymentAmount(suggestedPrepaymentForThreshold)}
+                                                        className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                    >
+                                                        Portami al 33%: {formatEuro(suggestedPrepaymentForThreshold)}
+                                                    </button>
+                                                )}
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rata attuale</p>
-                                            <p className="mt-1 text-base font-bold text-foreground">{formatEuro(selectedLoanEntry.snapshot.currentInstallment)}</p>
+                                            <p className="mt-1 text-base font-bold text-foreground">
+                                                {formatEuro(selectedLoanEntry.snapshot.currentInstallment)}
+                                            </p>
                                         </div>
                                         <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/25">
-                                            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-300">Nuova rata stimata</p>
-                                            <p className="mt-1 text-base font-bold text-emerald-700 dark:text-emerald-300">{formatEuro(previewNewInstallment)}</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-300">
+                                                Nuova rata stimata
+                                            </p>
+                                            <p className="mt-1 text-base font-bold text-emerald-700 dark:text-emerald-300">
+                                                {formatEuro(previewNewInstallment)}
+                                            </p>
                                         </div>
                                         <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Debito dopo versamento</p>
@@ -641,15 +936,19 @@ export function LoanCalculator() {
                                         </div>
                                         <div className="rounded-2xl border border-blue-200/80 bg-blue-50/80 p-3 dark:border-blue-900/60 dark:bg-blue-950/25">
                                             <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">Riduzione rata</p>
-                                            <p className="mt-1 text-base font-bold text-blue-700 dark:text-blue-300">{formatEuro(previewMonthlySavings)}</p>
+                                            <p className="mt-1 text-base font-bold text-blue-700 dark:text-blue-300">
+                                                {formatEuro(previewMonthlySavings)}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    <p className={`text-xs leading-relaxed ${
-                                        selectedLoanEntry.snapshot.recalculationMode === "estimate"
-                                            ? "text-amber-700 dark:text-amber-300"
-                                            : "text-muted-foreground"
-                                    }`}>
+                                    <p
+                                        className={`text-xs leading-relaxed ${
+                                            selectedLoanEntry.snapshot.recalculationMode === "estimate"
+                                                ? "text-amber-700 dark:text-amber-300"
+                                                : "text-muted-foreground"
+                                        }`}
+                                    >
                                         {getRecalculationModeLabel(
                                             debtReductionSimulation?.recalculationMode ?? selectedLoanEntry.snapshot.recalculationMode,
                                         )}
@@ -662,19 +961,24 @@ export function LoanCalculator() {
                             <div className="flex justify-between text-xs">
                                 <span className="text-muted-foreground">Rapporto rata / reddito</span>
                                 <span className={`font-bold ${dtiData.isOk ? "text-emerald-600" : dtiData.isWarning ? "text-amber-600" : "text-red-600"}`}>
-                                    {dtiData.dtiPct.toFixed(1)}% su max 33%{dtiData.hasSimulation ? ` • prima ${dtiData.baselineDtiPct.toFixed(1)}%` : ""}
+                                    {dtiData.dtiPct.toFixed(1)}% su max 33%
+                                    {dtiData.hasSimulation ? ` - prima ${dtiData.baselineDtiPct.toFixed(1)}%` : ""}
                                 </span>
                             </div>
+
                             <div className="relative pt-7">
                                 <div
                                     className="absolute top-0 z-30"
                                     style={{ left: getDtiPosition(dtiIndicatorValue), transform: dtiIndicatorTransform }}
                                 >
-                                    <div className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold shadow-sm ${dtiAccentClasses.badge}`}>
+                                    <div
+                                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold shadow-sm ${dtiAccentClasses.badge}`}
+                                    >
                                         <span className="h-1.5 w-1.5 rounded-full bg-current" />
                                         {dtiData.dtiPct.toFixed(1)}%
                                     </div>
                                 </div>
+
                                 <div className="relative h-4 overflow-hidden rounded-full bg-muted/60 shadow-inner ring-1 ring-black/5 dark:ring-white/10">
                                     {DTI_TRACK_SEGMENTS.map((segment) => (
                                         <div
@@ -703,15 +1007,15 @@ export function LoanCalculator() {
                                     />
                                 </div>
                             </div>
+
                             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                                 <span>Area comfort</span>
                                 <span>Attenzione</span>
                                 <span>Critica</span>
                             </div>
+
                             <div className="relative h-4 text-[10px]">
-                                <div
-                                    className="absolute inset-x-0 top-1/2 border-t border-dashed border-border/70"
-                                />
+                                <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-border/70" />
                                 {DTI_MARKERS.map((marker) => (
                                     <span
                                         key={marker.value}
@@ -724,35 +1028,43 @@ export function LoanCalculator() {
                             </div>
                         </div>
 
-                        <div className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-xs ${
-                            dtiData.isOk
-                                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
-                                : dtiData.isWarning
-                                ? "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
-                                : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300"
-                        }`}>
-                            {dtiData.isOk
-                                ? <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
-                                : dtiData.isDanger
-                                ? <XCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-600" />
-                                : <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />}
-                            <span>
-                                {dtiData.isOk
-                                    ? `Rapporto rata/reddito al ${dtiData.dtiPct.toFixed(1)}%, entro il limite del 33%. La banca dovrebbe approvare il finanziamento.`
+                        <div
+                            className={`flex items-start gap-2.5 rounded-2xl p-3.5 text-xs ${
+                                dtiData.isOk
+                                    ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
                                     : dtiData.isWarning
-                                    ? `Rapporto rata/reddito al ${dtiData.dtiPct.toFixed(1)}%, oltre il 33% consigliato. L'approvazione dipende dalla politica del singolo istituto.`
-                                    : `Rapporto rata/reddito al ${dtiData.dtiPct.toFixed(1)}%, oltre il 40%. La banca difficilmente approverà il finanziamento nelle condizioni attuali.`}
+                                    ? "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                                    : "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-300"
+                            }`}
+                        >
+                            {dtiData.isOk ? (
+                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                            ) : dtiData.isDanger ? (
+                                <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                            ) : (
+                                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                            )}
+                            <span>
+                                {dtiData.hasSimulation
+                                    ? dtiData.isOk
+                                        ? `Con ${activeSimulationSummaryLabel} e il versamento simulato di ${formatEuro(dtiData.simulatedPrepayment)} su ${dtiData.simulatedLoanName}, il rapporto scende da ${dtiData.baselineDtiPct.toFixed(1)}% a ${dtiData.dtiPct.toFixed(1)}% e torna sotto la soglia del 33%.`
+                                        : `Con ${activeSimulationSummaryLabel} e il versamento simulato di ${formatEuro(dtiData.simulatedPrepayment)} su ${dtiData.simulatedLoanName}, il rapporto migliora di ${dtiData.dtiImprovementPct.toFixed(1)} punti ma resta al ${dtiData.dtiPct.toFixed(1)}%.`
+                                    : dtiData.isOk
+                                    ? `Considerando ${activeSimulationSummaryLabel}, il rapporto rata/reddito e al ${dtiData.dtiPct.toFixed(1)}%, entro il limite del 33%.`
+                                    : dtiData.isWarning
+                                    ? `Considerando ${activeSimulationSummaryLabel}, il rapporto rata/reddito sale al ${dtiData.dtiPct.toFixed(1)}%, oltre il 33% consigliato.`
+                                    : `Considerando ${activeSimulationSummaryLabel}, il rapporto rata/reddito raggiunge il ${dtiData.dtiPct.toFixed(1)}%, oltre il 40%.`}
                             </span>
                         </div>
 
                         <p className="text-xs text-muted-foreground">
                             Rata massima aggiuntiva sostenibile al 33%{dtiData.hasSimulation ? " dopo il versamento" : ""}:{" "}
                             <span className={`font-semibold ${dtiData.maxNewInstallment > 0 ? "text-foreground" : "text-red-500"}`}>
-                                {dtiData.maxNewInstallment > 0 ? formatEuro(dtiData.maxNewInstallment) : "soglia già superata dalle rate esistenti"}
+                                {dtiData.maxNewInstallment > 0 ? formatEuro(dtiData.maxNewInstallment) : "soglia gia superata dalle rate esistenti"}
                             </span>
                             {dtiData.hasSimulation && (
                                 <span className="ml-1 text-muted-foreground">
-                                    (prima {dtiData.baselineMaxNewInstallment > 0 ? formatEuro(dtiData.baselineMaxNewInstallment) : "0â‚¬"})
+                                    (prima {dtiData.baselineMaxNewInstallment > 0 ? formatEuro(dtiData.baselineMaxNewInstallment) : "0 EUR"})
                                 </span>
                             )}
                         </p>
@@ -760,140 +1072,150 @@ export function LoanCalculator() {
                 </Card>
             )}
 
-            {/* KPI cards */}
-            <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-                <div className="rounded-3xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950/30">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Rata Mensile</p>
-                    <p className="mt-1 text-lg font-extrabold text-orange-600 dark:text-orange-400">{formatEuro(result.installment)}</p>
-                    <p className="mt-0.5 text-[10px] text-orange-400">per {durata} mesi</p>
-                </div>
-                <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Totale Pagato</p>
-                    <p className="mt-1 text-lg font-extrabold text-blue-600 dark:text-blue-400">{formatEuro(result.totalPaid)}</p>
-                    <p className="mt-0.5 text-[10px] text-blue-400">capitale + interessi</p>
-                </div>
-                <div className="rounded-3xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Interessi Totali</p>
-                    <p className="mt-1 text-lg font-extrabold text-red-600 dark:text-red-400">{formatEuro(result.totalInterest)}</p>
-                    <p className="mt-0.5 text-[10px] text-red-400">costo del credito</p>
-                </div>
-                <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/30">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400">% Costo Credito</p>
-                    <p className="mt-1 text-lg font-extrabold text-rose-600 dark:text-rose-400">{costoPct.toFixed(1)}%</p>
-                    <p className="mt-0.5 text-[10px] text-rose-400">su capitale finanziato</p>
-                </div>
-            </div>
-
-            {/* Chart */}
-            {result.chartData.length > 0 && (
-                <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
-                    <CardContent className="p-5">
-                        <h3 className="mb-4 text-sm font-bold text-muted-foreground">Piano di Rimborso per Anno</h3>
-                        <div className="h-72">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={result.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                    <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-                                    <YAxis
-                                        yAxisId="bars"
-                                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                        tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
-                                    />
-                                    <YAxis
-                                        yAxisId="line"
-                                        orientation="right"
-                                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                        tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)}
-                                    />
-                                    <Tooltip
-                                        formatter={(value: number | string | undefined, name?: string) => [formatEuro(Number(value ?? 0)), name ?? "Valore"]}
-                                        contentStyle={{
-                                            borderRadius: "16px",
-                                            border: "1px solid var(--border)",
-                                            backgroundColor: "var(--popover)",
-                                            color: "var(--popover-foreground)",
-                                            boxShadow: "0 16px 40px -16px rgba(15,23,42,0.45)",
-                                        }}
-                                    />
-                                    <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted-foreground)" }} />
-                                    <Bar yAxisId="bars" dataKey="Capitale" stackId="a" fill="#3b82f6" fillOpacity={0.85} radius={[0, 0, 4, 4]} />
-                                    <Bar yAxisId="bars" dataKey="Interessi" stackId="a" fill="#ef4444" fillOpacity={0.75} radius={[4, 4, 0, 0]} />
-                                    <Line
-                                        yAxisId="line"
-                                        type="monotone"
-                                        dataKey="Debito Residuo"
-                                        stroke="#f97316"
-                                        strokeWidth={2}
-                                        dot={false}
-                                    />
-                                </ComposedChart>
-                            </ResponsiveContainer>
+            {activeSimulationEntries.length > 0 && (
+                <>
+                    <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+                        <div className="rounded-3xl border border-orange-200 bg-orange-50 p-4 dark:border-orange-900 dark:bg-orange-950/30">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Nuove Rate Simulate</p>
+                            <p className="mt-1 text-lg font-extrabold text-orange-600 dark:text-orange-300">{formatEuro(dtiData.totalNewInstallment)}</p>
+                            <p className="mt-0.5 text-[10px] text-orange-400">
+                                {activeSimulationEntries.length} finanziament{activeSimulationEntries.length === 1 ? "o" : "i"} attiv{activeSimulationEntries.length === 1 ? "o" : "i"}
+                            </p>
                         </div>
-                        <p className="mt-3 text-[10px] text-muted-foreground text-center">
-                            <span className="inline-block w-3 h-2 bg-blue-500 rounded mr-1" />Quota capitale &nbsp;
-                            <span className="inline-block w-3 h-2 bg-red-500 rounded mr-1" />Quota interessi &nbsp;
-                            <span className="font-semibold text-orange-500">— Debito residuo</span> (asse dx)
-                        </p>
-                    </CardContent>
-                </Card>
-            )}
+                        <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Totale Pagato</p>
+                            <p className="mt-1 text-lg font-extrabold text-blue-600 dark:text-blue-300">{formatEuro(aggregateResult.totalPaid)}</p>
+                            <p className="mt-0.5 text-[10px] text-blue-400">capitale + interessi</p>
+                        </div>
+                        <div className="rounded-3xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-red-400">Interessi Totali</p>
+                            <p className="mt-1 text-lg font-extrabold text-red-600 dark:text-red-300">{formatEuro(aggregateResult.totalInterest)}</p>
+                            <p className="mt-0.5 text-[10px] text-red-400">sommati su tutte le simulazioni</p>
+                        </div>
+                        <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/30">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400">% Costo Credito</p>
+                            <p className="mt-1 text-lg font-extrabold text-rose-600 dark:text-rose-300">{aggregateCostPct.toFixed(1)}%</p>
+                            <p className="mt-0.5 text-[10px] text-rose-400">sul capitale totale simulato</p>
+                        </div>
+                    </div>
 
-            {/* Amortization table toggle */}
-            {result.schedule.length > 0 && (
-                <div>
-                    <button
-                        onClick={() => setShowTable((v) => !v)}
-                        className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card/80 px-5 py-3 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/40"
-                    >
-                        <span className="flex items-center gap-2">
-                            <CreditCard className="h-4 w-4 text-orange-500" />
-                            Piano di ammortamento dettagliato ({durata} rate)
-                        </span>
-                        {showTable ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    </button>
-
-                    {showTable && (
-                        <Card className="mt-2 rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
-                            <CardContent className="p-0">
-                                <div className="max-h-96 overflow-auto rounded-3xl">
-                                    <table className="w-full text-xs">
-                                        <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-                                            <tr>
-                                                {["Mese", "Rata", "Q. Capitale", "Q. Interessi", "Debito Residuo"].map((h) => (
-                                                    <th key={h} className="px-4 py-3 text-left font-semibold text-muted-foreground">{h}</th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {result.schedule.map((row, idx) => (
-                                                <tr
-                                                    key={row.mese}
-                                                    className={idx % 2 === 0 ? "bg-transparent" : "bg-muted/20"}
-                                                >
-                                                    <td className="px-4 py-2 font-medium">{row.mese}</td>
-                                                    <td className="px-4 py-2">{formatEuro(row.rata)}</td>
-                                                    <td className="px-4 py-2 text-blue-600 dark:text-blue-400">{formatEuro(row.capitale)}</td>
-                                                    <td className="px-4 py-2 text-red-500 dark:text-red-400">{formatEuro(row.interessi)}</td>
-                                                    <td className="px-4 py-2 font-semibold">{formatEuro(row.debito)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                    {aggregateResult.chartData.length > 0 && (
+                        <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+                            <CardContent className="p-5">
+                                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-muted-foreground">Piano di Rimborso Complessivo</h3>
+                                        <p className="text-xs text-muted-foreground">
+                                            Somma anno per anno di tutte le simulazioni attive in questo momento.
+                                        </p>
+                                    </div>
+                                    <span className="text-[11px] font-semibold text-muted-foreground">
+                                        Orizzonte massimo: {aggregateResult.schedule.length} mesi
+                                    </span>
                                 </div>
+
+                                <div className="h-72">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <ComposedChart data={aggregateResult.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                                            <YAxis
+                                                yAxisId="bars"
+                                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                                tickFormatter={(value: number) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(value))}
+                                            />
+                                            <YAxis
+                                                yAxisId="line"
+                                                orientation="right"
+                                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                                tickFormatter={(value: number) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(value))}
+                                            />
+                                            <Tooltip
+                                                formatter={(value: number | string | undefined, name?: string) => [
+                                                    formatEuro(Number(value ?? 0)),
+                                                    name ?? "Valore",
+                                                ]}
+                                                contentStyle={{
+                                                    borderRadius: "16px",
+                                                    border: "1px solid var(--border)",
+                                                    backgroundColor: "var(--popover)",
+                                                    color: "var(--popover-foreground)",
+                                                    boxShadow: "0 16px 40px -16px rgba(15,23,42,0.45)",
+                                                }}
+                                            />
+                                            <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted-foreground)" }} />
+                                            <Bar yAxisId="bars" dataKey="Capitale" stackId="a" fill="#3b82f6" fillOpacity={0.85} radius={[0, 0, 4, 4]} />
+                                            <Bar yAxisId="bars" dataKey="Interessi" stackId="a" fill="#ef4444" fillOpacity={0.75} radius={[4, 4, 0, 0]} />
+                                            <Line yAxisId="line" type="monotone" dataKey="Debito Residuo" stroke="#f97316" strokeWidth={2} dot={false} />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+
+                                <p className="mt-3 text-center text-[10px] text-muted-foreground">
+                                    <span className="mr-1 inline-block h-2 w-3 rounded bg-blue-500" /> Quota capitale{" "}
+                                    <span className="mr-1 inline-block h-2 w-3 rounded bg-red-500" /> Quota interessi{" "}
+                                    <span className="font-semibold text-orange-500">- Debito residuo</span> (asse dx)
+                                </p>
                             </CardContent>
                         </Card>
                     )}
-                </div>
+
+                    {aggregateResult.schedule.length > 0 && (
+                        <div>
+                            <button
+                                type="button"
+                                onClick={() => setShowOverallTable((current) => !current)}
+                                className="flex w-full items-center justify-between rounded-2xl border border-border/70 bg-card/80 px-5 py-3 text-sm font-semibold text-foreground shadow-sm transition-colors hover:bg-muted/40"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <CreditCard className="h-4 w-4 text-orange-500" />
+                                    Piano di ammortamento complessivo ({aggregateResult.schedule.length} mesi)
+                                </span>
+                                {showOverallTable ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </button>
+
+                            {showOverallTable && (
+                                <Card className="mt-2 rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+                                    <CardContent className="p-0">
+                                        <div className="max-h-96 overflow-auto rounded-3xl">
+                                            <table className="w-full text-xs">
+                                                <thead className="sticky top-0 bg-muted/80 backdrop-blur">
+                                                    <tr>
+                                                        {["Mese", "Rata", "Q. Capitale", "Q. Interessi", "Debito Residuo"].map((heading) => (
+                                                            <th key={heading} className="px-4 py-3 text-left font-semibold text-muted-foreground">
+                                                                {heading}
+                                                            </th>
+                                                        ))}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {aggregateResult.schedule.map((row, index) => (
+                                                        <tr key={row.mese} className={index % 2 === 0 ? "bg-transparent" : "bg-muted/20"}>
+                                                            <td className="px-4 py-2 font-medium">{row.mese}</td>
+                                                            <td className="px-4 py-2">{formatEuro(row.rata)}</td>
+                                                            <td className="px-4 py-2 text-blue-600 dark:text-blue-400">{formatEuro(row.capitale)}</td>
+                                                            <td className="px-4 py-2 text-red-500 dark:text-red-400">{formatEuro(row.interessi)}</td>
+                                                            <td className="px-4 py-2 font-semibold">{formatEuro(row.debito)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
 
-            {/* Info box */}
             <div className="space-y-2 rounded-3xl border border-orange-200 bg-orange-50/90 p-5 text-sm dark:border-orange-800 dark:bg-orange-950/20">
                 <p className="text-xs font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400">Come funziona</p>
                 <ul className="list-inside list-disc space-y-1 text-xs text-orange-700 dark:text-orange-400">
-                    <li>La rata è costante per tutta la durata del prestito (ammortamento alla francese)</li>
-                    <li>Nelle prime rate la quota interessi è maggiore; con il tempo cresce la quota capitale</li>
-                    <li>Il TAN (Tasso Annuo Nominale) non include le spese accessorie — il TAEG effettivo può essere più alto</li>
-                    <li>Aumentare l&apos;anticipo riduce il capitale finanziato e quindi gli interessi totali</li>
+                    <li>Ogni simulazione usa ammortamento alla francese e puo essere sommata alle altre.</li>
+                    <li>Le nuove rate vengono aggregate nel DTI insieme ai prestiti gia esistenti.</li>
+                    <li>La leva anti-DTI ricalcola prima un debito attivo, poi aggiorna l&apos;analisi complessiva.</li>
+                    <li>Aumentare anticipo o ridurre importo, durata e tasso su ogni card cambia il totale generale in tempo reale.</li>
                 </ul>
             </div>
         </div>

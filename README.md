@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.6.1`
+**Versione corrente:** `v1.7.0`
 
 ---
 
@@ -113,6 +113,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.7.0 - 23 aprile 2026 (simulazione multi-finanziamento nel calcolatore rate)
+
+- **Simulazioni parallele nello stesso scenario** - il `Calcolatore Finanziamento` permette ora di aggiungere piu' finanziamenti uno sotto l'altro con un bottone `+` dedicato, cosi' si possono confrontare e sommare piu' nuove rate nello stesso momento prima di prendere una decisione
+- **Analisi generale cumulata sotto alle card** - sotto i singoli blocchi viene costruita una vista aggregata con rata totale simulata, costo complessivo, interessi, grafico e piano di ammortamento cumulato di tutte le simulazioni attive, in modo da leggere l'impatto finale come farebbe una banca sul quadro complessivo
+- **Integrazione con la leva anti-DTI gia' presente** - la riduzione o estinzione di un debito esistente continua a funzionare, ma adesso viene applicata all'analisi complessiva di tutte le nuove simulazioni, cosi' il rapporto rata/reddito mostra uno scenario molto piu' realistico e operativo
+
 ### v1.6.1 - 23 aprile 2026 (simulazione estinzione anticipata nel calcolatore finanziamenti)
 
 - **Nuova leva anti-DTI nel Calcolatore Finanziamento** - dentro `Strumenti -> Calcolatore Rata Finanziamento` e' stata aggiunta una sezione opzionale che permette di selezionare un prestito o mutuo gia' attivo, simulare un versamento extra o l'estinzione totale e vedere subito come cambia il rapporto rata/reddito prima di richiedere un nuovo finanziamento
