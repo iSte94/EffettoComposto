@@ -32,6 +32,7 @@ export const preferencesSchema = z.object({
     acceptedPurchases: z.string().optional(),
     advisorSavedScenarios: z.string().optional(),
     advisorReminders: z.string().optional(),
+    loanCalculatorSavedScenarios: z.string().optional(),
     careerProgression: z.string().optional(),
     salaryCalculationHistory: z.string().optional(),
     // FIRE

@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.7.0`
+**Versione corrente:** `v1.8.0`
 
 ---
 
@@ -113,6 +113,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.8.0 - 23 aprile 2026 (workspace salvabile nel calcolatore finanziamenti)
+
+- **Scenari salvati nel Calcolatore Finanziamento** - ora ogni combinazione di card, intestatario e leva anti-DTI puo' essere salvata con un nome e ripresa in un secondo momento, cosi' l'utente puo' tornare sui propri ragionamenti senza ricostruire tutto da zero
+- **Ripresa, modifica, aggiornamento e duplicazione** - il pannello scenari permette di riaprire una simulazione salvata, modificarla, aggiornarla sullo stesso slot oppure salvarne una copia come nuovo scenario per confrontare varianti diverse
+- **Persistenza coerente con account e backup** - gli scenari vengono memorizzati nelle `Preference` come gli altri workspace personali dell'app, quindi seguono il login, il local fallback del browser e l'export/import dati utente
+
 ### v1.7.0 - 23 aprile 2026 (simulazione multi-finanziamento nel calcolatore rate)
 
 - **Simulazioni parallele nello stesso scenario** - il `Calcolatore Finanziamento` permette ora di aggiungere piu' finanziamenti uno sotto l'altro con un bottone `+` dedicato, cosi' si possono confrontare e sommare piu' nuove rate nello stesso momento prima di prendere una decisione

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,15 +17,22 @@ import {
     ChevronUp,
     CreditCard,
     Euro,
+    FolderOpen,
     Layers3,
     Percent,
     Plus,
+    Save,
     Trash2,
     Users,
     XCircle,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { usePreferences } from "@/hooks/usePreferences";
+import {
+    parseLoanCalculatorSavedScenarios,
+    removeLoanCalculatorScenario,
+    upsertLoanCalculatorScenario,
+} from "@/lib/loan-calculator-workspace";
 import {
     type ExistingLoan,
     type ExistingLoanPrepaymentSimulation,
@@ -33,6 +41,12 @@ import {
     simulateLoanPrepayment,
 } from "@/lib/finance/loans";
 import { DTI_THRESHOLD } from "@/lib/constants";
+import type {
+    LoanCalculatorFinancingSimulation,
+    LoanCalculatorIntestatario,
+    LoanCalculatorSavedScenario,
+    LoanCalculatorSavedScenarioInput,
+} from "@/types";
 import {
     Bar,
     CartesianGrid,
@@ -66,15 +80,7 @@ interface AmortizationResult {
     }[];
 }
 
-interface FinancingSimulation {
-    id: string;
-    importo: number;
-    anticipo: number;
-    tasso: number;
-    durata: number;
-}
-
-interface FinancingSimulationComputed extends FinancingSimulation {
+interface FinancingSimulationComputed extends LoanCalculatorFinancingSimulation {
     label: string;
     principal: number;
     result: AmortizationResult;
@@ -101,11 +107,16 @@ const DTI_TRACK_SEGMENTS = [
     { start: DTI_WARNING_THRESHOLD, end: DTI_SCALE_MAX, className: "bg-red-100/90 dark:bg-red-950/35" },
 ] as const;
 
+const savedScenarioDateFormatter = new Intl.DateTimeFormat("it-IT", {
+    dateStyle: "medium",
+    timeStyle: "short",
+});
+
 function createSimulationId() {
     return Math.random().toString(36).slice(2, 10);
 }
 
-function createFinancingSimulation(prefilled: boolean): FinancingSimulation {
+function createFinancingSimulation(prefilled: boolean): LoanCalculatorFinancingSimulation {
     return {
         id: createSimulationId(),
         importo: prefilled ? 50000 : 0,
@@ -117,6 +128,11 @@ function createFinancingSimulation(prefilled: boolean): FinancingSimulation {
 
 function getSimulationLabel(index: number) {
     return index === 0 ? "Finanziamento principale" : `Finanziamento ${index + 1}`;
+}
+
+function formatSavedScenarioDate(value: string) {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? "Data non disponibile" : savedScenarioDateFormatter.format(parsed);
 }
 
 function getRecalculationModeLabel(mode: LoanRecalculationMode) {
@@ -242,17 +258,48 @@ function aggregateAmortizationResults(results: AmortizationResult[]): Amortizati
 }
 
 export function LoanCalculator() {
-    const [simulations, setSimulations] = useState<FinancingSimulation[]>(() => [createFinancingSimulation(true)]);
+    const [simulations, setSimulations] = useState<LoanCalculatorFinancingSimulation[]>(() => [createFinancingSimulation(true)]);
     const [showOverallTable, setShowOverallTable] = useState(false);
-    const [intestatario, setIntestatario] = useState<"person1" | "person2" | "both">("person1");
+    const [intestatario, setIntestatario] = useState<LoanCalculatorIntestatario>("person1");
     const [enableDebtReductionSimulation, setEnableDebtReductionSimulation] = useState(false);
     const [selectedExistingLoanId, setSelectedExistingLoanId] = useState("");
     const [selectedPrepaymentAmount, setSelectedPrepaymentAmount] = useState(0);
+    const [scenarioName, setScenarioName] = useState("");
+    const [editingScenarioId, setEditingScenarioId] = useState<string | null>(null);
 
-    const { preferences } = usePreferences();
+    const { preferences, isLoaded, updatePreference } = usePreferences();
 
     const person1Name = preferences.person1Name || "Persona 1";
     const person2Name = preferences.person2Name || "Persona 2";
+    const savedScenarios = useMemo(
+        () => parseLoanCalculatorSavedScenarios(preferences.loanCalculatorSavedScenarios),
+        [preferences.loanCalculatorSavedScenarios],
+    );
+
+    const savedScenarioSummaries = useMemo(
+        () =>
+            savedScenarios.map((scenario) => {
+                const activeEntries = scenario.simulations
+                    .map((simulation) => {
+                        const principal = Math.max(0, simulation.importo - simulation.anticipo);
+                        const result = computeAmortization(principal, simulation.tasso, simulation.durata);
+
+                        return {
+                            principal,
+                            result,
+                        };
+                    })
+                    .filter((entry) => entry.principal > 0 && entry.result.installment > 0);
+
+                return {
+                    scenario,
+                    activeCount: activeEntries.length,
+                    totalInstallment: activeEntries.reduce((sum, entry) => sum + entry.result.installment, 0),
+                    totalPrincipal: activeEntries.reduce((sum, entry) => sum + entry.principal, 0),
+                };
+            }),
+        [savedScenarios],
+    );
 
     const simulationEntries = useMemo<FinancingSimulationComputed[]>(
         () =>
@@ -287,6 +334,88 @@ export function LoanCalculator() {
     );
 
     const aggregateCostPct = aggregatePrincipal > 0 ? (aggregateResult.totalInterest / aggregatePrincipal) * 100 : 0;
+
+    const persistSavedScenarios = (nextScenarios: LoanCalculatorSavedScenario[]) => {
+        updatePreference("loanCalculatorSavedScenarios", JSON.stringify(nextScenarios));
+    };
+
+    const buildScenarioInput = (): LoanCalculatorSavedScenarioInput | null => {
+        const trimmedName = scenarioName.trim();
+        if (!trimmedName) {
+            toast.error("Dai un nome allo scenario prima di salvarlo.");
+            return null;
+        }
+
+        return {
+            name: trimmedName,
+            simulations: simulations.map((simulation) => ({
+                id: simulation.id || createSimulationId(),
+                importo: Math.max(0, simulation.importo),
+                anticipo: Math.max(0, Math.min(simulation.anticipo, simulation.importo)),
+                tasso: Math.max(0, simulation.tasso),
+                durata: Math.max(6, Math.min(120, simulation.durata)),
+            })),
+            intestatario,
+            enableDebtReductionSimulation,
+            selectedExistingLoanId: selectedExistingLoanId || null,
+            selectedPrepaymentAmount: Math.max(0, selectedPrepaymentAmount),
+        };
+    };
+
+    const handleSaveScenario = (mode: "update" | "new") => {
+        if (!isLoaded) return;
+
+        const input = buildScenarioInput();
+        if (!input) return;
+
+        const result = upsertLoanCalculatorScenario(savedScenarios, input, {
+            scenarioId: mode === "update" ? editingScenarioId ?? undefined : undefined,
+        });
+
+        persistSavedScenarios(result.scenarios);
+        setEditingScenarioId(result.scenario.id);
+        setScenarioName(result.scenario.name);
+
+        toast.success(
+            mode === "update" && editingScenarioId
+                ? `Scenario "${result.scenario.name}" aggiornato nelle preferenze.`
+                : `Scenario "${result.scenario.name}" salvato nelle preferenze.`,
+        );
+    };
+
+    const handleLoadScenario = (scenario: LoanCalculatorSavedScenario) => {
+        setSimulations(
+            scenario.simulations.length > 0
+                ? scenario.simulations.map((simulation) => ({
+                    ...simulation,
+                    id: simulation.id || createSimulationId(),
+                }))
+                : [createFinancingSimulation(true)],
+        );
+        setIntestatario(scenario.intestatario);
+        setEnableDebtReductionSimulation(scenario.enableDebtReductionSimulation);
+        setSelectedExistingLoanId(scenario.selectedExistingLoanId ?? "");
+        setSelectedPrepaymentAmount(scenario.selectedPrepaymentAmount);
+        setScenarioName(scenario.name);
+        setEditingScenarioId(scenario.id);
+        setShowOverallTable(false);
+        toast.success(`Scenario "${scenario.name}" ripristinato.`);
+    };
+
+    const handleDeleteScenario = (scenarioId: string) => {
+        const scenario = savedScenarios.find((current) => current.id === scenarioId);
+        const nextScenarios = removeLoanCalculatorScenario(savedScenarios, scenarioId);
+
+        persistSavedScenarios(nextScenarios);
+
+        if (editingScenarioId === scenarioId) {
+            setEditingScenarioId(null);
+        }
+
+        toast.success(
+            scenario ? `Scenario "${scenario.name}" eliminato.` : "Scenario eliminato.",
+        );
+    };
 
     const existingLoans: ExistingLoan[] = useMemo(() => {
         try {
@@ -470,10 +599,10 @@ export function LoanCalculator() {
     const activeSimulationSummaryLabel =
         activeSimulationEntries.length === 1 ? "la simulazione attiva" : `le ${activeSimulationEntries.length} simulazioni attive`;
 
-    const updateSimulation = <K extends keyof FinancingSimulation>(
+    const updateSimulation = <K extends keyof LoanCalculatorFinancingSimulation>(
         simulationId: string,
         field: K,
-        value: FinancingSimulation[K],
+        value: LoanCalculatorFinancingSimulation[K],
     ) => {
         setSimulations((current) =>
             current.map((simulation) => (simulation.id === simulationId ? { ...simulation, [field]: value } : simulation)),
@@ -501,6 +630,160 @@ export function LoanCalculator() {
                     </p>
                 </div>
             </div>
+
+            <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
+                <CardContent className="space-y-5 p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="space-y-2">
+                            <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-blue-600 dark:border-blue-900/70 dark:bg-blue-950/30 dark:text-blue-300">
+                                <Save className="h-3.5 w-3.5" />
+                                Scenari salvati
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-foreground">Salva, riprendi e modifica le tue simulazioni</h3>
+                                <p className="mt-1 max-w-3xl text-sm leading-relaxed text-muted-foreground">
+                                    Dai un nome allo scenario corrente e ritrovalo quando vuoi per riaprire tutte le card, l&apos;intestatario e l&apos;eventuale leva anti-DTI.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-border/70 bg-background/80 px-4 py-3 text-right shadow-sm">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Archivio</p>
+                            <p className="text-base font-bold text-foreground">{savedScenarios.length} scenari</p>
+                            <p className="text-[11px] text-muted-foreground">
+                                {editingScenarioId ? "stai modificando uno scenario salvato" : "salvati nell'account o nel browser"}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+                        <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Nome scenario</Label>
+                            <Input
+                                value={scenarioName}
+                                onChange={(event) => setScenarioName(event.target.value)}
+                                placeholder="Es. Auto + arredamento estate 2026"
+                                className="min-h-11 rounded-xl text-sm"
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-2 sm:flex-row lg:items-end">
+                            <button
+                                type="button"
+                                onClick={() => handleSaveScenario(editingScenarioId ? "update" : "new")}
+                                disabled={!isLoaded}
+                                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <Save className="h-4 w-4" />
+                                {editingScenarioId ? "Aggiorna scenario" : "Salva scenario"}
+                            </button>
+
+                            {editingScenarioId && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleSaveScenario("new")}
+                                    disabled={!isLoaded}
+                                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border/70 bg-background/80 px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Salva come nuovo
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {editingScenarioId && (
+                        <p className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-3 text-xs text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300">
+                            Lo scenario corrente e collegato a un salvataggio esistente: se premi <span className="font-semibold">Aggiorna scenario</span> sovrascrivi quello, mentre <span className="font-semibold">Salva come nuovo</span> crea una copia separata.
+                        </p>
+                    )}
+
+                    {savedScenarioSummaries.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                            {savedScenarioSummaries.map(({ scenario, activeCount, totalInstallment, totalPrincipal }) => (
+                                <div
+                                    key={scenario.id}
+                                    className={`rounded-2xl border p-4 shadow-sm transition-colors ${
+                                        scenario.id === editingScenarioId
+                                            ? "border-orange-200 bg-orange-50/80 dark:border-orange-900/60 dark:bg-orange-950/20"
+                                            : "border-border/70 bg-background/70"
+                                    }`}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="space-y-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <p className="text-sm font-bold text-foreground">{scenario.name}</p>
+                                                {scenario.id === editingScenarioId && (
+                                                    <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-orange-600 dark:bg-orange-950/40 dark:text-orange-300">
+                                                        In modifica
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[11px] text-muted-foreground">
+                                                Aggiornato {formatSavedScenarioDate(scenario.updatedAt)}
+                                            </p>
+                                        </div>
+
+                                        <div className="rounded-2xl border border-border/70 bg-card/80 px-3 py-2 text-right">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rate nuove</p>
+                                            <p className="text-sm font-bold text-foreground">{formatEuro(totalInstallment)}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                                        <div className="rounded-xl bg-muted/30 px-3 py-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Card</p>
+                                            <p className="mt-1 font-semibold text-foreground">
+                                                {activeCount} attive su {scenario.simulations.length}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl bg-muted/30 px-3 py-2">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Capitale</p>
+                                            <p className="mt-1 font-semibold text-foreground">{formatEuro(totalPrincipal)}</p>
+                                        </div>
+                                    </div>
+
+                                    <p className="mt-3 text-[11px] text-muted-foreground">
+                                        Intestatario:{" "}
+                                        <span className="font-medium text-foreground">
+                                            {scenario.intestatario === "person1"
+                                                ? person1Name
+                                                : scenario.intestatario === "person2"
+                                                ? person2Name
+                                                : "Entrambi"}
+                                        </span>
+                                        {" · "}
+                                        {scenario.enableDebtReductionSimulation ? "leva anti-DTI salvata" : "nessuna riduzione debiti salvata"}
+                                    </p>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleLoadScenario(scenario)}
+                                            className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-card/80 px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-muted/40"
+                                        >
+                                            <FolderOpen className="h-4 w-4 text-orange-500" />
+                                            Riprendi
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteScenario(scenario.id)}
+                                            className="inline-flex items-center gap-2 rounded-xl border border-border/70 bg-card/80 px-3 py-2 text-xs font-semibold text-red-600 transition-colors hover:border-red-200 hover:bg-red-50 dark:hover:border-red-900/70 dark:hover:bg-red-950/30"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Elimina
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="rounded-2xl border border-dashed border-border/70 bg-muted/20 px-4 py-4 text-sm text-muted-foreground">
+                            Non hai ancora scenari salvati. Quando trovi una combinazione utile, assegnale un nome qui sopra e potrai riprenderla in qualsiasi momento.
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card className="rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
                 <CardContent className="space-y-5 p-5">
@@ -1215,6 +1498,7 @@ export function LoanCalculator() {
                     <li>Ogni simulazione usa ammortamento alla francese e puo essere sommata alle altre.</li>
                     <li>Le nuove rate vengono aggregate nel DTI insieme ai prestiti gia esistenti.</li>
                     <li>La leva anti-DTI ricalcola prima un debito attivo, poi aggiorna l&apos;analisi complessiva.</li>
+                    <li>Puoi salvare uno scenario completo e riprenderlo piu avanti per modificarlo o duplicarlo.</li>
                     <li>Aumentare anticipo o ridurre importo, durata e tasso su ogni card cambia il totale generale in tempo reale.</li>
                 </ul>
             </div>

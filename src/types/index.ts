@@ -179,6 +179,31 @@ export interface FinancialSnapshot {
     expectedInflation: number;        // %
 }
 
+export type LoanCalculatorIntestatario = "person1" | "person2" | "both";
+
+export interface LoanCalculatorFinancingSimulation {
+    id: string;
+    importo: number;
+    anticipo: number;
+    tasso: number;
+    durata: number;
+}
+
+export interface LoanCalculatorSavedScenarioInput {
+    name: string;
+    simulations: LoanCalculatorFinancingSimulation[];
+    intestatario: LoanCalculatorIntestatario;
+    enableDebtReductionSimulation: boolean;
+    selectedExistingLoanId: string | null;
+    selectedPrepaymentAmount: number;
+}
+
+export interface LoanCalculatorSavedScenario extends LoanCalculatorSavedScenarioInput {
+    id: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export type PurchaseCategory = "auto" | "immobile" | "arredamento" | "altro";
 
 export interface PurchaseSimulation {

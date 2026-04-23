@@ -67,6 +67,7 @@ model Preference {
   acceptedPurchases        String   @default("[]") // Legacy JSON string of accepted purchase simulations
   advisorSavedScenarios    String   @default("[]") // JSON string of advisor-only saved scenarios
   advisorReminders         String   @default("[]") // JSON string of advisor reminders
+  loanCalculatorSavedScenarios String @default("[]") // JSON string of saved loan calculator workspaces
   careerProgression        String   @default("[]") // JSON string of career progression predictions
   salaryCalculationHistory String   @default("[]") // JSON string of gross-to-net salary simulations
 

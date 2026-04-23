@@ -27,6 +27,7 @@ export interface MortgagePreferences {
     extraMaintenance: number;
     careerProgression: string;
     salaryCalculationHistory: string;
+    loanCalculatorSavedScenarios: string;
     expectedMonthlyExpenses: number;
     fireWithdrawalRate: number;
     fireExpectedReturn: number;
@@ -56,6 +57,7 @@ const DEFAULT_PREFERENCES: MortgagePreferences = {
     extraMaintenance: 10000,
     careerProgression: "[]",
     salaryCalculationHistory: "[]",
+    loanCalculatorSavedScenarios: "[]",
     expectedMonthlyExpenses: 2500,
     fireWithdrawalRate: 3.25,
     fireExpectedReturn: 6,
@@ -90,6 +92,7 @@ export function usePreferences() {
         extraMaintenance: raw?.extraMaintenance ?? DEFAULT_PREFERENCES.extraMaintenance,
         careerProgression: raw?.careerProgression ?? DEFAULT_PREFERENCES.careerProgression,
         salaryCalculationHistory: raw?.salaryCalculationHistory ?? DEFAULT_PREFERENCES.salaryCalculationHistory,
+        loanCalculatorSavedScenarios: raw?.loanCalculatorSavedScenarios ?? DEFAULT_PREFERENCES.loanCalculatorSavedScenarios,
         expectedMonthlyExpenses: raw?.expectedMonthlyExpenses ?? DEFAULT_PREFERENCES.expectedMonthlyExpenses,
         fireWithdrawalRate: raw?.fireWithdrawalRate ?? DEFAULT_PREFERENCES.fireWithdrawalRate,
         fireExpectedReturn: raw?.fireExpectedReturn ?? DEFAULT_PREFERENCES.fireExpectedReturn,
