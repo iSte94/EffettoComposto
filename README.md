@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.6.0`
+**Versione corrente:** `v1.6.1`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.6.1 - 23 aprile 2026 (simulazione estinzione anticipata nel calcolatore finanziamenti)
+
+- **Nuova leva anti-DTI nel Calcolatore Finanziamento** - dentro `Strumenti -> Calcolatore Rata Finanziamento` e' stata aggiunta una sezione opzionale che permette di selezionare un prestito o mutuo gia' attivo, simulare un versamento extra o l'estinzione totale e vedere subito come cambia il rapporto rata/reddito prima di richiedere un nuovo finanziamento
+- **Ricalcolo rata sul debito residuo in base al tipo di piano** - il motore condiviso in `src/lib/finance/loans.ts` ora costruisce uno snapshot del prestito attivo e ricalcola la nuova rata mantenendo la durata residua con logica coerente al dato disponibile: ammortamento francese per mutui/prestiti standard, piano crescente per i debiti marcati come variabili/crescenti, approccio lineare per i casi a tasso zero e fallback proporzionale quando mancano abbastanza dati
+- **Analisi DTI piu' operativa e guidata** - il pannello mostra debito residuo stimato, nuova rata, risparmio mensile, totale rate prima/dopo e un pulsante rapido `Portami al 33%` per stimare quanto capitale versare sul prestito scelto per rientrare nella soglia bancaria
+- **Qualita' della release** - aggiunti test dedicati per snapshot del prestito, estinzione parziale, estinzione totale e ricalcolo su piano crescente; verifica locale completata con `vitest`, `eslint` e `tsc --noEmit`
+
 ### v1.6.0 - 21 aprile 2026 (visualizzazione FIRE degli eventi futuri)
 
 - **Nuovo tab "Eventi Futuri" nel FIRE** - aggiunta una vista dedicata con grafico mensile moderno: barre verdi/rosse per impatto netto del mese, linea cumulata blu per l'effetto sul percorso FIRE e linea arancione per le rate future generate dagli eventi finanziati

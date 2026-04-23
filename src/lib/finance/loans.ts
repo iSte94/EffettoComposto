@@ -12,6 +12,27 @@ export interface ExistingLoan {
     owner?: "person1" | "person2";
 }
 
+export type LoanRecalculationMode = "french" | "growing" | "linear" | "estimate";
+
+export interface ExistingLoanSnapshot {
+    totalMonths: number;
+    monthsPassed: number;
+    remainingMonths: number;
+    currentInstallment: number;
+    remainingDebt: number;
+    isActive: boolean;
+    recalculationMode: LoanRecalculationMode;
+    growthRate: number;
+}
+
+export interface ExistingLoanPrepaymentSimulation extends ExistingLoanSnapshot {
+    appliedPrepayment: number;
+    newRemainingDebt: number;
+    newInstallment: number;
+    monthlySavings: number;
+    fullyExtinguished: boolean;
+}
+
 export interface MortgagePaymentParams {
     /** Capitale finanziato in euro (>= 0). */
     loanAmount: number;
@@ -32,6 +53,185 @@ export interface MortgagePaymentResult {
     numPayments: number;
     /** Tasso mensile effettivo (decimale). */
     monthlyRate: number;
+}
+
+function getMonthDifference(start: Date, end: Date): number {
+    return (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+}
+
+function parseMonthInput(value?: string): Date | null {
+    if (!value) return null;
+    const parsed = new Date(`${value}-01`);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function calculateRemainingDebtFromProgress(loan: ExistingLoan, totalMonths: number, monthsPassed: number): number {
+    const normalizedMonthsPassed = Number.isFinite(monthsPassed) ? Math.max(0, monthsPassed) : 0;
+    const remainingMonths = totalMonths - normalizedMonthsPassed;
+
+    if (remainingMonths <= 0) return 0;
+
+    if (loan.currentRemainingDebt) {
+        return Math.max(0, loan.currentRemainingDebt);
+    }
+
+    if (loan.originalAmount && loan.interestRate !== undefined && loan.interestRate > 0) {
+        const principal = loan.originalAmount;
+        const monthlyRate = (loan.interestRate / 100) / 12;
+
+        if (loan.isVariable && loan.installment && normalizedMonthsPassed > 0) {
+            const firstPayment = principal * monthlyRate;
+            const delta = (loan.installment - firstPayment) / normalizedMonthsPassed;
+
+            if (delta > 0) {
+                let balance = principal;
+
+                for (let month = 0; month < normalizedMonthsPassed; month++) {
+                    const installment = firstPayment + delta * month;
+                    const interest = balance * monthlyRate;
+                    const capital = installment - interest;
+
+                    if (capital > 0) {
+                        balance -= capital;
+                    }
+                }
+
+                return Math.max(0, balance);
+            }
+        }
+
+        return calculateMortgageRemainingDebt({
+            loanAmount: principal,
+            annualRatePct: loan.interestRate,
+            years: totalMonths / 12,
+            monthsPassed: normalizedMonthsPassed,
+        });
+    }
+
+    if (loan.originalAmount && totalMonths > 0) {
+        return Math.max(0, loan.originalAmount * (remainingMonths / totalMonths));
+    }
+
+    return Math.max(0, (Number(loan.installment) || 0) * remainingMonths);
+}
+
+function calculateGrowingPaymentForRemainingDebt(params: {
+    remainingDebt: number;
+    annualRatePct: number;
+    remainingMonths: number;
+    growthRate: number;
+}): number {
+    const remainingDebt = Number.isFinite(params.remainingDebt) ? Math.max(0, params.remainingDebt) : 0;
+    const annualRatePct = Number.isFinite(params.annualRatePct) ? Math.max(0, params.annualRatePct) : 0;
+    const remainingMonths = Number.isFinite(params.remainingMonths) ? Math.max(0, params.remainingMonths) : 0;
+    const growthRate = Number.isFinite(params.growthRate) ? Math.max(0, params.growthRate) : 0;
+
+    if (remainingDebt === 0 || remainingMonths === 0) return 0;
+
+    const monthlyRate = (annualRatePct / 100) / 12;
+    if (growthRate === 0) {
+        if (monthlyRate === 0) return remainingDebt / remainingMonths;
+        return calculateMortgagePayment({
+            loanAmount: remainingDebt,
+            annualRatePct,
+            years: remainingMonths / 12,
+        }).monthlyPayment;
+    }
+
+    const ratio = (1 + growthRate) / (1 + monthlyRate);
+    if (Math.abs(ratio - 1) < 0.000001) {
+        return remainingDebt * (1 + monthlyRate) / remainingMonths;
+    }
+
+    const denominator = 1 - Math.pow(ratio, remainingMonths);
+    if (Math.abs(denominator) < 0.000001) {
+        return 0;
+    }
+
+    return remainingDebt * (1 + monthlyRate) * (1 - ratio) / denominator;
+}
+
+function calculateGrowthRateFromCurrentState(params: {
+    remainingDebt: number;
+    currentInstallment: number;
+    annualRatePct?: number;
+    remainingMonths: number;
+}): number {
+    const remainingDebt = Number.isFinite(params.remainingDebt) ? Math.max(0, params.remainingDebt) : 0;
+    const currentInstallment = Number.isFinite(params.currentInstallment) ? Math.max(0, params.currentInstallment) : 0;
+    const annualRatePct = Number.isFinite(params.annualRatePct) ? Math.max(0, params.annualRatePct ?? 0) : 0;
+    const remainingMonths = Number.isFinite(params.remainingMonths) ? Math.max(0, params.remainingMonths) : 0;
+
+    if (remainingDebt === 0 || currentInstallment === 0 || remainingMonths <= 1) return 0;
+
+    const standardInstallment = calculateMortgagePayment({
+        loanAmount: remainingDebt,
+        annualRatePct,
+        years: remainingMonths / 12,
+    }).monthlyPayment;
+
+    if (currentInstallment >= standardInstallment * 0.98) return 0;
+
+    let low = 0;
+    let high = 0.05;
+    let bestGrowth = 0;
+
+    for (let iteration = 0; iteration < 40; iteration++) {
+        const mid = (low + high) / 2;
+        const simulatedPresentValue = calculateGrowingPaymentForRemainingDebt({
+            remainingDebt: 1,
+            annualRatePct,
+            remainingMonths,
+            growthRate: mid,
+        });
+
+        if (simulatedPresentValue === 0) {
+            break;
+        }
+
+        const requiredInstallment = currentInstallment / simulatedPresentValue;
+        if (requiredInstallment > remainingDebt) {
+            high = mid;
+        } else {
+            low = mid;
+            bestGrowth = mid;
+        }
+    }
+
+    return bestGrowth;
+}
+
+function resolveLoanRecalculationMode(loan: ExistingLoan, snapshot: {
+    remainingDebt: number;
+    currentInstallment: number;
+    remainingMonths: number;
+}): { mode: LoanRecalculationMode; growthRate: number } {
+    if (snapshot.remainingDebt <= 0 || snapshot.remainingMonths <= 0 || snapshot.currentInstallment <= 0) {
+        return { mode: "estimate", growthRate: 0 };
+    }
+
+    if (loan.isVariable && loan.interestRate !== undefined) {
+        const growthRate = calculateGrowthRateFromCurrentState({
+            remainingDebt: snapshot.remainingDebt,
+            currentInstallment: snapshot.currentInstallment,
+            annualRatePct: loan.interestRate,
+            remainingMonths: snapshot.remainingMonths,
+        });
+
+        return growthRate > 0
+            ? { mode: "growing", growthRate }
+            : { mode: "french", growthRate: 0 };
+    }
+
+    if (loan.originalAmount || loan.currentRemainingDebt) {
+        if (!loan.interestRate || loan.interestRate <= 0) {
+            return { mode: "linear", growthRate: 0 };
+        }
+
+        return { mode: "french", growthRate: 0 };
+    }
+
+    return { mode: "estimate", growthRate: 0 };
 }
 
 /**
@@ -242,3 +442,118 @@ export const getInstallmentAmountForMonth = (loan: ExistingLoan, targetMonthsPas
 
     return Number(loan.installment) || 0;
 };
+
+export function getExistingLoanSnapshot(loan: ExistingLoan, asOfDate: Date = new Date()): ExistingLoanSnapshot {
+    const start = parseMonthInput(loan.startDate);
+    const end = parseMonthInput(loan.endDate);
+
+    if (!start || !end) {
+        const fallbackRemainingDebt = Math.max(0, loan.currentRemainingDebt || loan.originalAmount || 0);
+        const fallbackInstallment = Math.max(0, Number(loan.installment) || 0);
+        const resolved = resolveLoanRecalculationMode(loan, {
+            remainingDebt: fallbackRemainingDebt,
+            currentInstallment: fallbackInstallment,
+            remainingMonths: 0,
+        });
+
+        return {
+            totalMonths: 0,
+            monthsPassed: 0,
+            remainingMonths: 0,
+            currentInstallment: fallbackInstallment,
+            remainingDebt: fallbackRemainingDebt,
+            isActive: false,
+            recalculationMode: resolved.mode,
+            growthRate: resolved.growthRate,
+        };
+    }
+
+    const totalMonths = getMonthDifference(start, end);
+    const monthsPassed = getMonthDifference(start, asOfDate);
+    const isActive = totalMonths > 0 && monthsPassed >= 0 && monthsPassed < totalMonths;
+    const normalizedMonthsPassed = Math.max(0, monthsPassed);
+    const remainingMonths = Math.max(0, totalMonths - normalizedMonthsPassed);
+    const derivedInstallment = totalMonths > 0
+        ? getInstallmentAmountForMonth(loan, normalizedMonthsPassed, totalMonths, normalizedMonthsPassed)
+        : 0;
+    const currentInstallment = isActive
+        ? Math.max(0, loan.isVariable && loan.installment ? Number(loan.installment) || derivedInstallment : derivedInstallment)
+        : 0;
+    const remainingDebt = isActive
+        ? calculateRemainingDebtFromProgress(loan, totalMonths, normalizedMonthsPassed)
+        : monthsPassed < 0
+        ? Math.max(0, loan.currentRemainingDebt || loan.originalAmount || 0)
+        : 0;
+    const resolved = resolveLoanRecalculationMode(loan, {
+        remainingDebt,
+        currentInstallment,
+        remainingMonths,
+    });
+
+    return {
+        totalMonths,
+        monthsPassed,
+        remainingMonths,
+        currentInstallment,
+        remainingDebt,
+        isActive,
+        recalculationMode: resolved.mode,
+        growthRate: resolved.growthRate,
+    };
+}
+
+export function simulateLoanPrepayment(
+    loan: ExistingLoan,
+    prepaymentAmount: number,
+    asOfDate: Date = new Date(),
+): ExistingLoanPrepaymentSimulation {
+    const snapshot = getExistingLoanSnapshot(loan, asOfDate);
+    const appliedPrepayment = Math.min(
+        snapshot.remainingDebt,
+        Math.max(0, Number.isFinite(prepaymentAmount) ? prepaymentAmount : 0),
+    );
+
+    if (!snapshot.isActive || snapshot.remainingDebt <= 0 || snapshot.remainingMonths <= 0) {
+        return {
+            ...snapshot,
+            appliedPrepayment: 0,
+            newRemainingDebt: snapshot.remainingDebt,
+            newInstallment: snapshot.currentInstallment,
+            monthlySavings: 0,
+            fullyExtinguished: snapshot.remainingDebt <= 0,
+        };
+    }
+
+    const newRemainingDebt = Math.max(0, snapshot.remainingDebt - appliedPrepayment);
+    let newInstallment = snapshot.currentInstallment;
+
+    if (newRemainingDebt === 0) {
+        newInstallment = 0;
+    } else if (snapshot.recalculationMode === "growing") {
+        newInstallment = calculateGrowingPaymentForRemainingDebt({
+            remainingDebt: newRemainingDebt,
+            annualRatePct: Math.max(0, loan.interestRate || 0),
+            remainingMonths: snapshot.remainingMonths,
+            growthRate: snapshot.growthRate,
+        });
+    } else if (snapshot.recalculationMode === "french") {
+        newInstallment = calculateMortgagePayment({
+            loanAmount: newRemainingDebt,
+            annualRatePct: Math.max(0, loan.interestRate || 0),
+            years: snapshot.remainingMonths / 12,
+        }).monthlyPayment;
+    } else if (snapshot.recalculationMode === "linear") {
+        newInstallment = snapshot.remainingMonths > 0 ? newRemainingDebt / snapshot.remainingMonths : 0;
+    } else if (snapshot.remainingDebt > 0) {
+        newInstallment = snapshot.currentInstallment * (newRemainingDebt / snapshot.remainingDebt);
+    }
+
+    return {
+        ...snapshot,
+        appliedPrepayment,
+        newRemainingDebt,
+        newInstallment: Math.max(0, newInstallment),
+        monthlySavings: Math.max(0, snapshot.currentInstallment - newInstallment),
+        fullyExtinguished: newRemainingDebt === 0,
+    };
+}

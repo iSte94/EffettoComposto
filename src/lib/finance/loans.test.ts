@@ -3,8 +3,10 @@ import {
     calculateMortgagePayment,
     calculateMortgageRemainingDebt,
     calculateRemainingDebt,
+    getExistingLoanSnapshot,
     getInstallmentAmountForMonth,
     calculateGrowthRate,
+    simulateLoanPrepayment,
 } from './loans';
 import type { ExistingLoan } from './loans';
 
@@ -236,5 +238,107 @@ describe('calculateGrowthRate', () => {
     it('returns 0 when remaining months is 0', () => {
         const loan = makeLoan({ originalAmount: 100000, interestRate: 5 });
         expect(calculateGrowthRate(loan, 60, 60)).toBe(0);
+    });
+});
+
+describe('getExistingLoanSnapshot', () => {
+    it('builds an active snapshot for a standard fixed loan', () => {
+        const loan = makeLoan({
+            startDate: '2024-01',
+            endDate: '2034-01',
+            originalAmount: 100000,
+            interestRate: 5,
+            installment: 1060.66,
+        });
+
+        const snapshot = getExistingLoanSnapshot(loan, new Date('2026-01-15T00:00:00Z'));
+
+        expect(snapshot.isActive).toBe(true);
+        expect(snapshot.totalMonths).toBe(120);
+        expect(snapshot.monthsPassed).toBe(24);
+        expect(snapshot.remainingMonths).toBe(96);
+        expect(snapshot.currentInstallment).toBeCloseTo(1060.66, 2);
+        expect(snapshot.remainingDebt).toBeCloseTo(
+            calculateMortgageRemainingDebt({ loanAmount: 100000, annualRatePct: 5, years: 10, monthsPassed: 24 }),
+            4,
+        );
+        expect(snapshot.recalculationMode).toBe('french');
+    });
+});
+
+describe('simulateLoanPrepayment', () => {
+    it('recalculates a lower installment for a fixed-rate loan after partial prepayment', () => {
+        const loan = makeLoan({
+            startDate: '2024-01',
+            endDate: '2034-01',
+            originalAmount: 100000,
+            interestRate: 5,
+            installment: 1060.66,
+        });
+
+        const simulation = simulateLoanPrepayment(loan, 10000, new Date('2026-01-15T00:00:00Z'));
+        const expectedInstallment = calculateMortgagePayment({
+            loanAmount: simulation.newRemainingDebt,
+            annualRatePct: 5,
+            years: simulation.remainingMonths / 12,
+        }).monthlyPayment;
+
+        expect(simulation.appliedPrepayment).toBe(10000);
+        expect(simulation.newInstallment).toBeCloseTo(expectedInstallment, 6);
+        expect(simulation.newInstallment).toBeLessThan(simulation.currentInstallment);
+        expect(simulation.monthlySavings).toBeCloseTo(simulation.currentInstallment - simulation.newInstallment, 6);
+        expect(simulation.recalculationMode).toBe('french');
+    });
+
+    it('sets installment to zero when the loan is fully extinguished', () => {
+        const loan = makeLoan({
+            startDate: '2024-01',
+            endDate: '2034-01',
+            originalAmount: 100000,
+            interestRate: 5,
+            installment: 1060.66,
+        });
+
+        const simulation = simulateLoanPrepayment(loan, 1_000_000, new Date('2026-01-15T00:00:00Z'));
+
+        expect(simulation.fullyExtinguished).toBe(true);
+        expect(simulation.newRemainingDebt).toBe(0);
+        expect(simulation.newInstallment).toBe(0);
+        expect(simulation.monthlySavings).toBeCloseTo(simulation.currentInstallment, 6);
+    });
+
+    it('uses a linear recalculation when the loan has no interest data', () => {
+        const loan = makeLoan({
+            startDate: '2025-01',
+            endDate: '2029-01',
+            originalAmount: 24000,
+            interestRate: 0,
+            installment: 500,
+        });
+
+        const simulation = simulateLoanPrepayment(loan, 6000, new Date('2026-01-15T00:00:00Z'));
+
+        expect(simulation.recalculationMode).toBe('linear');
+        expect(simulation.remainingDebt).toBeCloseTo(18000, 6);
+        expect(simulation.newRemainingDebt).toBeCloseTo(12000, 6);
+        expect(simulation.newInstallment).toBeCloseTo(12000 / 36, 6);
+    });
+
+    it('keeps the growing-loan model when the current installment is below the fixed-rate equivalent', () => {
+        const loan = makeLoan({
+            startDate: '2023-01',
+            endDate: '2033-01',
+            currentRemainingDebt: 50000,
+            interestRate: 4.2,
+            installment: 620,
+            isVariable: true,
+        });
+
+        const simulation = simulateLoanPrepayment(loan, 5000, new Date('2026-01-15T00:00:00Z'));
+
+        expect(simulation.recalculationMode).toBe('growing');
+        expect(simulation.growthRate).toBeGreaterThan(0);
+        expect(simulation.newInstallment).toBeGreaterThan(0);
+        expect(simulation.newInstallment).toBeLessThan(simulation.currentInstallment);
     });
 });

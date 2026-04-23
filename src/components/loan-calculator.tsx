@@ -4,11 +4,19 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { Car, Euro, Percent, Calendar, CreditCard, ChevronDown, ChevronUp, Users, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { usePreferences } from "@/hooks/usePreferences";
-import { ExistingLoan, getInstallmentAmountForMonth } from "@/lib/finance/loans";
+import {
+    type ExistingLoan,
+    type ExistingLoanPrepaymentSimulation,
+    type LoanRecalculationMode,
+    getExistingLoanSnapshot,
+    simulateLoanPrepayment,
+} from "@/lib/finance/loans";
 import { DTI_THRESHOLD } from "@/lib/constants";
 import {
     ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -63,6 +71,19 @@ const DTI_TRACK_SEGMENTS = [
     },
 ] as const;
 
+function getRecalculationModeLabel(mode: LoanRecalculationMode) {
+    switch (mode) {
+        case "french":
+            return "Rata ricalcolata con tasso salvato e durata residua invariata";
+        case "growing":
+            return "Rata ricalcolata come piano crescente mantenendo la progressione attuale";
+        case "linear":
+            return "Rata ricalcolata in modo lineare sul debito residuo";
+        default:
+            return "Stima proporzionale: aggiungi importo originario e tasso per massima precisione";
+    }
+}
+
 function computeAmortization(principal: number, annualRatePct: number, months: number): AmortizationResult {
     const empty: AmortizationResult = { installment: 0, totalPaid: 0, totalInterest: 0, schedule: [], chartData: [] };
     if (principal <= 0 || months <= 0) return empty;
@@ -114,6 +135,9 @@ export function LoanCalculator() {
     const [durata, setDurata] = useState(60);
     const [showTable, setShowTable] = useState(false);
     const [intestatario, setIntestatario] = useState<"person1" | "person2" | "both">("person1");
+    const [enableDebtReductionSimulation, setEnableDebtReductionSimulation] = useState(false);
+    const [selectedExistingLoanId, setSelectedExistingLoanId] = useState("");
+    const [selectedPrepaymentAmount, setSelectedPrepaymentAmount] = useState(0);
 
     const { preferences } = usePreferences();
 
@@ -133,29 +157,55 @@ export function LoanCalculator() {
         try { return JSON.parse(preferences.existingLoansList); } catch { return []; }
     }, [preferences.existingLoansList]);
 
-    const dtiData = useMemo(() => {
-        const relevantLoans = intestatario === "both"
+    const relevantLoanEntries = useMemo(() => {
+        const scopedLoans = intestatario === "both"
             ? existingLoans
-            : existingLoans.filter((l) =>
-                intestatario === "person1" ? l.owner !== "person2" : l.owner !== "person1",
+            : existingLoans.filter((loan) =>
+                intestatario === "person1" ? loan.owner !== "person2" : loan.owner !== "person1",
             );
 
-        const now = new Date();
-        let activeCount = 0;
-        const existingInstallment = relevantLoans.reduce((acc, loan) => {
-            if (!loan.startDate || !loan.endDate) {
-                activeCount++;
-                return acc + (Number(loan.installment) || 0);
+        return scopedLoans.map((loan) => ({
+            loan,
+            snapshot: getExistingLoanSnapshot(loan),
+        }));
+    }, [existingLoans, intestatario]);
+
+    const activeLoanEntries = useMemo(
+        () => relevantLoanEntries.filter(({ snapshot }) => snapshot.isActive && snapshot.currentInstallment > 0 && snapshot.remainingDebt > 0),
+        [relevantLoanEntries],
+    );
+
+    const effectiveSelectedLoanId =
+        activeLoanEntries.some(({ loan }) => loan.id === selectedExistingLoanId)
+            ? selectedExistingLoanId
+            : activeLoanEntries[0]?.loan.id ?? "";
+
+    const selectedLoanEntry = useMemo(
+        () => activeLoanEntries.find(({ loan }) => loan.id === effectiveSelectedLoanId) ?? null,
+        [activeLoanEntries, effectiveSelectedLoanId],
+    );
+
+    const clampedPrepaymentAmount = selectedLoanEntry
+        ? Math.min(Math.max(0, selectedPrepaymentAmount), selectedLoanEntry.snapshot.remainingDebt)
+        : 0;
+
+    const debtReductionSimulation = useMemo<ExistingLoanPrepaymentSimulation | null>(() => {
+        if (!enableDebtReductionSimulation || !selectedLoanEntry) return null;
+        return simulateLoanPrepayment(selectedLoanEntry.loan, clampedPrepaymentAmount);
+    }, [clampedPrepaymentAmount, enableDebtReductionSimulation, selectedLoanEntry]);
+
+    const activeDebtReductionSimulation =
+        enableDebtReductionSimulation && debtReductionSimulation && clampedPrepaymentAmount > 0
+            ? debtReductionSimulation
+            : null;
+
+    const dtiData = useMemo(() => {
+        const existingInstallment = activeLoanEntries.reduce((acc, { snapshot }) => acc + snapshot.currentInstallment, 0);
+        const adjustedExistingInstallment = activeLoanEntries.reduce((acc, entry) => {
+            if (activeDebtReductionSimulation && entry.loan.id === selectedLoanEntry?.loan.id) {
+                return acc + activeDebtReductionSimulation.newInstallment;
             }
-            const start = new Date(loan.startDate + "-01");
-            const end = new Date(loan.endDate + "-01");
-            const totalMonths =
-                (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-            const monthsPassed =
-                (now.getFullYear() - start.getFullYear()) * 12 + (now.getMonth() - start.getMonth());
-            if (monthsPassed >= totalMonths) return acc;
-            activeCount++;
-            return acc + getInstallmentAmountForMonth(loan, monthsPassed, totalMonths, monthsPassed);
+            return acc + entry.snapshot.currentInstallment;
         }, 0);
 
         const income =
@@ -163,24 +213,45 @@ export function LoanCalculator() {
             : intestatario === "person2" ? (preferences.person2Income || 0)
             : (preferences.person1Income || 0) + (preferences.person2Income || 0);
 
-        const totalInstallment = existingInstallment + result.installment;
+        const totalInstallment = adjustedExistingInstallment + result.installment;
+        const baselineTotalInstallment = existingInstallment + result.installment;
         const dti = income > 0 ? totalInstallment / income : 0;
-        const maxNewInstallment = Math.max(0, income * DTI_THRESHOLD - existingInstallment);
+        const baselineDti = income > 0 ? baselineTotalInstallment / income : 0;
+        const maxNewInstallment = Math.max(0, income * DTI_THRESHOLD - adjustedExistingInstallment);
+        const baselineMaxNewInstallment = Math.max(0, income * DTI_THRESHOLD - existingInstallment);
 
         return {
-            activeCount,
+            activeCount: activeLoanEntries.length,
             existingInstallment,
+            adjustedExistingInstallment,
             income,
             totalInstallment,
+            baselineTotalInstallment,
             dti,
+            baselineDti,
             dtiPct: dti * 100,
+            baselineDtiPct: baselineDti * 100,
+            dtiImprovementPct: Math.max(0, (baselineDti - dti) * 100),
             isOk: dti > 0 && dti <= DTI_THRESHOLD,
             isWarning: dti > DTI_THRESHOLD && dti <= DTI_WARNING_THRESHOLD / 100,
             isDanger: dti > DTI_WARNING_THRESHOLD / 100,
             hasIncome: income > 0,
             maxNewInstallment,
+            baselineMaxNewInstallment,
+            hasSimulation: Boolean(activeDebtReductionSimulation),
+            simulatedLoanName: selectedLoanEntry?.loan.name ?? "",
+            simulatedPrepayment: activeDebtReductionSimulation?.appliedPrepayment ?? 0,
+            simulatedMonthlySavings: activeDebtReductionSimulation?.monthlySavings ?? 0,
         };
-    }, [existingLoans, intestatario, preferences.person1Income, preferences.person2Income, result.installment]);
+    }, [
+        activeDebtReductionSimulation,
+        activeLoanEntries,
+        intestatario,
+        preferences.person1Income,
+        preferences.person2Income,
+        result.installment,
+        selectedLoanEntry,
+    ]);
 
     const dtiProgressPct = Math.min(100, (dtiData.dtiPct / DTI_SCALE_MAX) * 100);
     const dtiIndicatorValue = Math.min(DTI_SCALE_MAX, Math.max(0, dtiData.dtiPct));
@@ -207,6 +278,47 @@ export function LoanCalculator() {
             fill: "bg-red-500",
             marker: "bg-red-500 ring-red-500/25",
         };
+    const suggestedPrepaymentForThreshold = useMemo(() => {
+        if (!selectedLoanEntry || dtiData.income <= 0) return 0;
+
+        const otherInstallments = activeLoanEntries.reduce((acc, entry) => (
+            entry.loan.id === selectedLoanEntry.loan.id ? acc : acc + entry.snapshot.currentInstallment
+        ), 0);
+        const targetSelectedLoanInstallment = dtiData.income * DTI_THRESHOLD - result.installment - otherInstallments;
+
+        if (targetSelectedLoanInstallment <= 0) {
+            return selectedLoanEntry.snapshot.remainingDebt;
+        }
+
+        if (selectedLoanEntry.snapshot.currentInstallment <= targetSelectedLoanInstallment) {
+            return 0;
+        }
+
+        let low = 0;
+        let high = selectedLoanEntry.snapshot.remainingDebt;
+
+        for (let iteration = 0; iteration < 30; iteration++) {
+            const mid = (low + high) / 2;
+            const simulation = simulateLoanPrepayment(selectedLoanEntry.loan, mid);
+
+            if (simulation.newInstallment <= targetSelectedLoanInstallment) {
+                high = mid;
+            } else {
+                low = mid;
+            }
+        }
+
+        return Math.min(selectedLoanEntry.snapshot.remainingDebt, high);
+    }, [activeLoanEntries, dtiData.income, result.installment, selectedLoanEntry]);
+    const previewNewInstallment = debtReductionSimulation?.newInstallment ?? selectedLoanEntry?.snapshot.currentInstallment ?? 0;
+    const previewMonthlySavings = debtReductionSimulation?.monthlySavings ?? 0;
+    const debtReductionSliderStep = selectedLoanEntry
+        ? selectedLoanEntry.snapshot.remainingDebt <= 5000
+            ? 50
+            : selectedLoanEntry.snapshot.remainingDebt <= 20000
+            ? 100
+            : 500
+        : 100;
 
     return (
         <div className="space-y-6">
@@ -368,11 +480,27 @@ export function LoanCalculator() {
                                 <span className="text-muted-foreground">Reddito netto mensile</span>
                                 <span className="font-semibold">{formatEuro(dtiData.income)}</span>
                             </div>
-                            {dtiData.existingInstallment > 0 && (
+                            {dtiData.existingInstallment > 0 && !dtiData.hasSimulation && (
                                 <div className="flex justify-between text-muted-foreground">
                                     <span>Rate esistenti ({dtiData.activeCount} prestit{dtiData.activeCount === 1 ? "o" : "i"} attiv{dtiData.activeCount === 1 ? "o" : "i"})</span>
                                     <span>{formatEuro(dtiData.existingInstallment)}</span>
                                 </div>
+                            )}
+                            {dtiData.hasSimulation && (
+                                <>
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Rate esistenti attuali ({dtiData.activeCount} prestiti attivi)</span>
+                                        <span>{formatEuro(dtiData.existingInstallment)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-emerald-700 dark:text-emerald-300">
+                                        <span>- Riduzione simulata su {dtiData.simulatedLoanName}</span>
+                                        <span>-{formatEuro(dtiData.simulatedMonthlySavings)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-muted-foreground">
+                                        <span>Rate esistenti dopo il versamento</span>
+                                        <span>{formatEuro(dtiData.adjustedExistingInstallment)}</span>
+                                    </div>
+                                </>
                             )}
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">+ Nuova rata finanziamento</span>
@@ -382,13 +510,159 @@ export function LoanCalculator() {
                                 <span>Totale rate mensili</span>
                                 <span>{formatEuro(dtiData.totalInstallment)}</span>
                             </div>
+                            {dtiData.hasSimulation && (
+                                <div className="flex justify-between text-[11px] text-muted-foreground">
+                                    <span>Prima del versamento simulato</span>
+                                    <span>{formatEuro(dtiData.baselineTotalInstallment)}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-4 rounded-2xl border border-orange-200/70 bg-orange-50/50 p-4 dark:border-orange-900/60 dark:bg-orange-950/15">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-orange-500">Leva anti-DTI</p>
+                                    <h4 className="text-sm font-semibold text-foreground">Simula estinzione anticipata o versamento extra</h4>
+                                    <p className="text-xs leading-relaxed text-muted-foreground">
+                                        Riduciamo il debito residuo di un prestito gi&agrave; attivo e ricalcoliamo la rata mantenendo la durata residua.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-medium text-muted-foreground">Attiva</span>
+                                    <Switch
+                                        checked={enableDebtReductionSimulation}
+                                        onCheckedChange={(checked) => setEnableDebtReductionSimulation(checked)}
+                                        className="data-[state=checked]:bg-orange-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {enableDebtReductionSimulation && activeLoanEntries.length === 0 && (
+                                <div className="rounded-2xl border border-dashed border-border/70 bg-background/70 px-4 py-3 text-xs text-muted-foreground">
+                                    Nessun prestito attivo idoneo per la simulazione in questo perimetro di intestatari.
+                                </div>
+                            )}
+
+                            {enableDebtReductionSimulation && selectedLoanEntry && (
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs text-muted-foreground">Prestito / mutuo da ridurre</Label>
+                                            <Select
+                                                value={effectiveSelectedLoanId}
+                                                onValueChange={(value) => {
+                                                    setSelectedExistingLoanId(value);
+                                                    setSelectedPrepaymentAmount(0);
+                                                }}
+                                            >
+                                                <SelectTrigger className="min-h-11 rounded-xl bg-background/80">
+                                                    <SelectValue placeholder="Seleziona un debito" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {activeLoanEntries.map(({ loan, snapshot }) => (
+                                                        <SelectItem key={loan.id} value={loan.id}>
+                                                            {loan.name} • {formatEuro(snapshot.currentInstallment)}/mese
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs text-muted-foreground">Versamento extra / estinzione parziale</Label>
+                                            <Input
+                                                type="number"
+                                                min="0"
+                                                max={selectedLoanEntry.snapshot.remainingDebt}
+                                                step={debtReductionSliderStep}
+                                                value={clampedPrepaymentAmount || ""}
+                                                onChange={(e) => setSelectedPrepaymentAmount(Math.max(0, Number(e.target.value) || 0))}
+                                                className="min-h-11 rounded-xl bg-background/80 text-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                                            <span>Debito residuo stimato: {formatEuro(selectedLoanEntry.snapshot.remainingDebt)}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedPrepaymentAmount(selectedLoanEntry.snapshot.remainingDebt)}
+                                                className="rounded-full border border-border/70 bg-background/80 px-3 py-1 font-semibold text-foreground transition-colors hover:bg-muted/50"
+                                            >
+                                                Estingui tutto
+                                            </button>
+                                        </div>
+                                        <Slider
+                                            min={0}
+                                            max={Math.max(selectedLoanEntry.snapshot.remainingDebt, debtReductionSliderStep)}
+                                            step={debtReductionSliderStep}
+                                            value={[clampedPrepaymentAmount]}
+                                            onValueChange={([value]) => setSelectedPrepaymentAmount(value)}
+                                            className="[&_[role=slider]]:bg-orange-500"
+                                        />
+                                        <div className="flex flex-wrap gap-2">
+                                            {[25, 50, 75, 100].map((percentage) => (
+                                                <button
+                                                    key={percentage}
+                                                    type="button"
+                                                    onClick={() => setSelectedPrepaymentAmount((selectedLoanEntry.snapshot.remainingDebt * percentage) / 100)}
+                                                    className="rounded-full border border-border/70 bg-background/80 px-3 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-muted/50"
+                                                >
+                                                    {percentage}%
+                                                </button>
+                                            ))}
+                                            {suggestedPrepaymentForThreshold > 0 && suggestedPrepaymentForThreshold < selectedLoanEntry.snapshot.remainingDebt && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedPrepaymentAmount(suggestedPrepaymentForThreshold)}
+                                                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                                >
+                                                    Portami al 33%: {formatEuro(suggestedPrepaymentForThreshold)}
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Rata attuale</p>
+                                            <p className="mt-1 text-base font-bold text-foreground">{formatEuro(selectedLoanEntry.snapshot.currentInstallment)}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/80 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-300">Nuova rata stimata</p>
+                                            <p className="mt-1 text-base font-bold text-emerald-700 dark:text-emerald-300">{formatEuro(previewNewInstallment)}</p>
+                                        </div>
+                                        <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Debito dopo versamento</p>
+                                            <p className="mt-1 text-base font-bold text-foreground">
+                                                {formatEuro(debtReductionSimulation?.newRemainingDebt ?? selectedLoanEntry.snapshot.remainingDebt)}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-2xl border border-blue-200/80 bg-blue-50/80 p-3 dark:border-blue-900/60 dark:bg-blue-950/25">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">Riduzione rata</p>
+                                            <p className="mt-1 text-base font-bold text-blue-700 dark:text-blue-300">{formatEuro(previewMonthlySavings)}</p>
+                                        </div>
+                                    </div>
+
+                                    <p className={`text-xs leading-relaxed ${
+                                        selectedLoanEntry.snapshot.recalculationMode === "estimate"
+                                            ? "text-amber-700 dark:text-amber-300"
+                                            : "text-muted-foreground"
+                                    }`}>
+                                        {getRecalculationModeLabel(
+                                            debtReductionSimulation?.recalculationMode ?? selectedLoanEntry.snapshot.recalculationMode,
+                                        )}
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-1.5">
                             <div className="flex justify-between text-xs">
                                 <span className="text-muted-foreground">Rapporto rata / reddito</span>
                                 <span className={`font-bold ${dtiData.isOk ? "text-emerald-600" : dtiData.isWarning ? "text-amber-600" : "text-red-600"}`}>
-                                    {dtiData.dtiPct.toFixed(1)}% su max 33%
+                                    {dtiData.dtiPct.toFixed(1)}% su max 33%{dtiData.hasSimulation ? ` • prima ${dtiData.baselineDtiPct.toFixed(1)}%` : ""}
                                 </span>
                             </div>
                             <div className="relative pt-7">
@@ -472,10 +746,15 @@ export function LoanCalculator() {
                         </div>
 
                         <p className="text-xs text-muted-foreground">
-                            Rata massima aggiuntiva sostenibile al 33%:{" "}
+                            Rata massima aggiuntiva sostenibile al 33%{dtiData.hasSimulation ? " dopo il versamento" : ""}:{" "}
                             <span className={`font-semibold ${dtiData.maxNewInstallment > 0 ? "text-foreground" : "text-red-500"}`}>
                                 {dtiData.maxNewInstallment > 0 ? formatEuro(dtiData.maxNewInstallment) : "soglia già superata dalle rate esistenti"}
                             </span>
+                            {dtiData.hasSimulation && (
+                                <span className="ml-1 text-muted-foreground">
+                                    (prima {dtiData.baselineMaxNewInstallment > 0 ? formatEuro(dtiData.baselineMaxNewInstallment) : "0â‚¬"})
+                                </span>
+                            )}
                         </p>
                     </CardContent>
                 </Card>
