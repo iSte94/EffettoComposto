@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.8.1 - 23 aprile 2026 (hardening matematica: fire-sensitivity — guardie su SWR/rendimento reale)
+
+- **Bugfix finanziario critico (Matrice di Sensitivita' FIRE)** - `src/lib/finance/fire-sensitivity.ts` ora clampa `withdrawalRatePct` con la stessa soglia minima (0.1%) gia' usata da `fire-projection.ts`. Prima del fix, un utente che impostava `SWR = 0` vedeva `fireTarget = Infinity` e l'intera matrice restituiva `yearsToFire = null` in ogni cella; con `SWR < 0` il target diventava negativo e TUTTE le celle risultavano istantaneamente `FIRE raggiunto` (falso positivo pericoloso, soprattutto perche' la stessa funzione e' esposta agli AI tools di `src/lib/ai/tools.ts` e `server-tools.ts`)
+- **Guardia contro NaN silenziosi** - `yearsToFire()` ora gestisce esplicitamente il caso `1 + realReturn <= 0` (scenario iperinflattivo degenere: es. nominale 0% + inflazione >= 100%). Prima `Math.pow(valore negativo o zero, 1/12)` restituiva `NaN` che contaminava tutte le celle della griglia. Ora si cade su un fallback coerente con `fire-projection.ts`
+- **Normalizzazione input** - `startingCapital`, `currentAge`, `monthlyExpensesBaseline`, `monthlySavingsBaseline` e `maxYears` vengono sanificati (NaN/Infinity → fallback finito) prima di essere usati nei calcoli, evitando propagazione di valori non numerici nei risultati visualizzati nella UI `sensitivity-matrix.tsx`
+- **Test di regressione** - aggiunto `fire-sensitivity.test.ts` con 18 test (il modulo prima era completamente privo di copertura): coerenza dimensioni matrice, monotonicita' per riga/colonna, baseline cell, best/worst case, tutti gli scenari di input invalido (SWR 0/negativo/NaN, iperinflazione, NaN su input principali)
+
 ### v1.8.0 - 23 aprile 2026 (workspace salvabile nel calcolatore finanziamenti)
 
 - **Scenari salvati nel Calcolatore Finanziamento** - ora ogni combinazione di card, intestatario e leva anti-DTI puo' essere salvata con un nome e ripresa in un secondo momento, cosi' l'utente puo' tornare sui propri ragionamenti senza ricostruire tutto da zero
