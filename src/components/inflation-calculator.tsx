@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingDown, Euro, Calendar, Percent, Hourglass } from "lucide-react";
+import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { projectInflation } from "@/lib/finance/inflation";
 import {
@@ -49,6 +49,8 @@ export function InflationCalculator() {
         equivalentFutureCapital,
         realReturnPct,
         purchasingPowerHalvingYears,
+        purchasingPowerGap,
+        monthlySavingsToPreservePurchasingPower,
     } = projection;
 
     // Etichetta compatta per il tempo di dimezzamento: intero se >= 10 anni
@@ -183,6 +185,62 @@ export function InflationCalculator() {
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {amount > 0 && years > 0 && (
+                <div
+                    className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-xs ${
+                        monthlySavingsToPreservePurchasingPower > 0
+                            ? "border-indigo-200 bg-indigo-50/70 text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200"
+                            : "border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+                    }`}
+                    title={
+                        monthlySavingsToPreservePurchasingPower > 0
+                            ? `Per coprire il gap di ${formatEuro(purchasingPowerGap)} fra ${formatEuro(equivalentFutureCapital)} necessari e ${formatEuro(finalNominal)} prodotti dal solo capitale iniziale investito al ${formatPercent(nominalReturn)} annuo.`
+                            : `Il rendimento nominale del ${formatPercent(nominalReturn)} supera l'inflazione del ${formatPercent(inflationRate)}: il capitale iniziale investito preserva gia' il potere d'acquisto.`
+                    }
+                >
+                    <PiggyBank
+                        className={`mt-0.5 h-4 w-4 shrink-0 ${
+                            monthlySavingsToPreservePurchasingPower > 0
+                                ? "text-indigo-500 dark:text-indigo-400"
+                                : "text-emerald-500 dark:text-emerald-400"
+                        }`}
+                        aria-hidden
+                    />
+                    <div className="flex-1">
+                        <p
+                            className={`text-[10px] font-bold uppercase tracking-widest ${
+                                monthlySavingsToPreservePurchasingPower > 0
+                                    ? "text-indigo-500 dark:text-indigo-400"
+                                    : "text-emerald-500 dark:text-emerald-400"
+                            }`}
+                        >
+                            Risparmio Mensile Necessario
+                        </p>
+                        {monthlySavingsToPreservePurchasingPower > 0 ? (
+                            <>
+                                <p className="mt-0.5 text-sm font-extrabold">
+                                    {formatEuro(monthlySavingsToPreservePurchasingPower)}/mese
+                                </p>
+                                <p className="mt-0.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
+                                    da versare oltre al capitale iniziale, al {formatPercent(nominalReturn)} annuo, per
+                                    raggiungere i {formatEuro(equivalentFutureCapital)} che ti servono fra {years} anni
+                                    e preservare l&apos;attuale potere d&apos;acquisto.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="mt-0.5 text-sm font-extrabold">Nessuno</p>
+                                <p className="mt-0.5 text-[11px] leading-snug text-emerald-700/80 dark:text-emerald-300/80">
+                                    il solo capitale iniziale investito al {formatPercent(nominalReturn)} supera il
+                                    capitale equivalente futuro di {formatEuro(equivalentFutureCapital)}: il potere
+                                    d&apos;acquisto e&apos; preservato senza nuovi versamenti.
+                                </p>
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 

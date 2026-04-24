@@ -62,6 +62,22 @@ export interface InflationProjectionResult {
      * piu' accurata della Regola del 72 (che approssima a 72/i%).
      */
     purchasingPowerHalvingYears: number | null;
+    /**
+     * Gap (in euro nominali) fra il capitale equivalente futuro necessario
+     * per preservare il potere d'acquisto e quanto il lump sum iniziale
+     * produrrebbe a fine orizzonte investito al rendimento nominale scelto.
+     * Zero quando l'investimento del solo capitale iniziale copre gia'
+     * l'erosione inflazionistica.
+     */
+    purchasingPowerGap: number;
+    /**
+     * Risparmio mensile aggiuntivo necessario, investito al rendimento
+     * nominale, per colmare `purchasingPowerGap` nell'orizzonte `years`.
+     * Usa la formula della rendita: PMT = gap / [((1+m)^N - 1) / m] con
+     * m = tasso mensile e N = mesi totali. Cade su `gap / N` quando il
+     * rendimento nominale e' zero e su 0 quando non c'e' gap o years = 0.
+     */
+    monthlySavingsToPreservePurchasingPower: number;
 }
 
 function sanitize(value: number, fallback = 0): number {
@@ -118,6 +134,13 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
     const purchasingPowerHalvingYears =
         inflationRatePct > 0 ? Math.log(2) / Math.log(1 + inflationRatePct / 100) : null;
 
+    const purchasingPowerGap = Math.max(0, equivalentFutureCapital - finalNominal);
+    const monthlySavingsToPreservePurchasingPower = computeMonthlySavingsForGap(
+        purchasingPowerGap,
+        nominalReturnPct,
+        years,
+    );
+
     return {
         points,
         realReturnPct,
@@ -128,5 +151,32 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         lostPercent,
         equivalentFutureCapital,
         purchasingPowerHalvingYears,
+        purchasingPowerGap,
+        monthlySavingsToPreservePurchasingPower,
     };
+}
+
+/**
+ * Rata mensile necessaria per raggiungere `gap` euro nominali in `years` anni
+ * investendo ad `annualReturnPct` (versamenti a fine periodo, capitalizzazione
+ * mensile). Formula chiusa della rendita futura:
+ *     FV = PMT * [((1+m)^N - 1) / m]   =>   PMT = FV / [((1+m)^N - 1) / m]
+ * con degenerazione a `gap / N` per rendimento nullo. Ritorna 0 se non serve
+ * risparmiare (gap nullo, orizzonte nullo, o input non finiti).
+ */
+function computeMonthlySavingsForGap(
+    gap: number,
+    annualReturnPct: number,
+    years: number,
+): number {
+    if (!Number.isFinite(gap) || gap <= 0) return 0;
+    if (!Number.isFinite(years) || years <= 0) return 0;
+    const months = Math.max(1, Math.round(years * 12));
+    const monthlyRate = annualReturnPct / 100 / 12;
+    if (Math.abs(monthlyRate) < 1e-9) {
+        return Math.round(gap / months);
+    }
+    const annuityFactor = (Math.pow(1 + monthlyRate, months) - 1) / monthlyRate;
+    if (!Number.isFinite(annuityFactor) || annuityFactor <= 0) return 0;
+    return Math.round(gap / annuityFactor);
 }
