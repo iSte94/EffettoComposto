@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2 } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
@@ -13,6 +13,11 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend,
 } from "recharts";
+
+// SWR (Safe Withdrawal Rate) di default usato nel resto dell'app per calcoli
+// FIRE (vedi DEFAULT_FIRE_WITHDRAWAL_RATE in fire-metrics.ts). Piu' conservativo
+// del classico 4% Trinity, prudente per orizzonti lunghi tipici italiani.
+const DEFAULT_SWR_PCT = 3.25;
 
 export function CompoundInterestCalculator() {
     const [initialCapital, setInitialCapital] = useState(10000);
@@ -73,6 +78,15 @@ export function CompoundInterestCalculator() {
         const doublingYearsReal =
             realReturnPct > 0 ? Math.log(2) / Math.log(1 + realReturnPct / 100) : null;
 
+        // Rendita FIRE teorica: applica il SWR di default al capitale finale.
+        // Usiamo il valore REALE (deflazionato) perche' l'utente ragiona in
+        // potere d'acquisto odierno quando valuta se la cifra "basta per
+        // vivere"; il valore nominale e' solo informativo/secondario.
+        // Formula: rendita_annua = capitale * SWR; rendita_mensile = /12.
+        const swrFactor = DEFAULT_SWR_PCT / 100;
+        const fireMonthlyIncomeReal = Math.max(0, (realFinalBalance * swrFactor) / 12);
+        const fireMonthlyIncomeNominal = Math.max(0, (balance * swrFactor) / 12);
+
         return {
             finalBalance: balance,
             totalDeposited,
@@ -84,6 +98,8 @@ export function CompoundInterestCalculator() {
             doublingYearsNominal,
             doublingYearsReal,
             realReturnPct,
+            fireMonthlyIncomeReal,
+            fireMonthlyIncomeNominal,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -274,6 +290,29 @@ export function CompoundInterestCalculator() {
                                             : "rendimento reale <= 0"}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50/70 to-amber-50/60 p-4 dark:border-orange-900 dark:from-orange-950/30 dark:to-amber-950/20"
+                            title={`Al ${DEFAULT_SWR_PCT}% SWR (Safe Withdrawal Rate), il capitale reale finale di ${formatEuro(result.realFinalBalance)} puo' sostenere un prelievo mensile di circa ${formatEuro(result.fireMonthlyIncomeReal)} in potere d'acquisto odierno, teoricamente a tempo indefinito.`}
+                        >
+                            <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400">
+                                <Flame className="h-3 w-3" /> Rendita Mensile FIRE
+                                <InfoTooltip iconClassName="w-3 h-3">Rendita mensile teorica generata dal capitale finale applicando un Safe Withdrawal Rate del {DEFAULT_SWR_PCT}% (prudente rispetto al classico 4% Trinity). Il valore principale e&apos; espresso in potere d&apos;acquisto odierno (euro reali), cosi&apos; puoi confrontarlo subito con le tue spese mensili attuali e capire se il capitale accumulato basterebbe per vivere di rendita.</InfoTooltip>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-extrabold text-orange-700 dark:text-orange-300">
+                                    {formatEuro(result.fireMonthlyIncomeReal)}<span className="text-sm font-semibold text-orange-600/80 dark:text-orange-400/80">/mese</span>
+                                </div>
+                                <div className="mt-0.5 text-[10px] text-orange-600/80 dark:text-orange-400/70">
+                                    in euro odierni, al {DEFAULT_SWR_PCT}% SWR
+                                </div>
+                                {result.fireMonthlyIncomeNominal > result.fireMonthlyIncomeReal + 1 && (
+                                    <div className="mt-1 text-[10px] text-muted-foreground">
+                                        nominali fra {years} anni: {formatEuro(result.fireMonthlyIncomeNominal)}/mese
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
