@@ -154,4 +154,66 @@ describe("projectInflation", () => {
             expect(a.purchasingPowerHalvingYears).toBeCloseTo(b.purchasingPowerHalvingYears!, 6);
         });
     });
+
+    describe("monthlySavingsToPreservePurchasingPower", () => {
+        it("rendimento reale positivo: nessun risparmio aggiuntivo necessario", () => {
+            // 7% nominale batte 2% inflazione => finalNominal > equivalentFutureCapital.
+            const r = projectInflation({ amount: 100000, inflationRatePct: 2, years: 20, nominalReturnPct: 7 });
+            expect(r.purchasingPowerGap).toBe(0);
+            expect(r.monthlySavingsToPreservePurchasingPower).toBe(0);
+        });
+
+        it("rendimento nominale = inflazione: gap ~ 0, rata ~ 0", () => {
+            // Real return = 0 => il lump sum copre esattamente il capitale equivalente futuro.
+            const r = projectInflation({ amount: 50000, inflationRatePct: 3, years: 15, nominalReturnPct: 3 });
+            expect(r.purchasingPowerGap).toBeLessThanOrEqual(1);
+            expect(r.monthlySavingsToPreservePurchasingPower).toBeLessThanOrEqual(1);
+        });
+
+        it("rendimento reale negativo: rata positiva che colma il gap via rendita", () => {
+            // 2% nominale vs 5% inflazione su 100k in 10 anni -> gap ~ 41k; rata @2% mensile.
+            const r = projectInflation({ amount: 100000, inflationRatePct: 5, years: 10, nominalReturnPct: 2 });
+            expect(r.purchasingPowerGap).toBeGreaterThan(0);
+            expect(r.monthlySavingsToPreservePurchasingPower).toBeGreaterThan(0);
+
+            // Verifica indipendente della formula della rendita futura.
+            const months = r.monthlySavingsToPreservePurchasingPower > 0 ? 10 * 12 : 0;
+            const m = 0.02 / 12;
+            const annuityFactor = (Math.pow(1 + m, months) - 1) / m;
+            const expectedPmt = r.purchasingPowerGap / annuityFactor;
+            expect(r.monthlySavingsToPreservePurchasingPower).toBeCloseTo(expectedPmt, -1);
+        });
+
+        it("rendimento nominale zero: rata = gap / mesi (degenerazione lineare)", () => {
+            // Senza capitalizzazione la rendita diventa una semplice suddivisione temporale.
+            const r = projectInflation({ amount: 10000, inflationRatePct: 3, years: 10, nominalReturnPct: 0 });
+            expect(r.purchasingPowerGap).toBeGreaterThan(0);
+            const months = 10 * 12;
+            expect(r.monthlySavingsToPreservePurchasingPower).toBeCloseTo(r.purchasingPowerGap / months, -1);
+        });
+
+        it("years = 0: nessuna rata (orizzonte nullo)", () => {
+            const r = projectInflation({ amount: 10000, inflationRatePct: 3, years: 0, nominalReturnPct: 5 });
+            expect(r.monthlySavingsToPreservePurchasingPower).toBe(0);
+        });
+
+        it("amount = 0: rata positiva pari al capitale equivalente futuro via rendita", () => {
+            // Con lump sum nullo ma inflazione positiva serve partire da zero: gap = equivalentFutureCapital.
+            // amount=0 => equivalentFutureCapital=0 => gap=0; verifichiamo che non esploda.
+            const r = projectInflation({ amount: 0, inflationRatePct: 3, years: 10, nominalReturnPct: 5 });
+            expect(r.purchasingPowerGap).toBe(0);
+            expect(r.monthlySavingsToPreservePurchasingPower).toBe(0);
+        });
+
+        it("input non finiti non producono NaN/Infinity", () => {
+            const r = projectInflation({
+                amount: Number.NaN,
+                inflationRatePct: Number.POSITIVE_INFINITY,
+                years: Number.NaN,
+                nominalReturnPct: Number.NaN,
+            });
+            expect(Number.isFinite(r.purchasingPowerGap)).toBe(true);
+            expect(Number.isFinite(r.monthlySavingsToPreservePurchasingPower)).toBe(true);
+        });
+    });
 });

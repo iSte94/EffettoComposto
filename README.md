@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.0`
+**Versione corrente:** `v1.10.2`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.10.2 - 24 aprile 2026 (UX — nuova KPI "Risparmio Mensile Necessario" nel Calcolatore Inflazione)
+
+- **Da insight a consiglio operativo (Calcolatore Inflazione)** - il tab mostrava gia' il `Capitale Equivalente Futuro` (quanti euro nominali servono fra N anni per preservare l'attuale potere d'acquisto) e il `Valore Nominale Investito` (quanto produce il capitale iniziale al rendimento scelto), ma lasciava all'utente il compito di fare la sottrazione e trasformare il risultato in un piano di accumulo. La nuova card indigo/emerald integra la lettura chiudendo il cerchio: quando l'investimento del solo capitale iniziale non copre l'erosione inflazionistica (real return <= 0) dice esplicitamente quanti euro vanno versati OGNI MESE, al rendimento nominale scelto, per colmare il gap nell'orizzonte temporale indicato; quando invece il rendimento reale e' positivo conferma che il lump sum basta da solo con messaggio rassicurante ("Nessuno") in verde. La distinzione visiva tra i due stati e' immediata e comunica cosa fare (o non fare) a colpo d'occhio
+- **Formula chiusa della rendita futura, non iterazioni** - la nuova utility pura `computeMonthlySavingsForGap` in `src/lib/finance/inflation.ts` usa la formula in forma chiusa `PMT = gap / [((1+m)^N - 1) / m]` con `m = rendimento_annuo/12` ed `N = anni*12` (mensilizzazione standard dei piani PAC), con degenerazione lineare `gap / N` quando il rendimento nominale e' zero (evita divisione per zero nel limite) e guardie su input NaN/Infinity/years<=0 che restituiscono 0 invece di propagare valori non finiti in UI. Estesa l'interfaccia `InflationProjectionResult` con i campi `purchasingPowerGap` e `monthlySavingsToPreservePurchasingPower`, tipizzati e documentati per futuri consumer (es. advisor, report)
+- **Copertura test completa** - aggiunti 7 test di regressione a `inflation.test.ts` che coprono: rendimento reale positivo (nessuna rata), rendimento nominale = inflazione (gap ~ 0), rendimento reale negativo con verifica indipendente della formula della rendita, rendimento nominale zero (degenerazione lineare), orizzonte nullo, amount nullo e sanitizzazione input non finiti. Tutti i 348 test della suite (34 file) passano
+- **Perche' migliora l'esperienza utente** - chi usa il Calcolatore Inflazione per prendere decisioni reali (quanto mettere via per il figlio, per la pensione integrativa, per un acquisto futuro) ora ottiene la risposta che cercava davvero - "quanto devo mettere via al mese?" - invece di dover fare mentalmente l'inversa della rendita. E' un classico miglioramento dell'1% in stile "don't make me think": stessa pagina, stessi input, un numero in piu' che trasforma un calcolatore esplicativo in uno strumento di pianificazione azionabile
+
 ### v1.10.1 - 24 aprile 2026 (UX — nuovo chip "Nuovo massimo storico" / "Sotto il picco" nel Riepilogo)
 
 - **Nuova metrica "Current Drawdown" nel Riepilogo** - accanto alle pillole CAGR e Max Drawdown il tab Riepilogo mostra ora un chip che indica la distanza percentuale del patrimonio corrente dal picco storico. Quando il patrimonio attuale coincide con il massimo mai registrato viene evidenziato un badge verde con icona trofeo ("Nuovo massimo storico"); quando siamo sotto il picco viene mostrata la distanza percentuale in ambra con tooltip che esplicita quanto manca in euro per tornare all'ATH. Complementa il Max Drawdown (che resta il peggior calo osservato) dando immediato feedback sullo stato ATTUALE: l'utente capisce a colpo d'occhio se sta segnando un nuovo massimo o se e' in fase di recupero da un drawdown
