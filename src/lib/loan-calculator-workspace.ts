@@ -32,6 +32,12 @@ export function parseLoanCalculatorSavedScenarios(raw: unknown): LoanCalculatorS
     return sortScenarios(parsed.data.map((scenario) => ({
         ...scenario,
         selectedExistingLoanId: scenario.selectedExistingLoanId ?? null,
+        simulations: scenario.simulations.map((simulation) => ({
+            ...simulation,
+            name: simulation.name ?? "",
+            hasTradeIn: simulation.hasTradeIn ?? false,
+            tradeInValue: simulation.tradeInValue ?? 0,
+        })),
     })));
 }
 

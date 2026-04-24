@@ -4,8 +4,11 @@ export const loanCalculatorIntestatarioSchema = z.enum(["person1", "person2", "b
 
 export const loanCalculatorFinancingSimulationSchema = z.object({
     id: z.string().min(1),
+    name: z.string().trim().max(80).optional().default(""),
     importo: z.number().min(0),
     anticipo: z.number().min(0),
+    hasTradeIn: z.boolean().optional().default(false),
+    tradeInValue: z.number().min(0).optional().default(0),
     tasso: z.number().min(0).max(100),
     durata: z.number().int().min(6).max(120),
 }).superRefine((value, ctx) => {

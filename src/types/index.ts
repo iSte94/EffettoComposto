@@ -183,8 +183,11 @@ export type LoanCalculatorIntestatario = "person1" | "person2" | "both";
 
 export interface LoanCalculatorFinancingSimulation {
     id: string;
+    name: string;
     importo: number;
     anticipo: number;
+    hasTradeIn: boolean;
+    tradeInValue: number;
     tasso: number;
     durata: number;
 }

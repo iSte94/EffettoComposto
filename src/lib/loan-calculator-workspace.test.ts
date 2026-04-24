@@ -11,8 +11,11 @@ const baseInput: LoanCalculatorSavedScenarioInput = {
     simulations: [
         {
             id: "sim-1",
+            name: "Auto nuova",
             importo: 25000,
             anticipo: 5000,
+            hasTradeIn: true,
+            tradeInValue: 7000,
             tasso: 5.5,
             durata: 60,
         },
@@ -49,6 +52,38 @@ describe("loan-calculator-workspace", () => {
         const parsed = parseLoanCalculatorSavedScenarios(raw);
 
         expect(parsed.map((scenario) => scenario.id)).toEqual(["new", "old"]);
+    });
+
+    it("parseLoanCalculatorSavedScenarios keeps compatibility with older saved simulations", () => {
+        const raw = JSON.stringify([
+            {
+                id: "legacy",
+                createdAt: "2026-04-21T10:00:00.000Z",
+                updatedAt: "2026-04-22T10:00:00.000Z",
+                name: "Legacy",
+                simulations: [
+                    {
+                        id: "sim-legacy",
+                        importo: 18000,
+                        anticipo: 3000,
+                        tasso: 4.2,
+                        durata: 48,
+                    },
+                ],
+                intestatario: "person1",
+                enableDebtReductionSimulation: false,
+                selectedExistingLoanId: null,
+                selectedPrepaymentAmount: 0,
+            },
+        ]);
+
+        const parsed = parseLoanCalculatorSavedScenarios(raw);
+
+        expect(parsed[0]?.simulations[0]).toMatchObject({
+            name: "",
+            hasTradeIn: false,
+            tradeInValue: 0,
+        });
     });
 
     it("upsertLoanCalculatorScenario creates a new scenario when no id is provided", () => {

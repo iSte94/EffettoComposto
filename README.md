@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.8.2`
+**Versione corrente:** `v1.9.0`
 
 ---
 
@@ -113,6 +113,12 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.9.0 - 24 aprile 2026 (permuta e dettaglio salvataggi nel calcolatore finanziamenti)
+
+- **Permuta dentro ogni finanziamento** - ogni card del `Calcolatore Finanziamento` puo' ora attivare la voce `Permuta`, inserire il valore del bene dato in cambio e sommarlo automaticamente all'anticipo in denaro, riducendo in modo corretto il capitale effettivamente da finanziare
+- **Nomi personalizzati per ogni card** - ogni finanziamento simulato puo' avere un nome libero, utile sia nell'analisi generale sia quando si salva o si riapre uno scenario con piu prestiti contemporanei
+- **Specchio scenari salvati piu dettagliato** - il pannello dei salvataggi mostra ora per ogni scenario il dettaglio dei singoli finanziamenti con nome, durata, TAN, importo, anticipo, permuta e capitale richiesto, mantenendo anche la compatibilita' con gli scenari salvati prima di questa evoluzione
+
 ### v1.8.2 - 24 aprile 2026 (UX — nuova KPI "Tempo di Raddoppio" nel Calcolatore Interesse Composto)
 
 - **Nuova KPI educativa (Calcolatore Interesse Composto)** - aggiunta card "Tempo di Raddoppio" con doppia lettura (nominale e reale) che mostra in quanti anni il capitale raddoppia per sola capitalizzazione degli interessi ai parametri scelti, in parallelo alla KPI "Tempo di Dimezzamento" gia' presente nel Calcolatore Inflazione. Crea simmetria concettuale tra le due leve opposte che determinano il potere d'acquisto nel tempo
@@ -126,7 +132,6 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 - **Guardia contro NaN silenziosi** - `yearsToFire()` ora gestisce esplicitamente il caso `1 + realReturn <= 0` (scenario iperinflattivo degenere: es. nominale 0% + inflazione >= 100%). Prima `Math.pow(valore negativo o zero, 1/12)` restituiva `NaN` che contaminava tutte le celle della griglia. Ora si cade su un fallback coerente con `fire-projection.ts`
 - **Normalizzazione input** - `startingCapital`, `currentAge`, `monthlyExpensesBaseline`, `monthlySavingsBaseline` e `maxYears` vengono sanificati (NaN/Infinity → fallback finito) prima di essere usati nei calcoli, evitando propagazione di valori non numerici nei risultati visualizzati nella UI `sensitivity-matrix.tsx`
 - **Test di regressione** - aggiunto `fire-sensitivity.test.ts` con 18 test (il modulo prima era completamente privo di copertura): coerenza dimensioni matrice, monotonicita' per riga/colonna, baseline cell, best/worst case, tutti gli scenari di input invalido (SWR 0/negativo/NaN, iperinflazione, NaN su input principali)
-
 ### v1.8.0 - 23 aprile 2026 (workspace salvabile nel calcolatore finanziamenti)
 
 - **Scenari salvati nel Calcolatore Finanziamento** - ora ogni combinazione di card, intestatario e leva anti-DTI puo' essere salvata con un nome e ripresa in un secondo momento, cosi' l'utente puo' tornare sui propri ragionamenti senza ricostruire tutto da zero

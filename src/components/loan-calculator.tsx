@@ -119,8 +119,11 @@ function createSimulationId() {
 function createFinancingSimulation(prefilled: boolean): LoanCalculatorFinancingSimulation {
     return {
         id: createSimulationId(),
+        name: "",
         importo: prefilled ? 50000 : 0,
         anticipo: 0,
+        hasTradeIn: false,
+        tradeInValue: 0,
         tasso: 2.5,
         durata: 60,
     };
@@ -130,9 +133,40 @@ function getSimulationLabel(index: number) {
     return index === 0 ? "Finanziamento principale" : `Finanziamento ${index + 1}`;
 }
 
+function getSimulationDisplayName(simulation: Pick<LoanCalculatorFinancingSimulation, "name">, index: number) {
+    const trimmedName = simulation.name.trim();
+    return trimmedName || getSimulationLabel(index);
+}
+
+function getTradeInAmount(simulation: Pick<LoanCalculatorFinancingSimulation, "hasTradeIn" | "tradeInValue">) {
+    return simulation.hasTradeIn ? Math.max(0, simulation.tradeInValue) : 0;
+}
+
+function getTotalUpfrontAmount(
+    simulation: Pick<LoanCalculatorFinancingSimulation, "anticipo" | "hasTradeIn" | "tradeInValue">,
+) {
+    return Math.max(0, simulation.anticipo) + getTradeInAmount(simulation);
+}
+
+function getSimulationPrincipal(
+    simulation: Pick<LoanCalculatorFinancingSimulation, "importo" | "anticipo" | "hasTradeIn" | "tradeInValue">,
+) {
+    return Math.max(0, simulation.importo - getTotalUpfrontAmount(simulation));
+}
+
 function formatSavedScenarioDate(value: string) {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? "Data non disponibile" : savedScenarioDateFormatter.format(parsed);
+}
+
+function getIntestatarioLabel(
+    intestatario: LoanCalculatorIntestatario,
+    person1Name: string,
+    person2Name: string,
+) {
+    if (intestatario === "person1") return person1Name;
+    if (intestatario === "person2") return person2Name;
+    return "Entrambi";
 }
 
 function getRecalculationModeLabel(mode: LoanRecalculationMode) {
@@ -279,20 +313,29 @@ export function LoanCalculator() {
     const savedScenarioSummaries = useMemo(
         () =>
             savedScenarios.map((scenario) => {
-                const activeEntries = scenario.simulations
-                    .map((simulation) => {
-                        const principal = Math.max(0, simulation.importo - simulation.anticipo);
+                const entries = scenario.simulations
+                    .map((simulation, index) => {
+                        const principal = getSimulationPrincipal(simulation);
                         const result = computeAmortization(principal, simulation.tasso, simulation.durata);
 
                         return {
+                            name: getSimulationDisplayName(simulation, index),
+                            importo: simulation.importo,
+                            anticipo: simulation.anticipo,
+                            tradeInAmount: getTradeInAmount(simulation),
+                            totalUpfront: getTotalUpfrontAmount(simulation),
                             principal,
                             result,
+                            duration: simulation.durata,
+                            rate: simulation.tasso,
                         };
-                    })
-                    .filter((entry) => entry.principal > 0 && entry.result.installment > 0);
+                    });
+
+                const activeEntries = entries.filter((entry) => entry.principal > 0 && entry.result.installment > 0);
 
                 return {
                     scenario,
+                    entries,
                     activeCount: activeEntries.length,
                     totalInstallment: activeEntries.reduce((sum, entry) => sum + entry.result.installment, 0),
                     totalPrincipal: activeEntries.reduce((sum, entry) => sum + entry.principal, 0),
@@ -304,12 +347,12 @@ export function LoanCalculator() {
     const simulationEntries = useMemo<FinancingSimulationComputed[]>(
         () =>
             simulations.map((simulation, index) => {
-                const principal = Math.max(0, simulation.importo - simulation.anticipo);
+                const principal = getSimulationPrincipal(simulation);
                 const result = computeAmortization(principal, simulation.tasso, simulation.durata);
 
                 return {
                     ...simulation,
-                    label: getSimulationLabel(index),
+                    label: getSimulationDisplayName(simulation, index),
                     principal,
                     result,
                     costoPct: principal > 0 ? (result.totalInterest / principal) * 100 : 0,
@@ -348,13 +391,25 @@ export function LoanCalculator() {
 
         return {
             name: trimmedName,
-            simulations: simulations.map((simulation) => ({
-                id: simulation.id || createSimulationId(),
-                importo: Math.max(0, simulation.importo),
-                anticipo: Math.max(0, Math.min(simulation.anticipo, simulation.importo)),
-                tasso: Math.max(0, simulation.tasso),
-                durata: Math.max(6, Math.min(120, simulation.durata)),
-            })),
+            simulations: simulations.map((simulation) => {
+                const importo = Math.max(0, simulation.importo);
+                const anticipo = Math.max(0, Math.min(simulation.anticipo, importo));
+                const remainingAfterAnticipo = Math.max(0, importo - anticipo);
+                const tradeInValue = simulation.hasTradeIn
+                    ? Math.max(0, Math.min(simulation.tradeInValue, remainingAfterAnticipo))
+                    : 0;
+
+                return {
+                    id: simulation.id || createSimulationId(),
+                    name: simulation.name.trim(),
+                    importo,
+                    anticipo,
+                    hasTradeIn: simulation.hasTradeIn,
+                    tradeInValue,
+                    tasso: Math.max(0, simulation.tasso),
+                    durata: Math.max(6, Math.min(120, simulation.durata)),
+                };
+            }),
             intestatario,
             enableDebtReductionSimulation,
             selectedExistingLoanId: selectedExistingLoanId || null,
@@ -700,7 +755,7 @@ export function LoanCalculator() {
 
                     {savedScenarioSummaries.length > 0 ? (
                         <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                            {savedScenarioSummaries.map(({ scenario, activeCount, totalInstallment, totalPrincipal }) => (
+                            {savedScenarioSummaries.map(({ scenario, entries, activeCount, totalInstallment, totalPrincipal }) => (
                                 <div
                                     key={scenario.id}
                                     className={`rounded-2xl border p-4 shadow-sm transition-colors ${
@@ -720,7 +775,7 @@ export function LoanCalculator() {
                                                 )}
                                             </div>
                                             <p className="text-[11px] text-muted-foreground">
-                                                Aggiornato {formatSavedScenarioDate(scenario.updatedAt)}
+                                                Aggiornato {formatSavedScenarioDate(scenario.updatedAt)} - {getIntestatarioLabel(scenario.intestatario, person1Name, person2Name)}
                                             </p>
                                         </div>
 
@@ -755,6 +810,42 @@ export function LoanCalculator() {
                                         {" · "}
                                         {scenario.enableDebtReductionSimulation ? "leva anti-DTI salvata" : "nessuna riduzione debiti salvata"}
                                     </p>
+
+                                    <div className="mt-3 rounded-2xl border border-border/60 bg-card/70 p-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                            Specchio finanziamenti salvati
+                                        </p>
+                                        <div className="mt-3 space-y-2">
+                                            {entries.map((entry, index) => (
+                                                <div
+                                                    key={`${scenario.id}-${index}-${entry.name}`}
+                                                    className="rounded-xl bg-muted/30 px-3 py-2 text-xs"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p className="font-semibold text-foreground">{entry.name}</p>
+                                                            <p className="text-[11px] text-muted-foreground">
+                                                                {entry.duration} mesi - TAN {entry.rate.toFixed(2)}%
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="font-semibold text-foreground">
+                                                                {entry.result.installment > 0 ? formatEuro(entry.result.installment) : "da completare"}
+                                                            </p>
+                                                            <p className="text-[11px] text-muted-foreground">rata mensile</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                                                        <span>Importo: <span className="font-medium text-foreground">{formatEuro(entry.importo)}</span></span>
+                                                        <span>Anticipo: <span className="font-medium text-foreground">{formatEuro(entry.anticipo)}</span></span>
+                                                        <span>Permuta: <span className="font-medium text-foreground">{formatEuro(entry.tradeInAmount)}</span></span>
+                                                        <span>Capitale richiesto: <span className="font-medium text-foreground">{formatEuro(entry.principal)}</span></span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
 
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         <button
@@ -852,7 +943,7 @@ export function LoanCalculator() {
                                     </div>
                                     <div>
                                         <h3 className="text-lg font-bold text-foreground">
-                                            {index === 0 ? "Prima simulazione" : `Simulazione aggiuntiva ${index + 1}`}
+                                            {simulation.label}
                                         </h3>
                                         <p className="mt-1 text-sm text-muted-foreground">
                                             {simulation.principal > 0
@@ -884,10 +975,20 @@ export function LoanCalculator() {
                                 </div>
                             </div>
 
+                            <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">Nome finanziamento</Label>
+                                <Input
+                                    value={simulation.name}
+                                    onChange={(event) => updateSimulation(simulation.id, "name", event.target.value)}
+                                    placeholder={index === 0 ? "Es. Auto principale" : `Es. Prestito extra ${index + 1}`}
+                                    className="min-h-11 rounded-xl text-sm"
+                                />
+                            </div>
+
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Euro className="h-3 w-3" /> Importo Finanziato
+                                        <Euro className="h-3 w-3" /> Importo / Prezzo Totale
                                     </Label>
                                     <Input
                                         type="number"
@@ -902,7 +1003,7 @@ export function LoanCalculator() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label className="flex items-center gap-1 text-xs text-muted-foreground">
-                                        <Euro className="h-3 w-3" /> Anticipo / Acconto
+                                        <Euro className="h-3 w-3" /> Anticipo in denaro
                                     </Label>
                                     <Input
                                         type="number"
@@ -915,6 +1016,43 @@ export function LoanCalculator() {
                                         className="min-h-11 rounded-xl text-sm"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-border/70 bg-muted/20 p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-foreground">Permuta</p>
+                                        <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                            Se consegni un bene usato, il suo valore si somma all&apos;anticipo e riduce il capitale da finanziare.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[11px] font-medium text-muted-foreground">Attiva</span>
+                                        <Switch
+                                            checked={simulation.hasTradeIn}
+                                            onCheckedChange={(checked) => updateSimulation(simulation.id, "hasTradeIn", checked)}
+                                            className="data-[state=checked]:bg-orange-500"
+                                        />
+                                    </div>
+                                </div>
+
+                                {simulation.hasTradeIn && (
+                                    <div className="mt-4 space-y-1.5">
+                                        <Label className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Euro className="h-3 w-3" /> Valore permuta
+                                        </Label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="500"
+                                            value={simulation.tradeInValue || ""}
+                                            onChange={(event) =>
+                                                updateSimulation(simulation.id, "tradeInValue", Math.max(0, Number(event.target.value) || 0))
+                                            }
+                                            className="min-h-11 rounded-xl bg-background/80 text-sm"
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -965,10 +1103,14 @@ export function LoanCalculator() {
                                 </div>
                             </div>
 
-                            {simulation.anticipo > 0 && (
+                            {(simulation.anticipo > 0 || getTradeInAmount(simulation) > 0) && (
                                 <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                                     Capitale finanziato: <span className="font-semibold text-foreground">{formatEuro(simulation.principal)}</span>
-                                    {" "}(importo {formatEuro(simulation.importo)} - anticipo {formatEuro(simulation.anticipo)})
+                                    {" "}(importo {formatEuro(simulation.importo)} - anticipo {formatEuro(simulation.anticipo)}
+                                    {simulation.hasTradeIn ? ` - permuta ${formatEuro(getTradeInAmount(simulation))}` : ""})
+                                    <span className="ml-1">
+                                        Apporto iniziale totale: <span className="font-semibold text-foreground">{formatEuro(getTotalUpfrontAmount(simulation))}</span>
+                                    </span>
                                 </p>
                             )}
 
@@ -1496,6 +1638,7 @@ export function LoanCalculator() {
                 <p className="text-xs font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400">Come funziona</p>
                 <ul className="list-inside list-disc space-y-1 text-xs text-orange-700 dark:text-orange-400">
                     <li>Ogni simulazione usa ammortamento alla francese e puo essere sommata alle altre.</li>
+                    <li>Puoi dare un nome a ogni finanziamento e usare la permuta come valore aggiuntivo all&apos;anticipo.</li>
                     <li>Le nuove rate vengono aggregate nel DTI insieme ai prestiti gia esistenti.</li>
                     <li>La leva anti-DTI ricalcola prima un debito attivo, poi aggiorna l&apos;analisi complessiva.</li>
                     <li>Puoi salvare uno scenario completo e riprenderlo piu avanti per modificarlo o duplicarlo.</li>
