@@ -17,6 +17,8 @@ describe('computeHistoryStats', () => {
         expect(stats.cagrYears).toBeNull();
         expect(stats.maxDrawdownPercent).toBeNull();
         expect(stats.peakValue).toBeNull();
+        expect(stats.currentDrawdownPercent).toBeNull();
+        expect(stats.isAtAllTimeHigh).toBe(false);
     });
 
     it('returns null CAGR with a single point but still reports peak', () => {
@@ -25,6 +27,8 @@ describe('computeHistoryStats', () => {
         expect(stats.cagrYears).toBeNull();
         expect(stats.maxDrawdownPercent).toBe(0);
         expect(stats.peakValue).toBe(10000);
+        expect(stats.currentDrawdownPercent).toBe(0);
+        expect(stats.isAtAllTimeHigh).toBe(true);
     });
 
     it('computes CAGR correctly on a 1 year doubling', () => {
@@ -101,5 +105,41 @@ describe('computeHistoryStats', () => {
         ]));
         expect(stats.maxDrawdownPercent).toBeCloseTo(-50, 5);
         expect(stats.peakValue).toBe(200);
+    });
+
+    it('reports current drawdown as 0 and ATH flag when last value equals peak', () => {
+        const stats = computeHistoryStats(makeHistory([
+            { daysAgo: 400, value: 100 },
+            { daysAgo: 200, value: 120 },
+            { daysAgo: 0, value: 130 },
+        ]));
+        expect(stats.peakValue).toBe(130);
+        expect(stats.currentDrawdownPercent).toBe(0);
+        expect(stats.isAtAllTimeHigh).toBe(true);
+    });
+
+    it('reports negative current drawdown when below peak', () => {
+        // Peak at 200, current at 150 -> -25%
+        const stats = computeHistoryStats(makeHistory([
+            { daysAgo: 400, value: 100 },
+            { daysAgo: 200, value: 200 },
+            { daysAgo: 0, value: 150 },
+        ]));
+        expect(stats.peakValue).toBe(200);
+        expect(stats.currentDrawdownPercent).toBeCloseTo(-25, 5);
+        expect(stats.isAtAllTimeHigh).toBe(false);
+    });
+
+    it('current drawdown differs from max drawdown after a partial recovery', () => {
+        // 100 -> 200 (peak) -> 100 (trough, max drawdown -50%) -> 180 (current, ~-10%)
+        const stats = computeHistoryStats(makeHistory([
+            { daysAgo: 400, value: 100 },
+            { daysAgo: 300, value: 200 },
+            { daysAgo: 100, value: 100 },
+            { daysAgo: 0, value: 180 },
+        ]));
+        expect(stats.maxDrawdownPercent).toBeCloseTo(-50, 5);
+        expect(stats.currentDrawdownPercent).toBeCloseTo(-10, 5);
+        expect(stats.isAtAllTimeHigh).toBe(false);
     });
 });

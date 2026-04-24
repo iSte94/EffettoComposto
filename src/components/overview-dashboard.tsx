@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
     BarChart3, Home, Wallet, Bitcoin, Package,
     Flame, Target, ShieldAlert, TrendingDown, FileDown,
-    LineChart, Activity, CalendarClock,
+    LineChart, Activity, CalendarClock, Trophy,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { computeHistoryStats } from "@/lib/finance/history-stats";
@@ -192,6 +192,8 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
             cagrYears: historyStats.cagrYears,
             maxDrawdownPercent: historyStats.maxDrawdownPercent,
             peakValue: historyStats.peakValue,
+            currentDrawdownPercent: historyStats.currentDrawdownPercent,
+            isAtAllTimeHigh: historyStats.isAtAllTimeHigh,
         };
     }, [history, preferences]);
 
@@ -316,8 +318,11 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                     {metrics.snapshotCount} snapshot totali &middot; ultimo: {new Date(metrics.latestDate).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}
                 </div>
 
-                {/* Statistiche storiche: CAGR + Max Drawdown */}
-                {(metrics.cagrPercent !== null || (metrics.maxDrawdownPercent !== null && metrics.maxDrawdownPercent < 0)) && (
+                {/* Statistiche storiche: CAGR + Stato vs picco + Max Drawdown */}
+                {(metrics.cagrPercent !== null
+                    || (metrics.maxDrawdownPercent !== null && metrics.maxDrawdownPercent < 0)
+                    || (metrics.snapshotCount >= 2 && metrics.currentDrawdownPercent !== null && metrics.peakValue !== null && metrics.peakValue > 0)
+                ) && (
                     <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
                         {metrics.cagrPercent !== null && metrics.cagrYears !== null && (
                             <TooltipProvider delayDuration={150}>
@@ -339,6 +344,40 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
                                             <div className="font-bold">Tasso di crescita annualizzato</div>
                                             <div className="text-muted-foreground">
                                                 Crescita composta del patrimonio su {metrics.cagrYears.toFixed(1)} {metrics.cagrYears >= 2 ? 'anni' : 'anno'} di storico.
+                                            </div>
+                                        </div>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        )}
+                        {metrics.snapshotCount >= 2 && metrics.currentDrawdownPercent !== null && metrics.peakValue !== null && metrics.peakValue > 0 && (
+                            <TooltipProvider delayDuration={150}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        {metrics.isAtAllTimeHigh ? (
+                                            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/80 bg-emerald-50/90 dark:border-emerald-800/80 dark:bg-emerald-950/40 px-3 py-1 text-xs font-semibold cursor-help">
+                                                <Trophy className="size-3.5 text-emerald-500" />
+                                                <span className="text-emerald-700 dark:text-emerald-300">Nuovo massimo storico</span>
+                                            </div>
+                                        ) : (
+                                            <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-secondary/60 px-3 py-1 text-xs font-semibold cursor-help">
+                                                <TrendingDown className="size-3.5 text-amber-500" />
+                                                <span className="text-muted-foreground">Sotto il picco</span>
+                                                <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                                                    {metrics.currentDrawdownPercent.toFixed(1)}%
+                                                </span>
+                                            </div>
+                                        )}
+                                    </TooltipTrigger>
+                                    <TooltipContent side="bottom" className="max-w-xs">
+                                        <div className="text-xs space-y-1 p-1">
+                                            <div className="font-bold">
+                                                {metrics.isAtAllTimeHigh ? 'Sei al tuo picco storico' : 'Distanza dal picco storico'}
+                                            </div>
+                                            <div className="text-muted-foreground">
+                                                {metrics.isAtAllTimeHigh
+                                                    ? `Il patrimonio attuale (${formatEuro(metrics.currentNetWorth)}) coincide con il massimo mai registrato.`
+                                                    : `Per tornare al picco di ${formatEuro(metrics.peakValue)} mancano ${formatEuro(Math.max(0, metrics.peakValue - metrics.currentNetWorth))}.`}
                                             </div>
                                         </div>
                                     </TooltipContent>
