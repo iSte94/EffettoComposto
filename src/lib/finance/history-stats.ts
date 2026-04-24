@@ -23,6 +23,16 @@ export interface HistoryStats {
     maxDrawdownPercent: number | null;
     /** Picco storico raggiunto (massimo valore assoluto osservato). */
     peakValue: number | null;
+    /**
+     * Distanza percentuale del valore corrente (ultimo snapshot) dal picco
+     * storico. 0 significa che siamo ad un nuovo massimo (ATH), valori negativi
+     * indicano di quanto stiamo sotto il picco (es. -7.5 = -7.5% sotto l'ATH).
+     * `null` quando non abbiamo dati sufficienti o un picco positivo a cui
+     * riferirci.
+     */
+    currentDrawdownPercent: number | null;
+    /** Indica se l'ultimo snapshot coincide con il picco storico. */
+    isAtAllTimeHigh: boolean;
 }
 
 // Soglia minima di storico richiesta per rendere significativo il CAGR.
@@ -44,7 +54,14 @@ const MIN_YEARS_FOR_CAGR = 0.25; // ~3 mesi
  */
 export function computeHistoryStats(history: HistoryPoint[]): HistoryStats {
     if (!history || history.length === 0) {
-        return { cagrPercent: null, cagrYears: null, maxDrawdownPercent: null, peakValue: null };
+        return {
+            cagrPercent: null,
+            cagrYears: null,
+            maxDrawdownPercent: null,
+            peakValue: null,
+            currentDrawdownPercent: null,
+            isAtAllTimeHigh: false,
+        };
     }
 
     // Max drawdown: scorri una sola volta tenendo il picco corrente.
@@ -88,10 +105,23 @@ export function computeHistoryStats(history: HistoryPoint[]): HistoryStats {
         }
     }
 
+    // Distanza del valore corrente (ultimo snapshot) dal picco storico.
+    // Tolleriamo piccoli errori in virgola mobile prima di dichiarare un ATH.
+    const latestValue = history[history.length - 1].value;
+    let currentDrawdownPercent: number | null = null;
+    let isAtAllTimeHigh = false;
+    if (peakValue !== null && peakValue > 0 && Number.isFinite(latestValue)) {
+        const raw = ((latestValue - peakValue) / peakValue) * 100;
+        currentDrawdownPercent = raw > 0 ? 0 : raw;
+        isAtAllTimeHigh = currentDrawdownPercent >= -0.05; // entro 0.05% dal picco
+    }
+
     return {
         cagrPercent,
         cagrYears,
         maxDrawdownPercent: history.length > 0 ? maxDrawdownPercent : null,
         peakValue,
+        currentDrawdownPercent,
+        isAtAllTimeHigh,
     };
 }
