@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
+import { computeRealReturn } from "@/lib/finance/fire-projection";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend,
@@ -62,6 +63,16 @@ export function CompoundInterestCalculator() {
         // Se negativo, l'inflazione ha eroso piu' di quanto il rendimento abbia prodotto.
         const realGain = realFinalBalance - totalDeposited;
 
+        // Tempo di raddoppio: ln(2) / ln(1+r), formula esatta (piu' accurata
+        // della Regola del 72). `null` se r <= 0 (il capitale non raddoppia mai
+        // per sola capitalizzazione). Mostrato in parallelo al "Tempo di
+        // Dimezzamento" del Calcolatore Inflazione per simmetria educativa.
+        const doublingYearsNominal =
+            annualRate > 0 ? Math.log(2) / Math.log(1 + annualRate / 100) : null;
+        const realReturnPct = computeRealReturn(annualRate, inflationRate) * 100;
+        const doublingYearsReal =
+            realReturnPct > 0 ? Math.log(2) / Math.log(1 + realReturnPct / 100) : null;
+
         return {
             finalBalance: balance,
             totalDeposited,
@@ -70,8 +81,21 @@ export function CompoundInterestCalculator() {
             crossoverYear,
             realFinalBalance,
             realGain,
+            doublingYearsNominal,
+            doublingYearsReal,
+            realReturnPct,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
+
+    // Etichetta compatta per il tempo di raddoppio: intero se >= 10 anni
+    // (precisione sub-annuale trascurabile sulla scala decennale), una cifra
+    // decimale sotto per differenziare rendimenti bassi (es. 7.3 anni).
+    const formatDoublingYears = (value: number | null) => {
+        if (value === null || !Number.isFinite(value)) return null;
+        return value >= 10 ? `${Math.round(value)} anni` : `${value.toFixed(1)} anni`;
+    };
+    const doublingNominalLabel = formatDoublingYears(result.doublingYearsNominal);
+    const doublingRealLabel = formatDoublingYears(result.doublingYearsReal);
 
     return (
         <div className="animate-in fade-in-50 space-y-8 duration-500">
@@ -216,6 +240,40 @@ export function CompoundInterestCalculator() {
                                 {result.realGain >= 0
                                     ? `potere d'acquisto in piu' rispetto ai ${formatEuro(result.totalDeposited)} versati`
                                     : `potere d'acquisto perso rispetto ai ${formatEuro(result.totalDeposited)} versati`}
+                            </div>
+                        </div>
+
+                        <div
+                            className="rounded-3xl border border-teal-200 bg-teal-50/70 p-4 dark:border-teal-900 dark:bg-teal-950/30"
+                            title={
+                                doublingNominalLabel
+                                    ? `Al ${annualRate.toFixed(1)}% annuo nominale, per sola capitalizzazione il capitale raddoppia ogni ${doublingNominalLabel}.`
+                                    : "Con rendimento nullo o negativo il capitale non raddoppia per sola capitalizzazione."
+                            }
+                        >
+                            <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-teal-600 dark:text-teal-400">
+                                <Repeat2 className="h-3 w-3" /> Tempo di Raddoppio
+                                <InfoTooltip iconClassName="w-3 h-3">Anni necessari perche&apos; il capitale raddoppi per sola capitalizzazione degli interessi (senza nuovi versamenti). Formula esatta: ln(2) / ln(1 + r), piu&apos; precisa della Regola del 72. Il valore reale e&apos; calcolato sul rendimento al netto dell&apos;inflazione.</InfoTooltip>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="text-center">
+                                    <div className="text-[10px] font-semibold uppercase tracking-wider text-teal-500/80 dark:text-teal-400/70">Nominale</div>
+                                    <div className="text-lg font-extrabold text-teal-700 dark:text-teal-300">
+                                        {doublingNominalLabel ?? <span className="text-muted-foreground">&mdash;</span>}
+                                    </div>
+                                    <div className="text-[10px] text-teal-600/70 dark:text-teal-400/60">al {annualRate.toFixed(1)}% annuo</div>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600/80 dark:text-emerald-400/70">Reale</div>
+                                    <div className={`text-lg font-extrabold ${doublingRealLabel ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}`}>
+                                        {doublingRealLabel ?? <span>&mdash;</span>}
+                                    </div>
+                                    <div className="text-[10px] text-emerald-600/70 dark:text-emerald-400/60">
+                                        {doublingRealLabel
+                                            ? `al ${result.realReturnPct.toFixed(1)}% reale`
+                                            : "rendimento reale <= 0"}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

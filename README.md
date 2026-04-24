@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.8.0`
+**Versione corrente:** `v1.8.2`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.8.2 - 24 aprile 2026 (UX — nuova KPI "Tempo di Raddoppio" nel Calcolatore Interesse Composto)
+
+- **Nuova KPI educativa (Calcolatore Interesse Composto)** - aggiunta card "Tempo di Raddoppio" con doppia lettura (nominale e reale) che mostra in quanti anni il capitale raddoppia per sola capitalizzazione degli interessi ai parametri scelti, in parallelo alla KPI "Tempo di Dimezzamento" gia' presente nel Calcolatore Inflazione. Crea simmetria concettuale tra le due leve opposte che determinano il potere d'acquisto nel tempo
+- **Formula esatta, non Regola del 72** - il calcolo usa `ln(2) / ln(1 + r)` invece dell'approssimazione `72/r`, piu' accurata soprattutto sui rendimenti bassi (es. al 2% la Regola del 72 stima 36 anni, la formula esatta 35 anni; al 15% 4.8 vs 5.0 anni). Coerente con la stessa formula gia' usata da `projectInflation` per il dimezzamento del potere d'acquisto
+- **Lettura reale coerente con il resto dell'app** - il tempo di raddoppio "reale" deriva il rendimento reale tramite `computeRealReturn` (Fisher esatto), la stessa funzione usata da FIRE dashboard, advisor e calcolatore inflazione. Mostra `—` quando il rendimento reale e' <= 0 (il capitale non raddoppia mai per sola capitalizzazione in scenari con inflazione >= rendimento nominale)
+- **Guardie sugli edge case** - con rendimento nominale 0% o negativo la card mostra `—` invece di `Infinity` o valori non finiti; formattazione compatta (un decimale sotto i 10 anni, intero oltre) coerente con quella di `halvingLabel` nel Calcolatore Inflazione
+
 ### v1.8.1 - 23 aprile 2026 (hardening matematica: fire-sensitivity — guardie su SWR/rendimento reale)
 
 - **Bugfix finanziario critico (Matrice di Sensitivita' FIRE)** - `src/lib/finance/fire-sensitivity.ts` ora clampa `withdrawalRatePct` con la stessa soglia minima (0.1%) gia' usata da `fire-projection.ts`. Prima del fix, un utente che impostava `SWR = 0` vedeva `fireTarget = Infinity` e l'intera matrice restituiva `yearsToFire = null` in ogni cella; con `SWR < 0` il target diventava negativo e TUTTE le celle risultavano istantaneamente `FIRE raggiunto` (falso positivo pericoloso, soprattutto perche' la stessa funzione e' esposta agli AI tools di `src/lib/ai/tools.ts` e `server-tools.ts`)
