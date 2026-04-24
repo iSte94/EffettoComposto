@@ -10,11 +10,14 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import {
     AlertTriangle,
+    ArrowUpRight,
+    Briefcase,
     Calendar,
     Car,
     CheckCircle2,
     ChevronDown,
     ChevronUp,
+    Clock3,
     CreditCard,
     Euro,
     FolderOpen,
@@ -40,6 +43,10 @@ import {
     getExistingLoanSnapshot,
     simulateLoanPrepayment,
 } from "@/lib/finance/loans";
+import {
+    buildCareerIncomeProjection,
+    getProjectedMonthlyIncomeForOwner,
+} from "@/lib/finance/career-projection";
 import { DTI_THRESHOLD } from "@/lib/constants";
 import type {
     LoanCalculatorFinancingSimulation,
@@ -85,6 +92,16 @@ interface FinancingSimulationComputed extends LoanCalculatorFinancingSimulation 
     principal: number;
     result: AmortizationResult;
     costoPct: number;
+}
+
+interface CareerDtiProjectionRow {
+    year: number;
+    yearOffset: number;
+    monthlyIncome: number;
+    dtiPct: number;
+    maxNewInstallment: number;
+    margin: number;
+    promotionAmount: number;
 }
 
 const DTI_SCALE_MAX = 50;
@@ -157,6 +174,12 @@ function getSimulationPrincipal(
 function formatSavedScenarioDate(value: string) {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? "Data non disponibile" : savedScenarioDateFormatter.format(parsed);
+}
+
+function formatWaitLabel(yearOffset: number) {
+    if (yearOffset <= 0) return "oggi";
+    if (yearOffset === 1) return "tra circa 12 mesi";
+    return `tra circa ${yearOffset} anni`;
 }
 
 function getIntestatarioLabel(
@@ -342,6 +365,16 @@ export function LoanCalculator() {
                 };
             }),
         [savedScenarios],
+    );
+
+    const careerIncomeProjection = useMemo(
+        () =>
+            buildCareerIncomeProjection({
+                progressionRaw: preferences.careerProgression,
+                person1MonthlyIncome: preferences.person1Income || 0,
+                person2MonthlyIncome: preferences.person2Income || 0,
+            }),
+        [preferences.careerProgression, preferences.person1Income, preferences.person2Income],
     );
 
     const simulationEntries = useMemo<FinancingSimulationComputed[]>(
@@ -580,6 +613,53 @@ export function LoanCalculator() {
         selectedLoanEntry,
     ]);
 
+    const careerDtiAnalysis = useMemo(() => {
+        const rows: CareerDtiProjectionRow[] = careerIncomeProjection.points.map((point) => {
+            const monthlyIncome = getProjectedMonthlyIncomeForOwner(point, intestatario);
+            const maxNewInstallment = Math.max(0, monthlyIncome * DTI_THRESHOLD - dtiData.adjustedExistingInstallment);
+            const margin = maxNewInstallment - dtiData.totalNewInstallment;
+            const promotionAmount =
+                intestatario === "person1"
+                    ? point.person1PromotionAmount
+                    : intestatario === "person2"
+                    ? point.person2PromotionAmount
+                    : point.person1PromotionAmount + point.person2PromotionAmount;
+
+            return {
+                year: point.year,
+                yearOffset: point.yearOffset,
+                monthlyIncome,
+                dtiPct: monthlyIncome > 0 ? (dtiData.totalInstallment / monthlyIncome) * 100 : 0,
+                maxNewInstallment,
+                margin,
+                promotionAmount,
+            };
+        });
+
+        const current = rows[0] ?? null;
+        const last = rows[rows.length - 1] ?? null;
+        const firstFutureFit = rows.find((row) => row.yearOffset > 0 && row.margin >= 0) ?? null;
+        const visibleOffsets = new Set([0, 1, 2, 3]);
+
+        if (firstFutureFit) visibleOffsets.add(firstFutureFit.yearOffset);
+        if (last) visibleOffsets.add(last.yearOffset);
+
+        return {
+            rows,
+            current,
+            last,
+            firstFutureFit,
+            previewRows: rows.filter((row) => visibleOffsets.has(row.yearOffset)).slice(0, 6),
+            currentGap: Math.max(0, dtiData.totalNewInstallment - (current?.maxNewInstallment ?? 0)),
+        };
+    }, [
+        careerIncomeProjection.points,
+        dtiData.adjustedExistingInstallment,
+        dtiData.totalInstallment,
+        dtiData.totalNewInstallment,
+        intestatario,
+    ]);
+
     const suggestedPrepaymentForThreshold = useMemo(() => {
         if (!selectedLoanEntry || dtiData.income <= 0) return 0;
 
@@ -807,7 +887,7 @@ export function LoanCalculator() {
                                                 ? person2Name
                                                 : "Entrambi"}
                                         </span>
-                                        {" · "}
+                                        {" - "}
                                         {scenario.enableDebtReductionSimulation ? "leva anti-DTI salvata" : "nessuna riduzione debiti salvata"}
                                     </p>
 
@@ -1482,6 +1562,153 @@ export function LoanCalculator() {
                             </span>
                         </div>
 
+                        {careerDtiAnalysis.current && careerDtiAnalysis.last && (
+                            <div className="space-y-4 rounded-2xl border border-blue-200/70 bg-blue-50/50 p-4 dark:border-blue-900/60 dark:bg-blue-950/15">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div className="flex items-start gap-3">
+                                        <div className="rounded-2xl bg-blue-100 p-2 text-blue-600 dark:bg-blue-950/70 dark:text-blue-300">
+                                            <Briefcase className="h-4 w-4" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-blue-500">
+                                                Carriera e timing
+                                            </p>
+                                            <h4 className="text-sm font-semibold text-foreground">
+                                                Proiezione del rapporto rata/reddito con gli aumenti salvati
+                                            </h4>
+                                            <p className="text-xs leading-relaxed text-muted-foreground">
+                                                Uso la sezione Carriera per {getIntestatarioLabel(intestatario, person1Name, person2Name)}:
+                                                aumenti annui, promozioni e redditi mensili aggiornano il margine futuro.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="rounded-2xl border border-blue-200/80 bg-background/80 px-3 py-2 text-right dark:border-blue-900/70">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Orizzonte</p>
+                                        <p className="text-sm font-bold text-foreground">
+                                            {careerIncomeProjection.progression.yearsToSimulate} anni
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Reddito oggi</p>
+                                        <p className="mt-1 text-base font-bold text-foreground">
+                                            {formatEuro(careerDtiAnalysis.current.monthlyIncome)}
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            DTI {careerDtiAnalysis.current.dtiPct.toFixed(1)}%
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Gap oggi</p>
+                                        <p className={`mt-1 text-base font-bold ${careerDtiAnalysis.currentGap > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                                            {careerDtiAnalysis.currentGap > 0 ? formatEuro(careerDtiAnalysis.currentGap) : "0 EUR"}
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground">margine mancante al 33%</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Primo anno utile</p>
+                                        <p className="mt-1 text-base font-bold text-foreground">
+                                            {dtiData.isOk
+                                                ? "Gia ora"
+                                                : careerDtiAnalysis.firstFutureFit
+                                                ? String(careerDtiAnalysis.firstFutureFit.year)
+                                                : "Non stimato"}
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            {dtiData.isOk
+                                                ? "scenario entro soglia"
+                                                : careerDtiAnalysis.firstFutureFit
+                                                ? formatWaitLabel(careerDtiAnalysis.firstFutureFit.yearOffset)
+                                                : "oltre orizzonte carriera"}
+                                        </p>
+                                    </div>
+                                    <div className="rounded-2xl border border-border/70 bg-background/80 p-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Fine proiezione</p>
+                                        <p className="mt-1 text-base font-bold text-foreground">
+                                            {formatEuro(careerDtiAnalysis.last.monthlyIncome)}
+                                        </p>
+                                        <p className="text-[11px] text-muted-foreground">
+                                            DTI {careerDtiAnalysis.last.dtiPct.toFixed(1)}%
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div
+                                    className={`flex items-start gap-2.5 rounded-2xl p-3 text-xs ${
+                                        dtiData.isOk
+                                            ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300"
+                                            : careerDtiAnalysis.firstFutureFit
+                                            ? "bg-blue-50 text-blue-800 dark:bg-blue-950/30 dark:text-blue-300"
+                                            : "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                                    }`}
+                                >
+                                    {dtiData.isOk ? (
+                                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                                    ) : careerDtiAnalysis.firstFutureFit ? (
+                                        <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                                    ) : (
+                                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                                    )}
+                                    <span>
+                                        {dtiData.isOk
+                                            ? `Lo scenario e gia sostenibile oggi. Con gli aumenti salvati, a fine proiezione il margine sulle nuove rate arriverebbe a ${formatEuro(Math.max(0, careerDtiAnalysis.last.maxNewInstallment - dtiData.totalNewInstallment))}.`
+                                            : careerDtiAnalysis.firstFutureFit
+                                            ? `Oggi mancano circa ${formatEuro(careerDtiAnalysis.currentGap)} di capacita mensile al 33%. Con la carriera salvata, lo scenario rientrerebbe nel ${careerDtiAnalysis.firstFutureFit.year}, ${formatWaitLabel(careerDtiAnalysis.firstFutureFit.yearOffset)}, con DTI stimato al ${careerDtiAnalysis.firstFutureFit.dtiPct.toFixed(1)}%.`
+                                            : `Con gli aumenti salvati lo scenario non rientra entro ${careerIncomeProjection.progression.yearsToSimulate} anni: a fine proiezione il margine stimato resta ${formatEuro(careerDtiAnalysis.last.margin)} rispetto alle nuove rate.`}
+                                    </span>
+                                </div>
+
+                                <div className="overflow-hidden rounded-2xl border border-border/70 bg-background/80">
+                                    <div className="grid grid-cols-4 gap-2 border-b border-border/70 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                        <span>Anno</span>
+                                        <span>Reddito/mese</span>
+                                        <span>DTI</span>
+                                        <span>Esito</span>
+                                    </div>
+                                    <div className="divide-y divide-border/60">
+                                        {careerDtiAnalysis.previewRows.map((row) => (
+                                            <div key={row.year} className="grid grid-cols-4 gap-2 px-3 py-2 text-xs">
+                                                <div>
+                                                    <p className="font-semibold text-foreground">{row.year}</p>
+                                                    <p className="text-[10px] text-muted-foreground">{formatWaitLabel(row.yearOffset)}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-foreground">{formatEuro(row.monthlyIncome)}</p>
+                                                    {row.promotionAmount > 0 && (
+                                                        <p className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-300">
+                                                            <ArrowUpRight className="h-3 w-3" />
+                                                            promo {formatEuro(row.promotionAmount)}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <p className={`font-semibold ${row.margin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                                                        {row.dtiPct.toFixed(1)}%
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        max nuove {formatEuro(row.maxNewInstallment)}
+                                                    </p>
+                                                </div>
+                                                <div className="flex items-center">
+                                                    <span
+                                                        className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                                                            row.margin >= 0
+                                                                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+                                                                : "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300"
+                                                        }`}
+                                                    >
+                                                        {row.margin >= 0 ? `ok +${formatEuro(row.margin)}` : `manca ${formatEuro(Math.abs(row.margin))}`}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         <p className="text-xs text-muted-foreground">
                             Rata massima aggiuntiva sostenibile al 33%{dtiData.hasSimulation ? " dopo il versamento" : ""}:{" "}
                             <span className={`font-semibold ${dtiData.maxNewInstallment > 0 ? "text-foreground" : "text-red-500"}`}>
@@ -1641,6 +1868,7 @@ export function LoanCalculator() {
                     <li>Puoi dare un nome a ogni finanziamento e usare la permuta come valore aggiuntivo all&apos;anticipo.</li>
                     <li>Le nuove rate vengono aggregate nel DTI insieme ai prestiti gia esistenti.</li>
                     <li>La leva anti-DTI ricalcola prima un debito attivo, poi aggiorna l&apos;analisi complessiva.</li>
+                    <li>La proiezione Carriera usa aumenti annui e promozioni salvate per stimare quando il DTI puo rientrare.</li>
                     <li>Puoi salvare uno scenario completo e riprenderlo piu avanti per modificarlo o duplicarlo.</li>
                     <li>Aumentare anticipo o ridurre importo, durata e tasso su ogni card cambia il totale generale in tempo reale.</li>
                 </ul>

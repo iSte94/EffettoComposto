@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.9.0`
+**Versione corrente:** `v1.10.0`
 
 ---
 
@@ -113,11 +113,18 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
-### v1.9.1 - 24 aprile 2026 (UX — nuovo chip "Nuovo massimo storico" / "Sotto il picco" nel Riepilogo)
+### v1.10.1 - 24 aprile 2026 (UX — nuovo chip "Nuovo massimo storico" / "Sotto il picco" nel Riepilogo)
 
 - **Nuova metrica "Current Drawdown" nel Riepilogo** - accanto alle pillole CAGR e Max Drawdown il tab Riepilogo mostra ora un chip che indica la distanza percentuale del patrimonio corrente dal picco storico. Quando il patrimonio attuale coincide con il massimo mai registrato viene evidenziato un badge verde con icona trofeo ("Nuovo massimo storico"); quando siamo sotto il picco viene mostrata la distanza percentuale in ambra con tooltip che esplicita quanto manca in euro per tornare all'ATH. Complementa il Max Drawdown (che resta il peggior calo osservato) dando immediato feedback sullo stato ATTUALE: l'utente capisce a colpo d'occhio se sta segnando un nuovo massimo o se e' in fase di recupero da un drawdown
 - **Refactoring `computeHistoryStats`** - esteso il tipo `HistoryStats` con `currentDrawdownPercent` e `isAtAllTimeHigh`, calcolati nello stesso singolo passaggio usato per il max drawdown. Nessun costo computazionale aggiuntivo perche' riutilizza `peakValue` e il valore dell'ultimo snapshot, e nessun breaking change per gli altri consumer della libreria (l'unico consumer attuale e' `overview-dashboard.tsx`). Aggiunta tolleranza di 0.05% per la soglia ATH, cosi' da non far "ballare" il badge per rumore in virgola mobile quando due snapshot consecutivi sono numericamente identici
-- **Nuovi test di regressione** - aggiunti 3 test a `history-stats.test.ts` (ATH con serie in monotonico rialzo, current drawdown < 0 con ultimo valore sotto il picco, e caso di recupero parziale dove `currentDrawdownPercent` e `maxDrawdownPercent` divergono). Tutti i 338 test della suite passano
+- **Nuovi test di regressione** - aggiunti 3 test a `history-stats.test.ts` (ATH con serie in monotonico rialzo, current drawdown < 0 con ultimo valore sotto il picco, e caso di recupero parziale dove `currentDrawdownPercent` e `maxDrawdownPercent` divergono). Tutti i 341 test della suite passano
+
+### v1.10.0 - 24 aprile 2026 (carriera e timing nel calcolatore finanziamenti)
+
+- **DTI prospettico collegato alla Carriera** - il `Calcolatore Finanziamento` usa ora i dati salvati nella sezione `Carriera` per proiettare redditi futuri, aumenti annui e promozioni, stimando come cambia il rapporto rata/reddito nel tempo
+- **Suggerimento operativo sul momento giusto** - se una simulazione oggi supera la soglia del 33%, il pannello indica il gap mensile attuale e il primo anno in cui lo scenario potrebbe rientrare grazie alla crescita prevista del reddito
+- **Specchietto annuale di sostenibilita** - aggiunta una mini-tabella con reddito mensile atteso, DTI, rata massima sostenibile e margine/mancanza per gli anni chiave, cosi' l'utente puo' decidere se anticipare, ridurre o attendere
+- **Motore condiviso e testato** - introdotta la utility `career-projection` con normalizzazione robusta dei dati Carriera e test dedicati su parsing, aumenti annui, promozioni e selezione intestatario
 
 ### v1.9.0 - 24 aprile 2026 (permuta e dettaglio salvataggi nel calcolatore finanziamenti)
 
