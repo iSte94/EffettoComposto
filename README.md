@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.9.0`
+**Versione corrente:** `v1.10.0`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.10.0 - 24 aprile 2026 (carriera e timing nel calcolatore finanziamenti)
+
+- **DTI prospettico collegato alla Carriera** - il `Calcolatore Finanziamento` usa ora i dati salvati nella sezione `Carriera` per proiettare redditi futuri, aumenti annui e promozioni, stimando come cambia il rapporto rata/reddito nel tempo
+- **Suggerimento operativo sul momento giusto** - se una simulazione oggi supera la soglia del 33%, il pannello indica il gap mensile attuale e il primo anno in cui lo scenario potrebbe rientrare grazie alla crescita prevista del reddito
+- **Specchietto annuale di sostenibilita** - aggiunta una mini-tabella con reddito mensile atteso, DTI, rata massima sostenibile e margine/mancanza per gli anni chiave, cosi' l'utente puo' decidere se anticipare, ridurre o attendere
+- **Motore condiviso e testato** - introdotta la utility `career-projection` con normalizzazione robusta dei dati Carriera e test dedicati su parsing, aumenti annui, promozioni e selezione intestatario
+
 ### v1.9.0 - 24 aprile 2026 (permuta e dettaglio salvataggi nel calcolatore finanziamenti)
 
 - **Permuta dentro ogni finanziamento** - ogni card del `Calcolatore Finanziamento` puo' ora attivare la voce `Permuta`, inserire il valore del bene dato in cambio e sommarlo automaticamente all'anticipo in denaro, riducendo in modo corretto il capitale effettivamente da finanziare
