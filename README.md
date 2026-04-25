@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.7`
+**Versione corrente:** `v1.10.8`
 
 ---
 
@@ -113,6 +113,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.8 - 25 aprile 2026 (bugfix matematico FIRE: propagazione NaN nel motore `projectFire`)
+
+- **Bug scovato** - in `src/lib/finance/fire-projection.ts` la funzione `projectFire` (motore deterministico riusato dal tab FIRE, dall'Advisor e dai confronti "con / senza acquisto") usava i pattern `Math.max(0, monthlyExpensesAtFire) * 12`, `Math.max(0.1, withdrawalRatePct) / 100` e `Math.max(0, startingCapital - oneTimeOutflow)` per "clampare" gli input. In JavaScript `Math.max(0, NaN) === NaN` (e non 0): bastava un singolo input non finito — un campo form svuotato dall'utente, una preferenza corrotta letta dal DB, una divisione per zero a monte — perché `fireTarget`, `swr` e `initialCapital` diventassero NaN, propagando il veleno nell'intero loop mensile e in TUTTI i punti del chart
+- **Effetto sulla dashboard** - la regressione produceva una catena di sintomi silenziosi: (a) header "€NaN" su `Capitale a target FIRE`, (b) chart spezzato con linea target invisibile, (c) `monthsToFire` bloccato a -1 (perché `capital >= NaN` è sempre false) e quindi banner "FIRE non raggiungibile entro l'orizzonte" anche con parametri sani, (d) advisor che riportava `delayMonths = 0` (entrambe le proiezioni "non raggiungono FIRE", `fireDelayMonths` ritorna 0). Lo stesso difetto colpiva l'orizzonte temporale (`maxYears`), l'età corrente, l'età di pensione, i mesi di costi ricorrenti/ongoing e i delta dei `plannedCapitalDeltaByMonth` / `plannedNetCashflowDeltaByMonth`
+- **Soluzione** - aggiunte due helper pure (`sanitizeFinite`, `sanitizeNonNegative`) all'inizio del modulo e una sanitizzazione esplicita di TUTTI i 13 input numerici prima del loop di simulazione. Il SWR è ora clampato con la stessa soglia `MIN_WITHDRAWAL_RATE_PCT = 0.1` già usata da `fire-sensitivity.ts` (UNICA fonte di verità del progetto), `Number.isFinite` discrimina sia NaN sia ±Infinity, e il guard `if (!Number.isFinite(capital) || capital < 0) capital = 0` blocca anche eventuali underflow numerici nel ricorso `capital * (1 + monthlyRate) + cashflow + plannedDelta`. Sanitizzati anche i delta del `plannedCapitalDeltaByMonth`/`plannedNetCashflowDeltaByMonth` (un singolo valore corrotto in array passati dall'Advisor non corrompe più le mensilità successive)
+- **Copertura test completa (9 nuovi test, suite 384/384 verde)** - aggiunto blocco `describe('projectFire — sanitizzazione input non finiti (regressione NaN)')` in `src/lib/finance/fire-projection.test.ts` con: NaN su `withdrawalRatePct` / `monthlyExpensesAtFire` (in scenario già pensionato) / `startingCapital` / `monthlySavings`, Infinity su `oneTimeOutflow`, scenario "tutti i campi NaN" che verifica output completamente finito (degraded ma stabile), `plannedCapitalDeltaByMonth` con NaN/Infinity intercalati, regressione esplicita per `withdrawalRatePct = 0` clampato a 0.1% e per valori negativi. Tutti i 384 test (37 file) passano, eslint pulito
+- **Perché rende l'app finanziariamente più robusta** - il motore `projectFire` è il cuore di QUATTRO superfici critiche (tab FIRE, Advisor "con/senza acquisto", proiezioni di confronto pre/post-mutuo, KPI di Riepilogo). Un singolo NaN proveniente da un input form svuotato — scenario perfettamente normale per un utente che cancella il campo per riscrivere — basta a invalidare l'intera dashboard, e il fallimento non è gridato (errore visibile) ma *silenzioso* (numero "€NaN", banner "non raggiungibile"). La sanitizzazione preventiva all'ingresso garantisce che il motore degradi sempre verso un output finito e ragionevole, allineandosi al pattern già adottato da `fire-sensitivity.ts` (v1.8.1) e `monte-carlo-helpers.ts` (v1.10.4) e chiudendo la stessa classe di bug sull'ultima delle helper finanziarie centrali
 
 ### v1.10.7 - 25 aprile 2026 (UX — nuova KPI "Costo del Ritardo (1 anno)" nel Calcolatore Interesse Composto)
 

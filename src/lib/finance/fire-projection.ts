@@ -84,6 +84,19 @@ export interface FireProjectionResult {
  *   - netSaving[m] = monthlySavings - recurringDelta - ongoingDelta
  *     dove i delta possono essere anche negativi (es. affitto netto positivo).
  */
+// Soglia minima di SWR per evitare divisioni per zero / target infiniti.
+// Coerente con `fire-sensitivity.ts` (UNICA fonte di verita' del progetto).
+const MIN_WITHDRAWAL_RATE_PCT = 0.1;
+
+function sanitizeFinite(value: number, fallback = 0): number {
+    return Number.isFinite(value) ? value : fallback;
+}
+
+function sanitizeNonNegative(value: number, fallback = 0): number {
+    const finite = sanitizeFinite(value, fallback);
+    return finite < 0 ? 0 : finite;
+}
+
 export function projectFire(params: FireProjectionParams): FireProjectionResult {
     const {
         startingCapital,
@@ -104,8 +117,30 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
         plannedNetCashflowDeltaByMonth = [],
     } = params;
 
-    const annualExpenses = Math.max(0, monthlyExpensesAtFire) * 12;
-    const swr = Math.max(0.1, withdrawalRatePct) / 100;
+    // BUG FIX (NaN propagation): `Math.max(0, NaN)` ritorna NaN in JavaScript,
+    // quindi i clamp originali (`Math.max(0, monthlyExpensesAtFire)`,
+    // `Math.max(0.1, withdrawalRatePct)`, `Math.max(0, startingCapital - oneTimeOutflow)`)
+    // NON proteggevano da input non finiti. Un singolo NaN proveniente da
+    // un campo form svuotato o da preferenze corrotte produceva
+    // `fireTarget = NaN` (dashboard "€NaN"), `capital = NaN` (chart spezzato)
+    // e silenziava `monthsToFire` (resta a -1) facendo apparire il piano
+    // "irraggiungibile" anche con parametri sani sotto. La sanitizzazione
+    // ora normalizza ogni input a un valore finito prima di usarlo.
+    const safeMonthlyExpensesAtFire = sanitizeNonNegative(monthlyExpensesAtFire);
+    const safeMonthlySavings = sanitizeFinite(monthlySavings);
+    const safeWithdrawalRatePct = Math.max(MIN_WITHDRAWAL_RATE_PCT, sanitizeFinite(withdrawalRatePct, MIN_WITHDRAWAL_RATE_PCT));
+    const safeStartingCapital = sanitizeNonNegative(startingCapital);
+    const safeOneTimeOutflow = sanitizeNonNegative(oneTimeOutflow);
+    const safeCurrentAge = sanitizeFinite(currentAge);
+    const safeRetirementAge = sanitizeFinite(retirementAge, Number.POSITIVE_INFINITY);
+    const safeMaxYears = Math.max(0, Math.floor(sanitizeFinite(maxYears, 60)));
+    const safeRecurringMonthlyCost = sanitizeFinite(recurringMonthlyCost);
+    const safeRecurringMonths = Math.max(0, Math.floor(sanitizeFinite(recurringMonths)));
+    const safeOngoingMonthlyCost = sanitizeFinite(ongoingMonthlyCost);
+    const safeOngoingMonths = Math.max(0, Math.floor(sanitizeFinite(ongoingMonths)));
+
+    const annualExpenses = safeMonthlyExpensesAtFire * 12;
+    const swr = safeWithdrawalRatePct / 100;
     const fireTarget = annualExpenses / swr;
 
     // Fisher equation esatta: evita la sovrastima da ~3-4% su 30 anni tipica
@@ -120,43 +155,43 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
     // patrimonio pre-acquisto, altrimenti il consulente riporta erroneamente
     // "nessun ritardo" quando un esborso una tantum toglie l'utente dalla
     // soglia FIRE (regressione #fire-already-fire-outflow).
-    const initialCapital = Math.max(0, startingCapital - oneTimeOutflow);
+    const initialCapital = Math.max(0, safeStartingCapital - safeOneTimeOutflow);
     let capital = initialCapital;
     const chartData: FireProjectionPoint[] = [];
     let yearsToFire = -1;
     let monthsToFire = -1;
 
     // Punto iniziale
-    chartData.push({ year: 0, age: currentAge, capital, target: fireTarget });
+    chartData.push({ year: 0, age: safeCurrentAge, capital, target: fireTarget });
 
-    const totalMonths = maxYears * 12;
+    const totalMonths = safeMaxYears * 12;
 
     for (let m = 1; m <= totalMonths; m++) {
-        const age = currentAge + m / 12;
-        const isRetired = age >= retirementAge || capital >= fireTarget;
+        const age = safeCurrentAge + m / 12;
+        const isRetired = age >= safeRetirementAge || capital >= fireTarget;
 
         // Cashflow del mese
         let cashflow: number;
         if (isRetired) {
-            cashflow = -monthlyExpensesAtFire;
+            cashflow = -safeMonthlyExpensesAtFire;
         } else {
-            let net = monthlySavings;
-            if (recurringMonths > 0 && m <= recurringMonths && recurringMonthlyCost !== 0) {
-                net -= recurringMonthlyCost;
+            let net = safeMonthlySavings;
+            if (safeRecurringMonths > 0 && m <= safeRecurringMonths && safeRecurringMonthlyCost !== 0) {
+                net -= safeRecurringMonthlyCost;
             }
-            if (ongoingMonthlyCost !== 0) {
-                const limit = ongoingMonths > 0 ? ongoingMonths : totalMonths;
-                if (m <= limit) net -= ongoingMonthlyCost;
+            if (safeOngoingMonthlyCost !== 0) {
+                const limit = safeOngoingMonths > 0 ? safeOngoingMonths : totalMonths;
+                if (m <= limit) net -= safeOngoingMonthlyCost;
             }
             cashflow = net;
         }
 
         const plannedMonthIndex = m - 1;
-        const plannedDelta = (plannedCapitalDeltaByMonth[plannedMonthIndex] ?? 0)
-            + (plannedNetCashflowDeltaByMonth[plannedMonthIndex] ?? 0);
+        const plannedDelta = sanitizeFinite(plannedCapitalDeltaByMonth[plannedMonthIndex] ?? 0)
+            + sanitizeFinite(plannedNetCashflowDeltaByMonth[plannedMonthIndex] ?? 0);
 
         capital = capital * (1 + monthlyRate) + cashflow + plannedDelta;
-        if (capital < 0) capital = 0;
+        if (!Number.isFinite(capital) || capital < 0) capital = 0;
 
         if (monthsToFire < 0 && capital >= fireTarget) {
             monthsToFire = m;
@@ -166,7 +201,7 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
         if (m % 12 === 0) {
             chartData.push({
                 year: m / 12,
-                age: currentAge + m / 12,
+                age: safeCurrentAge + m / 12,
                 capital,
                 target: fireTarget,
             });
@@ -186,7 +221,7 @@ export function projectFire(params: FireProjectionParams): FireProjectionResult 
         monthsToFire = 0;
     }
 
-    const ageAtFire = yearsToFire >= 0 ? currentAge + yearsToFire : -1;
+    const ageAtFire = yearsToFire >= 0 ? safeCurrentAge + yearsToFire : -1;
 
     return {
         fireTarget,
