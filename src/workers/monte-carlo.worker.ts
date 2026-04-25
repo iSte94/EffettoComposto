@@ -2,6 +2,7 @@
 // Riceve parametri e esegue 10k simulazioni senza bloccare la UI
 
 import { allocatePreRetirementPassiveIncomeAnnual } from "@/lib/finance/coast-fire";
+import { applyMonteCarloAnnualReturn } from "@/lib/finance/monte-carlo-helpers";
 
 interface MonteCarloParams {
     startingCapital: number;
@@ -115,7 +116,11 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                 const yearRealReturn = applyTaxStamp ? (realReturnDecimal - 0.002) : realReturnDecimal;
                 const randomYearReturn = randomNormal(yearRealReturn, stdDevDecimal);
 
-                runCap = runCap * (1 + randomYearReturn);
+                // BUG FIX: con volatilita' alte (>=20%) la coda sinistra della
+                // normale puo' produrre randomYearReturn < -1, facendo flippare
+                // il segno del capitale. La helper clampa a -100% di perdita
+                // massima e garantisce capitale >= 0. Vedi monte-carlo-helpers.ts.
+                runCap = applyMonteCarloAnnualReturn(runCap, randomYearReturn).nextCapital;
 
                 if (isRetired) {
                     const annualPublicPension = yAge >= publicPensionAge ? expectedPublicPension * 12 : 0;
@@ -158,7 +163,9 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                 // Pension Fund Pot: grows with stochastic return (no bollo)
                 if (runPensionCap > 0 || totalAnnualPensionContribution > 0) {
                     const pfRandomReturn = randomNormal(realReturnDecimal, stdDevDecimal); // No bollo
-                    runPensionCap = runPensionCap * (1 + pfRandomReturn);
+                    // Stesso clamping di runCap: il fondo pensione non puo'
+                    // andare in negativo per movimenti di mercato.
+                    runPensionCap = applyMonteCarloAnnualReturn(runPensionCap, pfRandomReturn).nextCapital;
                     if (!isRetired && totalAnnualPensionContribution > 0) {
                         runPensionCap += totalAnnualPensionContribution;
                     }
