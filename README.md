@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.4`
+**Versione corrente:** `v1.10.5`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.10.5 - 25 aprile 2026 (UX — nuova KPI "Costo Opportunita' a 30 anni" nel Tracker Abbonamenti)
+
+- **Dal mero costo al "latte factor" composto (Tracker Abbonamenti)** - il tab mostrava gia' il costo mensile e annuale aggregato degli abbonamenti, ma lasciava all'utente il salto mentale "ok, ma in 30 anni quanto mi costa davvero questa abitudine?". La nuova card emerald/teal sotto le due card rosa risponde direttamente: applica al totale mensile aggregato un investimento al 4% reale annuo (rendimento Fisher tipico, ~7% nominale - ~3% inflazione) per 30 anni con capitalizzazione mensile, e mostra quanto capitale - in potere d'acquisto odierno - avresti accumulato investendo invece di pagare. La cifra principale e' affiancata da un breakdown secondario "di cui X di soli interessi composti / speso in abbonamenti: Y" che spiega visivamente la magia del compounding senza richiedere all'utente alcun calcolo
+- **Brand alignment FIRE-friendly** - questa metrica chiude il cerchio fra il tracker abbonamenti (sezione "monitoraggio spese") e il claim centrale dell'app "Effetto Composto / Indipendenza Finanziaria". L'utente che traccia €60/mese di Netflix+Spotify+iCloud ora vede subito che - investiti al 4% reale per 30 anni - sono €41k in euro odierni, di cui €19k di soli interessi composti. E' il classico "latte factor" tradotto nel piano REALE (al netto dell'inflazione), confrontabile direttamente con i target FIRE/Coast FIRE che l'utente vede negli altri tab
+- **Helper pura riusabile + test completi (11 nuovi test)** - estratta utility `computeSubscriptionOpportunityCost` in `src/lib/finance/subscription-opportunity.ts` con costanti esportate (`DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT = 4`, `DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS = 30`) per consentire futuri consumer (es. budget tracker, advisor). Formula chiusa della rendita posticipata `FV = PMT * ((1+m)^N - 1) / m` con `m = (1+r)^(1/12) - 1` (conversione esatta del tasso annuo a mensile, non il naive r/12), degenerazione lineare per rendimento 0%, sanitizzazione di NaN/Infinity, clamp negativi a zero. Suite test copre default canonici, monotonicita' rispetto a rendimento e orizzonte, edge case (zero, negativi, NaN, Infinity), troncamento intero degli anni e regressione del valore di riferimento (€50/mese × 30 anni @ 4% reale ~ €34.5k). Tutti i 375 test della suite (36 file) passano
+- **Perche' migliora l'esperienza utente** - chi tiene gli abbonamenti sotto controllo non lo fa per ossessione del centesimo, lo fa perche' sospetta che si stia "mangiando" qualcosa di piu' grande. Adesso quel "qualcosa" ha un numero, in euro odierni, sulla stessa pagina, senza dover aprire il Calcolatore Interesse Composto e rifare i conti. Stessa pagina, stessi input, una cifra in piu' che trasforma il tracker spese in uno strumento decisionale: serve davvero questo abbonamento se in 30 anni mi costa €X di patrimonio FIRE futuro?
+
 ### v1.10.4 - 25 aprile 2026 (bugfix matematico Monte Carlo: capitale che cambiava segno con high volatility)
 
 - **Bug scovato** - in `monte-carlo.worker.ts` il rendimento annuo era campionato da una normale `N(meanReale, stdDev)` e applicato come `runCap = runCap * (1 + randomYearReturn)`. La coda sinistra della normale puo' produrre valori `< -1` (perdita > 100%): con lo slider della volatilita' fino al 30% (vedi `fire-settings-panel.tsx`) e rendimento reale tipico al 4%, la probabilita' P(Z < -3.47) ≈ 2.6e-4 si traduce in ~150 eventi attesi su 60 anni × 10.000 simulazioni. In quei casi il prodotto FACEVA FLIPPARE IL SEGNO al capitale (es. €1M → -€500k), valore matematicamente impossibile in un mercato reale (un asset puo' essere azzerato, non diventare negativo). Lo stesso bug colpiva anche il fondo pensione (`runPensionCap`) gestito con campionamento separato
