@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.5`
+**Versione corrente:** `v1.10.6`
 
 ---
 
@@ -113,6 +113,15 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.6 - 25 aprile 2026 (UX — nuova card "Impatto del Tuo Extra" nella Strategia Estinzione Debiti)
+
+- **Problema iniziale** - il tab `Strategia Estinzione Debiti` (`src/components/debt-strategy.tsx`) chiedeva all'utente di inserire un `Budget Extra Mensile per Estinzione` ma non gli rispondeva mai alla domanda piu' importante: "questi €X extra al mese mi stanno davvero ripagando lo sforzo?". Il pannello mostrava il confronto Snowball vs Avalanche e il delta interessi tra i due metodi, ma mancava il confronto piu' motivazionale: scenario "solo rate minime" vs scenario "con il tuo extra". L'utente vedeva quanto pagava (rata + extra) ma non quanta liberta' e quanti interessi guadagnava in cambio
+- **Cosa e' stato modificato** - aggiunta una nuova card `Impatto del Tuo Extra` (gradient emerald/teal coerente con il pattern delle altre card "valore aggiunto" nell'app) che appare solo quando l'utente sta effettivamente versando un extra (`extraMonthly > 0`) e produce un risparmio misurabile. La card mostra tre KPI affiancati: (1) `Mesi Risparmiati` con conversione automatica in anni quando supera i 12 mesi, (2) `Interessi Risparmiati` in euro confrontati con `totale extra versati`, (3) `Resa per €1 Extra` come ratio interessi-evitati / euro-extra-versati che trasforma lo sforzo in un coefficiente di leva immediatamente confrontabile
+- **Implementazione tecnica** - estesa la `useMemo` di `results` con una terza simulazione `avalancheBaseline` che gira `simulatePayoff(validDebts, "avalanche", 0)` (zero extra) per ottenere lo scenario di riferimento "solo rate minime". Il nuovo `useMemo` `extraImpact` calcola la differenza in mesi e interessi vs questa baseline, riusando la stessa funzione gia' coperta da 14 test in `debt-strategy.test.ts` senza introdurre nuova logica finanziaria. Card renderizzata dopo il grafico di confronto con guard `monthsSaved > 0 || interestSaved > 0.5` per evitare card vuote quando il rendimento marginale e' nullo
+- **Perche' migliora l'esperienza utente** - trasforma un input astratto ("metto 200€ extra al mese") in un piano d'azione misurabile ("pagando 200€/mese in piu' risparmi 4.200€ di interessi e 18 mesi di vita con i debiti"). E' il classico anchor motivazionale che manca nei tool di pianificazione debiti: chi sta gia' facendo lo sforzo riceve conferma immediata del valore prodotto, e chi sta valutando se aumentare l'extra ha una metrica concreta su cui ragionare. La metrica `Resa per €1 Extra` e' particolarmente potente perche' funziona come un IRR semplificato: se il tuo debito ha un tasso medio del 10% effettivo, ogni euro di extra ne "risparmia" circa 0.20-0.40 in interessi nel lungo periodo, rendendo il pagamento extra finanziariamente equivalente a un investimento risk-free al tasso del debito stesso
+- **Manutenibilita'** - intervento chirurgico (~50 righe di JSX + 12 righe di calcolo), zero modifiche alla logica core di `simulatePayoff`, zero nuovi tipi condivisi, zero nuove dipendenze. Suite test 375/375 verde, eslint pulito
+
 ### v1.10.5 - 25 aprile 2026 (UX — nuova KPI "Costo Opportunita' a 30 anni" nel Tracker Abbonamenti)
 
 - **Dal mero costo al "latte factor" composto (Tracker Abbonamenti)** - il tab mostrava gia' il costo mensile e annuale aggregato degli abbonamenti, ma lasciava all'utente il salto mentale "ok, ma in 30 anni quanto mi costa davvero questa abitudine?". La nuova card emerald/teal sotto le due card rosa risponde direttamente: applica al totale mensile aggregato un investimento al 4% reale annuo (rendimento Fisher tipico, ~7% nominale - ~3% inflazione) per 30 anni con capitalizzazione mensile, e mostra quanto capitale - in potere d'acquisto odierno - avresti accumulato investendo invece di pagare. La cifra principale e' affiancata da un breakdown secondario "di cui X di soli interessi composti / speso in abbonamenti: Y" che spiega visivamente la magia del compounding senza richiedere all'utente alcun calcolo
