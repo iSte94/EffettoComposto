@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.2`
+**Versione corrente:** `v1.10.4`
 
 ---
 
@@ -113,6 +113,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+### v1.10.4 - 25 aprile 2026 (bugfix matematico Monte Carlo: capitale che cambiava segno con high volatility)
+
+- **Bug scovato** - in `monte-carlo.worker.ts` il rendimento annuo era campionato da una normale `N(meanReale, stdDev)` e applicato come `runCap = runCap * (1 + randomYearReturn)`. La coda sinistra della normale puo' produrre valori `< -1` (perdita > 100%): con lo slider della volatilita' fino al 30% (vedi `fire-settings-panel.tsx`) e rendimento reale tipico al 4%, la probabilita' P(Z < -3.47) ≈ 2.6e-4 si traduce in ~150 eventi attesi su 60 anni × 10.000 simulazioni. In quei casi il prodotto FACEVA FLIPPARE IL SEGNO al capitale (es. €1M → -€500k), valore matematicamente impossibile in un mercato reale (un asset puo' essere azzerato, non diventare negativo). Lo stesso bug colpiva anche il fondo pensione (`runPensionCap`) gestito con campionamento separato
+- **Effetto sulle proiezioni FIRE** - il segno negativo intermedio inquinava i calcoli successivi nel ramo retired (sottrazione di spese da capitale gia' negativo), nell'allocazione del risparmio dei redditi passivi pre-pensione, nella liquidazione del fondo pensione e negli eventi pianificati, prima che il clamp `if (runCap < 0) runCap = 0` di fine anno tampasse il danno. Su 10k simulazioni a 60 anni con volatilita' alta significava distorcere i percentili p10/p50/p90 mostrati a video (specialmente la coda pessimista) e il `successRate` che il widget Monte Carlo riporta come "Probabilita' di sopravvivenza" — i valori spuriamente bassi della p10 davano consigli FIRE indebitamente prudenti
+- **Soluzione** - estratta una helper pura `applyMonteCarloAnnualReturn(capital, annualReturnDecimal)` in `src/lib/finance/monte-carlo-helpers.ts` che (a) clampa il rendimento a `>= -1` (perdita massima reale del 100%), (b) sanitizza input NaN/Infinity senza propagarli nella griglia dei percentili e (c) garantisce capitale risultante `>= 0` come ulteriore difesa. Il worker ora invoca questa helper sia per il portafoglio principale sia per il pot del fondo pensione, con identica semantica
+- **Copertura test completa (16 nuovi test)** - aggiunto `monte-carlo-helpers.test.ts` con: rendimenti positivi/negativi standard senza falso clamp, regressione esplicita per `randomYearReturn = -1.5` / `-2` / `-10` (che prima invertivano il segno), simulazione di 10.000 estrazioni Box-Muller con stdDev=30% per verificare che NESSUN draw produca capitale negativo, gestione di NaN/Infinity su rendimento e capitale, e invarianti finanziarie (capitale finale sempre `>= 0`, monotonicita' del rendimento, flag `wasReturnClamped` che scatta solo sotto -1). Tutti i 364 test della suite (35 file) passano
+- **Perche' rende l'app finanziariamente piu' robusta** - le proiezioni Monte Carlo sono il core del tab FIRE e influenzano scelte di vita reali (quanti soldi mettere via, a che eta' smettere di lavorare). Garantire che le simulazioni rispettino vincoli fisici basilari ("il mercato non rende negativo il tuo capitale") elimina una classe di errori silenziosi nei percentili pessimisti, restituendo all'utente curve p10/p50/p90 coerenti con la realta' anche negli scenari ad alta volatilita'
+
 ### v1.10.3 - 24 aprile 2026 (UX — nuova KPI "Rendita Mensile FIRE" nel Calcolatore Interesse Composto)
 
 - **Dal capitale finale alla rendita di vita (Calcolatore Interesse Composto)** - il tab mostrava gia' quanto il capitale vale nominalmente e realmente a fine orizzonte, ma lasciava all'utente il salto mentale "ok, ma questi euro quanto produrrebbero al mese se volessi vivere di rendita?". La nuova card arancio/ambra applica il Safe Withdrawal Rate prudente del 3.25% (lo stesso DEFAULT_FIRE_WITHDRAWAL_RATE gia' usato in FIRE dashboard, advisor e AI tools) al valore REALE del capitale finale e risponde direttamente: "con questi accantonamenti al {annualRate}% reale, fra {years} anni avresti una rendita mensile teorica di €X in potere d'acquisto odierno, teoricamente a tempo indefinito". Quando il valore nominale differisce sensibilmente da quello reale, viene mostrato anche il numero nominale come riga secondaria (utile per chi ragiona sul saldo che vedra' sul conto fra N anni)
