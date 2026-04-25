@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
     Target, Plus, Trash2, Pencil, Check, X,
     Home, PiggyBank, TrendingUp, Plane, Sparkles, CircleDot,
-    Zap, AlertTriangle, Clock, CalendarClock,
+    Zap, AlertTriangle, Clock, CalendarClock, Activity,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -202,8 +202,8 @@ function SavingsGoalsSkeleton() {
                     <Skeleton className="h-6 w-12" />
                 </div>
                 <Skeleton className="h-3 w-full rounded-full" />
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    {[0, 1, 2].map((i) => (
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    {[0, 1, 2, 3].map((i) => (
                         <div key={i} className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5 space-y-1.5">
                             <Skeleton className="h-2.5 w-20" />
                             <Skeleton className="h-4 w-24" />
@@ -345,6 +345,7 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
         overallProgress,
         totalRemaining,
         totalRequiredMonthly,
+        totalHistoricalMonthly,
         completedCount,
         sortedGoals,
     } = useMemo(() => {
@@ -354,12 +355,17 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
         const remaining = Math.max(0, targetSum - currentSum);
 
         let monthlySum = 0;
+        // Somma del ritmo storico SOLO sugli obiettivi che alimentano "Ritmo
+        // richiesto" (deadline attiva, mesi residui > 0): cosi' il confronto
+        // attuale-vs-richiesto e' apples-to-apples e il margine ha significato.
+        let historicalMonthlySum = 0;
         let completed = 0;
 
         const decorated = goals.map((goal) => {
             const pacing = getDeadlinePacing(goal);
             if (pacing && pacing.status !== "expired" && pacing.monthsLeft > 0) {
                 monthlySum += pacing.requiredMonthly;
+                historicalMonthlySum += Math.max(0, pacing.historicalMonthly);
             }
             if (goal.targetAmount > 0 && goal.currentAmount >= goal.targetAmount) {
                 completed += 1;
@@ -381,10 +387,20 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
             overallProgress: progress,
             totalRemaining: remaining,
             totalRequiredMonthly: monthlySum,
+            totalHistoricalMonthly: historicalMonthlySum,
             completedCount: completed,
             sortedGoals: decorated,
         };
     }, [goals]);
+
+    // Margine mensile aggregato: positivo = stai mantenendo (o superando) il
+    // ritmo richiesto sugli obiettivi con scadenza attiva; negativo = il
+    // tuo ritmo storico non basta a rispettare le deadline. Mostrato solo
+    // quando esistono obiettivi con scadenza attiva (totalRequiredMonthly > 0)
+    // perche' altrimenti il confronto e' indefinito.
+    const monthlyMargin = totalRequiredMonthly > 0
+        ? totalHistoricalMonthly - totalRequiredMonthly
+        : null;
 
     if (!user) {
         return (
@@ -440,7 +456,7 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                             style={{ width: `${Math.min(overallProgress, 100)}%` }}
                         />
                     </div>
-                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                         <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5">
                             <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                                 <Target className="h-3 w-3" /> Da risparmiare
@@ -457,6 +473,42 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                             <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">
                                 {totalRequiredMonthly > 0 ? `${formatEuro(totalRequiredMonthly)}/mese` : "—"}
                             </p>
+                        </div>
+                        <div
+                            className={`rounded-2xl border px-3 py-2.5 ${
+                                monthlyMargin === null
+                                    ? "border-border/60 bg-muted/30"
+                                    : monthlyMargin >= 0
+                                        ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/20"
+                                        : "border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/20"
+                            }`}
+                            title={
+                                monthlyMargin === null
+                                    ? "Imposta una scadenza su almeno un obiettivo per vedere il tuo ritmo attuale"
+                                    : monthlyMargin >= 0
+                                        ? `Stai gia' superando il ritmo richiesto di ${formatEuro(monthlyMargin)}/mese: gli obiettivi sono in linea o in anticipo`
+                                        : `Al ritmo attuale risparmi ${formatEuro(Math.abs(monthlyMargin))}/mese in meno di quanto serve per rispettare le scadenze`
+                            }
+                        >
+                            <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                <Activity className="h-3 w-3" /> Ritmo attuale
+                            </p>
+                            <p className="mt-0.5 text-sm font-extrabold tabular-nums text-foreground">
+                                {monthlyMargin === null ? "—" : `${formatEuro(totalHistoricalMonthly)}/mese`}
+                            </p>
+                            {monthlyMargin !== null && (
+                                <p
+                                    className={`mt-0.5 text-[10px] font-semibold ${
+                                        monthlyMargin >= 0
+                                            ? "text-emerald-600 dark:text-emerald-400"
+                                            : "text-amber-600 dark:text-amber-400"
+                                    }`}
+                                >
+                                    {monthlyMargin >= 0
+                                        ? `+${formatEuro(monthlyMargin)} vs richiesto`
+                                        : `-${formatEuro(Math.abs(monthlyMargin))} vs richiesto`}
+                                </p>
+                            )}
                         </div>
                         <div className="rounded-2xl border border-border/60 bg-muted/30 px-3 py-2.5">
                             <p className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">

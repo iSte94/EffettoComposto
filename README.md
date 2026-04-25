@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.8`
+**Versione corrente:** `v1.10.9`
 
 ---
 
@@ -113,6 +113,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.9 - 25 aprile 2026 (UX — nuova KPI "Ritmo attuale" e margine mensile negli Obiettivi di Risparmio)
+
+- **Problema iniziale** - il pannello di riepilogo del tab `Obiettivi di Risparmio` (`src/components/savings-goals.tsx`) mostrava gia' tre KPI utili (`Da risparmiare`, `Ritmo richiesto`, `Completati`) ma lasciava all'utente il salto mentale piu' importante: "il mio ritmo di risparmio storico e' davvero sufficiente a rispettare le scadenze che mi sono dato?". Il `Ritmo richiesto` rispondeva alla domanda "quanto serve al mese" ma non c'era nessun confronto con il ritmo attuale aggregato, costringendo l'utente a fare il calcolo a mente goal per goal usando solo l'indicatore `Ritmo attuale` per-card (visibile, ma non sommato). In pratica una persona con 4-5 obiettivi attivi non aveva un termometro complessivo: o tutti i suoi goal mostravano badge `In linea` (e si sentiva tranquillo) o trovava un mix di stati senza capire l'entita' aggregata del gap
+- **Cosa e' stato modificato** - aggiunta una quarta card `Ritmo attuale` al pannello di riepilogo, posizionata fra `Ritmo richiesto` e `Completati`, che mostra (a) la somma del ritmo storico mensile sugli obiettivi che alimentano `Ritmo richiesto` (deadline attiva, mesi residui > 0) cosi' il confronto e' apples-to-apples, e (b) un sub-label `+€X vs richiesto` (verde) o `-€X vs richiesto` (ambra) che quantifica il margine o il deficit aggregato. La card cambia colore di sfondo in funzione del segno del margine (emerald-50 per margine positivo, amber-50 per deficit, neutro quando non ci sono goal con deadline attiva), riusando lo stesso linguaggio cromatico gia' usato dai badge di pacing per-goal (`In linea` verde, `In ritardo` ambra/rosso). Il layout della griglia e' passato da `sm:grid-cols-3` a `sm:grid-cols-2 lg:grid-cols-4`: su mobile resta una sola colonna, su tablet diventa 2x2, su desktop tutte e 4 le card affiancate. Scheletro caricamento aggiornato a 4 placeholder coerenti
+- **Implementazione tecnica** - estesa la `useMemo` esistente (zero passate aggiuntive sui goal) con `historicalMonthlySum`, sommato solo sugli stessi goal che concorrono a `monthlySum` (uso del `pacing.historicalMonthly` gia' calcolato da `getDeadlinePacing`, clampato con `Math.max(0, ...)` per robustezza). Calcolato fuori dalla `useMemo` un `monthlyMargin = totalHistoricalMonthly - totalRequiredMonthly` con `null` quando `totalRequiredMonthly === 0` (impedisce di mostrare "+€0 vs richiesto" quando il confronto e' indefinito perche' nessun goal ha scadenza attiva). Formattazione coerente con il resto del codebase: `+${formatEuro(margin)}` per positivi e `-${formatEuro(Math.abs(margin))}` per negativi (stesso pattern usato in `loan-calculator.tsx`, `snapshot-history-table.tsx`, `coast-fire-scenarios.tsx`). Tooltip della card spiega in linguaggio naturale cosa significa il delta (`Stai gia' superando il ritmo richiesto di €X/mese...` vs `Al ritmo attuale risparmi €X/mese in meno di quanto serve...`)
+- **Perche' migliora l'esperienza utente** - trasforma il pannello da "termometro per-goal" in "termometro di portafoglio". Chi sta gestendo piu' obiettivi contemporaneamente (caso comune: fondo emergenza + caparra casa + viaggio) ottiene a colpo d'occhio la risposta operativa "il mio sforzo aggregato e' allineato con le scadenze che mi sono dato?". E' il classico nudge comportamentale che mancava: un margine positivo conferma il piano e libera capacita' di pianificazione (es. spostare l'extra su un nuovo goal), un deficit aggregato grida invece la quota mensile mancante in un'unica cifra, evitando che gli utenti sottovalutino la somma di piccoli ritardi distribuiti. La distinzione cromatica emerald/amber e' immediata e non richiede di leggere il numero per capire lo stato
+- **Manutenibilita'** - intervento chirurgico (~60 righe netto fra JSX della card e calcolo del margine), zero nuove dipendenze, una sola nuova icona (`Activity` di lucide-react, gia' presente in altri tab), nessun nuovo tipo condiviso, zero modifiche alla logica di pacing per-goal (riusa `getDeadlinePacing` e i suoi 4 stati gia' coperti dai test). Suite test 384/384 verde, eslint pulito, build TypeScript senza errori sul file modificato
 
 ### v1.10.8 - 25 aprile 2026 (bugfix matematico FIRE: propagazione NaN nel motore `projectFire`)
 
