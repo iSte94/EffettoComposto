@@ -6,9 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Repeat, CreditCard } from "lucide-react";
+import { Plus, Trash2, Repeat, CreditCard, Sparkles } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { useAuth } from "@/contexts/auth-context";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import {
+    computeSubscriptionOpportunityCost,
+    DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS,
+    DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT,
+} from "@/lib/finance/subscription-opportunity";
 
 interface Subscription {
     id: string;
@@ -98,6 +104,16 @@ export function SubscriptionTracker() {
         }
         return { monthly, annual: monthly * 12 };
     }, [subscriptions]);
+
+    // Costo opportunita' composto: traduce la spesa mensile aggregata nel
+    // capitale (in potere d'acquisto odierno) che avresti accumulato
+    // investendo la stessa cifra al rendimento reale di default per
+    // l'orizzonte di default. E' il "latte factor" sotto il claim
+    // "Effetto Composto" - chiude il cerchio fra abbonamenti e FIRE.
+    const opportunityCost = useMemo(
+        () => computeSubscriptionOpportunityCost({ monthlyAmount: totals.monthly }),
+        [totals.monthly],
+    );
 
     if (!loaded) return (
         <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
@@ -243,6 +259,35 @@ export function SubscriptionTracker() {
                                 <div className="text-xl font-extrabold text-rose-600 dark:text-rose-400">{formatEuro(totals.annual)}</div>
                             </div>
                         </div>
+
+                        {totals.monthly > 0 && (
+                            <div
+                                className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/70 p-4 dark:border-emerald-900 dark:from-emerald-950/30 dark:to-teal-950/20"
+                                title={`Investendo ${formatEuro(totals.monthly)}/mese al ${DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale annuo per ${DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni accumuleresti ${formatEuro(opportunityCost.futureValueReal)} in potere d'acquisto odierno (di cui ${formatEuro(opportunityCost.compoundGain)} di soli interessi composti).`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                                    <Sparkles className="h-3 w-3" /> Costo Opportunita&apos; a {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} Anni
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        Quanto avresti accumulato investendo la stessa cifra mensile al {DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale annuo per {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni, capitalizzazione mensile. Valore espresso in potere d&apos;acquisto odierno (al netto dell&apos;inflazione), confrontabile direttamente con la spesa attuale. E&apos; il classico &quot;latte factor&quot;: piccoli costi ricorrenti diventano grandi capitali grazie all&apos;effetto composto.
+                                    </InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                                        {formatEuro(opportunityCost.futureValueReal)}
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-emerald-600/80 dark:text-emerald-400/70">
+                                        in euro odierni, al {DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale per {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni
+                                    </div>
+                                    {opportunityCost.compoundGain > 0 && (
+                                        <div className="mt-1 text-[10px] text-muted-foreground">
+                                            di cui {formatEuro(opportunityCost.compoundGain)} di soli interessi composti
+                                            <span className="mx-1">·</span>
+                                            speso in abbonamenti: {formatEuro(opportunityCost.totalContributed)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </CardContent>
