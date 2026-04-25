@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.6`
+**Versione corrente:** `v1.10.7`
 
 ---
 
@@ -113,6 +113,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.7 - 25 aprile 2026 (UX — nuova KPI "Costo del Ritardo (1 anno)" nel Calcolatore Interesse Composto)
+
+- **Problema iniziale** - il `Calcolatore Interesse Composto` (`src/components/compound-interest-calculator.tsx`) era gia' ricco di KPI (Capitale Finale, Punto di Svolta, Tempo di Raddoppio, Rendita Mensile FIRE, Guadagno Reale) ma mancava la traduzione in euro del messaggio comportamentale piu' importante della finanza personale: "iniziare oggi vs iniziare fra un anno non e' solo 12 versamenti in meno, e' un anno di compounding che non lavora MAI piu' per te". L'utente poteva intuirlo solo abbassando manualmente lo slider degli anni, ma senza vedere il differenziale isolato e senza distinguere quanto della perdita fosse dovuto ai contributi saltati e quanto al compound mancato
+- **Cosa e' stato modificato** - aggiunta una nuova card `Costo del Ritardo (1 anno)` (gradient rose/amber per evocare urgenza senza essere allarmista) che appare solo per orizzonti >= 2 anni (con un solo anno il confronto degenererebbe sul capitale iniziale). La card mostra come cifra principale `-€X` (la perdita totale a fine piano se l'utente avesse iniziato 12 mesi piu' tardi a parita' di orizzonte finale) e, sotto, un breakdown didattico che separa i due contributi: `€Y di solo compound mancato · €Z di versamenti saltati`. Il compound mancato e' quasi sempre la quota piu' pesante e cresce esponenzialmente con l'orizzonte, esattamente il messaggio che il calcolatore vuole far passare
+- **Implementazione tecnica** - estesa la `useMemo` di `result` per catturare `balanceMinusOne` (saldo a fine `years - 1`) durante lo stesso loop di simulazione gia' esistente, evitando una seconda passata. Il `delayCostNominal` e' calcolato come `balance - balanceMinusOne` clampato a zero per robustezza, `delayMissedContributions` come `monthlyContribution * 12` (i 12 versamenti che NON saresti riuscito a fare nei 12 mesi di ritardo), `delayCompoundLoss` come differenza fra i due. Edge case `years <= 1` gestito esplicitamente settando `balanceMinusOne = initialCapital` e ritornando `null` (la card non viene renderizzata). Zero nuove dipendenze, zero modifiche alla logica core di simulazione, zero impatto sul rendering del grafico o della tabella
+- **Perche' migliora l'esperienza utente** - trasforma una verita' contro-intuitiva ("12 mesi di ritardo costano molto piu' di 12 versamenti") in un numero in euro che l'utente puo' confrontare con il proprio reddito mensile. E' il classico nudge comportamentale che mancava: chi sta valutando se "iniziare a gennaio prossimo invece di subito" vede istantaneamente che, su un piano da 30 anni con €300/mese al 7%, perdere il primo anno costa ~€16-20k a fine corsa (di cui solo €3.6k sono i contributi saltati: il resto e' compound che non potra' MAI essere recuperato neppure raddoppiando i versamenti dopo). Il breakdown compound vs versamenti e' didatticamente piu' potente del semplice totale perche' isola la quota irrecuperabile e fa vedere "in diretta" perche' iniziare presto e' la scelta piu' redditizia che si possa fare
+- **Manutenibilita'** - intervento chirurgico (~30 righe di JSX + 15 righe di calcolo nello stesso `useMemo`), una sola nuova icona (`Hourglass` riusata dal pattern esistente di Inflation Calculator). Suite 375/375 verde, eslint pulito, nessun nuovo tipo condiviso, nessuna estrazione di helper (la logica e' un differenziale di una simulazione gia' presente, non meritava un modulo a parte)
 
 ### v1.10.6 - 25 aprile 2026 (UX — nuova card "Impatto del Tuo Extra" nella Strategia Estinzione Debiti)
 

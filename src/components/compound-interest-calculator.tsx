@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
@@ -34,6 +34,11 @@ export function CompoundInterestCalculator() {
         let totalDeposited = initialCapital;
         // Prima annualita' in cui gli interessi maturati superano il capitale versato (effetto compounding).
         let crossoverYear: number | null = null;
+        // Capitale a fine "anno N - 1": ci serve come scenario di confronto per
+        // il "Costo del Ritardo": iniziare un anno dopo equivale, a parita' di
+        // orizzonte finale, a ottenere il saldo che oggi avresti dopo years-1
+        // anni (un anno in meno di accumulo + capitalizzazione).
+        let balanceMinusOne = initialCapital;
 
         chartData.push({
             anno: 0,
@@ -48,6 +53,9 @@ export function CompoundInterestCalculator() {
                 balance = balance * (1 + monthlyRate) + monthlyContribution;
                 totalDeposited += monthlyContribution;
             }
+            if (year === years - 1) {
+                balanceMinusOne = balance;
+            }
             const interestAccrued = balance - totalDeposited;
             if (crossoverYear === null && interestAccrued > totalDeposited) {
                 crossoverYear = year;
@@ -59,6 +67,10 @@ export function CompoundInterestCalculator() {
                 Interessi: Math.round(interestAccrued),
                 Totale: Math.round(balance),
             });
+        }
+        // Edge case: con orizzonte di 1 solo anno, "anno N - 1" == oggi (capitale iniziale).
+        if (years <= 1) {
+            balanceMinusOne = initialCapital;
         }
 
         // Valore reale a potere d'acquisto odierno: deflaziona il nominale finale.
@@ -87,6 +99,24 @@ export function CompoundInterestCalculator() {
         const fireMonthlyIncomeReal = Math.max(0, (realFinalBalance * swrFactor) / 12);
         const fireMonthlyIncomeNominal = Math.max(0, (balance * swrFactor) / 12);
 
+        // Costo del Ritardo (1 anno): a parita' di orizzonte, rinviare di 12 mesi
+        // l'inizio del piano significa accumulare/capitalizzare per un anno in
+        // meno. La differenza fra "capitale finale oggi" e "capitale finale se
+        // avessi iniziato fra un anno" quantifica il costo della procrastinazione
+        // ed e' tipicamente sproporzionato rispetto a quanto si rinuncia a
+        // versare in 12 mesi (e' il guadagno NETTO di compound che si perde).
+        // Disponibile solo per orizzonti >= 2 anni (con 1 anno il confronto
+        // degenera al capitale iniziale).
+        const delayCostNominal = years >= 2 ? Math.max(0, balance - balanceMinusOne) : null;
+        const delayMissedContributions = years >= 2 ? monthlyContribution * 12 : 0;
+        // Quota della perdita imputabile esclusivamente al compounding mancato
+        // (al netto dei 12 versamenti che non hai fatto): il vero "regalo" che
+        // l'effetto composto fa a chi inizia un anno prima.
+        const delayCompoundLoss =
+            delayCostNominal !== null
+                ? Math.max(0, delayCostNominal - delayMissedContributions)
+                : null;
+
         return {
             finalBalance: balance,
             totalDeposited,
@@ -100,6 +130,9 @@ export function CompoundInterestCalculator() {
             realReturnPct,
             fireMonthlyIncomeReal,
             fireMonthlyIncomeNominal,
+            delayCostNominal,
+            delayMissedContributions,
+            delayCompoundLoss,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -315,6 +348,37 @@ export function CompoundInterestCalculator() {
                                 )}
                             </div>
                         </div>
+
+                        {result.delayCostNominal !== null && result.delayCostNominal > 0 && (
+                            <div
+                                className="rounded-3xl border border-rose-200 bg-gradient-to-br from-rose-50/70 to-amber-50/60 p-4 dark:border-rose-900 dark:from-rose-950/30 dark:to-amber-950/20"
+                                title={`Rinviando di 12 mesi l'inizio del piano (a parita' di orizzonte di ${years} anni) il capitale finale scende di ${formatEuro(result.delayCostNominal)}: ${formatEuro(result.delayMissedContributions)} sono i 12 versamenti mancati, ${formatEuro(result.delayCompoundLoss ?? 0)} e' il compounding che non hai messo al lavoro.`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+                                    <Hourglass className="h-3 w-3" /> Costo del Ritardo (1 anno)
+                                    <InfoTooltip iconClassName="w-3 h-3">A parita&apos; di orizzonte finale, iniziare a investire 12 mesi piu&apos; tardi ti fa perdere questo importo a fine piano. Comprende i 12 contributi non versati e, soprattutto, il compounding che NON ha potuto lavorare per quei 12 mesi extra: il compound &eacute; quasi sempre la quota piu&apos; pesante e cresce esponenzialmente con l&apos;orizzonte. E&apos; il numero che traduce in euro il costo della procrastinazione.</InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-300">
+                                        -{formatEuro(result.delayCostNominal)}
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-rose-600/80 dark:text-rose-400/70">
+                                        in meno a fine piano se inizi fra 12 mesi
+                                    </div>
+                                    {result.delayCompoundLoss !== null && result.delayCompoundLoss > 0 && (
+                                        <div className="mt-1 text-[10px] text-muted-foreground">
+                                            di cui {formatEuro(result.delayCompoundLoss)} di solo compound mancato
+                                            {result.delayMissedContributions > 0 && (
+                                                <>
+                                                    <span className="mx-1">&middot;</span>
+                                                    {formatEuro(result.delayMissedContributions)} di versamenti saltati
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 
