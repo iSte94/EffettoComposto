@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.9`
+**Versione corrente:** `v1.10.10`
 
 ---
 
@@ -113,6 +113,14 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.10 - 25 aprile 2026 (UX — nuovo alert "Tempo stimato al FIRE" basato sul tasso di risparmio)
+
+- **Problema iniziale** - il pannello `FinancialAlerts` (`src/components/financial-alerts.tsx`) mostrava feedback FIRE solo a `fireProgress >= 75%` (alert `fire-close`/`fire-reached`) e calcolava la progress bar contro il `fireTarget` configurato dall'utente nelle preferenze. Tradotto: chiunque fosse all'inizio del percorso (la stragrande maggioranza degli utenti, sotto il 75%) non aveva NESSUN insight FIRE concreto nel Riepilogo. La domanda piu' importante per chi inizia ("a questo ritmo, in quanti anni arrivero' al FIRE?") rimaneva senza risposta nel dashboard, costringendo l'utente ad aprire il tab FIRE Monte Carlo, configurare le simulazioni e leggere la distribuzione di probabilita' — overhead cognitivo elevato per un singolo numero
+- **Cosa e' stato modificato** - aggiunto un nuovo alert `fire-years-estimate` che mostra "Tempo stimato al FIRE: ~N anni" usando reddito, spese e risparmio gia' presenti in `FinancialData`. Il messaggio cita il tasso di risparmio dell'utente, il rendimento reale assunto, l'SWR e il target in euro odierni, e chiude con un nudge ("aumenta il tasso di risparmio per accorciarli"). Severity dinamica: success per <=15 anni, warning oltre 15 anni o quando il piano supera i 100 anni. L'alert si attiva SOLO quando `monthlyIncome`, `monthlyExpenses` e `monthlySavings > 0` e quando l'alert "FIRE raggiunto" non e' gia' attivo (no doppione informativo)
+- **Implementazione tecnica** - estratta la matematica in un nuovo modulo puro `src/lib/finance/fire-years.ts` (zero side effect, zero dipendenze) con la funzione `estimateYearsToFire` e tre costanti esposte (`FIRE_YEARS_DEFAULT_REAL_RETURN_PCT = 4`, `FIRE_YEARS_DEFAULT_SWR_PCT = 3.25`, `FIRE_YEARS_MAX = 100`) — i default sono allineati con `subscription-opportunity.ts` (real return) e `fire-metrics.ts` (SWR), evitando assunzioni divergenti fra schermate dello stesso prodotto. Modello in EURO REALI: `target = annualExpenses / SWR`, equazione di accumulo `target = netWorth*(1+r)^n + annualSavings*((1+r)^n-1)/r` risolta in forma chiusa `n = ln(X) / ln(1+r)` con `X = (target + annualSavings/r) / (netWorth + annualSavings/r)`. Caduta lineare per `r ≈ 0` (no NaN), guard su patrimonio gia' a target (`alreadyFire = true`), capping a 100 anni. Suite test dedicata (`fire-years.test.ts`) con 13 casi: input invalidi, default, monotonia (savings rate ↑ → anni ↓; netWorth ↑ → anni ↓), riproduzione del caso di riferimento Networthify (50% savings @ 5% real ≈ 17 anni), 10% savings @ 5% real ≈ 51 anni, edge case `r=0` lineare puro
+- **Perche' migliora l'esperienza utente** - traduce un concetto astratto ("tasso di risparmio", "rendimento composto") in un singolo numero operativo ("~17 anni") che fa scattare la motivazione comportamentale tipica del messaggio di MMM "The Shockingly Simple Math Behind Early Retirement": il tasso di risparmio e' la leva piu' potente sul tempo al FIRE, molto piu' del rendimento. L'alert rende esplicita questa relazione direttamente nel Riepilogo, senza bisogno di aprire calcolatori dedicati. La citazione esplicita degli assunti (real return, SWR) nel messaggio mantiene l'utente informato e gli permette di tarare le aspettative; il nudge finale ("aumenta il tasso di risparmio per accorciarli") chiude il loop motivazionale
+- **Manutenibilita'** - intervento additivo: nuovo modulo puro testato + ~40 righe di alert nel componente esistente, nessuna modifica alle altre regole di alert, nessuna nuova dipendenza, una sola nuova icona (`Hourglass` di lucide-react, gia' usata altrove). Suite test 397/397 verde (13 nuovi casi sul motore), eslint pulito, TypeScript senza errori sui file toccati. La logica e' isolata in un file con un singolo export pubblico, riusabile in futuro da altri tab (es. Advisor Acquisti, Calcolatore FIRE) se servira' lo stesso insight altrove
 
 ### v1.10.9 - 25 aprile 2026 (UX — nuova KPI "Ritmo attuale" e margine mensile negli Obiettivi di Risparmio)
 
