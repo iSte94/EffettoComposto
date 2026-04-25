@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Snowflake, Flame, Scale } from "lucide-react";
+import { Plus, Trash2, Snowflake, Flame, Scale, Zap } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { simulatePayoff } from "@/lib/finance/debt-strategy";
@@ -40,8 +40,21 @@ export function DebtStrategy() {
         return {
             snowball: simulatePayoff(validDebts, "snowball", extraMonthly),
             avalanche: simulatePayoff(validDebts, "avalanche", extraMonthly),
+            // Baseline "solo rate minime": serve a quantificare l'impatto del
+            // budget extra. Usiamo avalanche per coerenza con la metrica di
+            // ottimo finanziario gia' mostrata sopra.
+            avalancheBaseline: simulatePayoff(validDebts, "avalanche", 0),
         };
     }, [debts, extraMonthly]);
+
+    const extraImpact = useMemo(() => {
+        if (!results || extraMonthly <= 0) return null;
+        const monthsSaved = results.avalancheBaseline.months - results.avalanche.months;
+        const interestSaved = results.avalancheBaseline.totalInterest - results.avalanche.totalInterest;
+        const totalExtraPaid = extraMonthly * results.avalanche.months;
+        const interestPerExtraEuro = totalExtraPaid > 0 ? interestSaved / totalExtraPaid : 0;
+        return { monthsSaved, interestSaved, totalExtraPaid, interestPerExtraEuro };
+    }, [results, extraMonthly]);
 
     const comparisonData = useMemo(() => {
         if (!results) return [];
@@ -243,6 +256,48 @@ export function DebtStrategy() {
                                 .
                             </div>
                         )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {extraImpact && (extraImpact.monthsSaved > 0 || extraImpact.interestSaved > 0.5) && (
+                <Card className="overflow-hidden rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/70 shadow-md dark:border-emerald-900 dark:from-emerald-950/30 dark:to-teal-950/20">
+                    <CardContent className="space-y-4 p-6">
+                        <h4 className="flex items-center gap-2 text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                            <Zap className="h-5 w-5" /> Impatto del Tuo Extra
+                            <InfoTooltip>Confronta lo scenario ottimale (Avalanche con il tuo extra mensile) con il pagamento delle sole rate minime: quantifica quanti mesi di liberta&#768; in piu&#768; e quanti interessi risparmi grazie all&apos;extra che metti ogni mese.</InfoTooltip>
+                        </h4>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div className="rounded-2xl bg-white/70 p-3 text-center dark:bg-slate-900/50">
+                                <div className="text-[10px] font-bold uppercase text-emerald-500">Mesi Risparmiati</div>
+                                <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                                    {extraImpact.monthsSaved > 0 ? `${extraImpact.monthsSaved} mesi` : "—"}
+                                </div>
+                                <div className="text-[10px] text-emerald-500">
+                                    {extraImpact.monthsSaved >= 12
+                                        ? `${(extraImpact.monthsSaved / 12).toFixed(1)} anni di liberta'`
+                                        : "vs solo rate minime"}
+                                </div>
+                            </div>
+                            <div className="rounded-2xl bg-white/70 p-3 text-center dark:bg-slate-900/50">
+                                <div className="text-[10px] font-bold uppercase text-emerald-500">Interessi Risparmiati</div>
+                                <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                                    {formatEuro(Math.max(0, extraImpact.interestSaved))}
+                                </div>
+                                <div className="text-[10px] text-emerald-500">
+                                    su {formatEuro(extraImpact.totalExtraPaid)} di extra versati
+                                </div>
+                            </div>
+                            <div className="rounded-2xl bg-white/70 p-3 text-center dark:bg-slate-900/50">
+                                <div className="text-[10px] font-bold uppercase text-emerald-500">Resa per €1 Extra</div>
+                                <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                                    {extraImpact.interestPerExtraEuro > 0
+                                        ? `€${extraImpact.interestPerExtraEuro.toFixed(2)}`
+                                        : "—"}
+                                </div>
+                                <div className="text-[10px] text-emerald-500">interessi evitati per ogni € extra</div>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
             )}
