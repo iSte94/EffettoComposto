@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank, CalendarClock, Hourglass } from "lucide-react";
+import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank, CalendarClock, Hourglass, Sparkles } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import {
     buildPlannedEventsSummary,
@@ -13,6 +13,13 @@ import {
     estimateYearsToFire,
     FIRE_YEARS_MAX,
 } from "@/lib/finance/fire-years";
+import {
+    computeExcessLiquidityImpact,
+    EXCESS_LIQUIDITY_DEFAULT_HORIZON_YEARS,
+    EXCESS_LIQUIDITY_DEFAULT_REAL_RETURN_PCT,
+    EXCESS_LIQUIDITY_TRIGGER_MONTHS,
+    RECOMMENDED_EMERGENCY_MONTHS,
+} from "@/lib/finance/excess-liquidity";
 import type { PlannedFinancialEvent } from "@/types";
 
 export interface FinancialData {
@@ -93,6 +100,22 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                     title: "Fondo emergenza sotto la soglia",
                     message: `${months.toFixed(1)} mesi di copertura. Considera di portarlo a 6 mesi.`,
                 });
+            } else if (months >= EXCESS_LIQUIDITY_TRIGGER_MONTHS) {
+                // Liquidita' eccessiva: oltre i 18 mesi di copertura il fondo
+                // emergenza non e' piu' "prudenza" ma "denaro inattivo".
+                // Traduciamo l'eccedenza (sopra i 6 mesi raccomandati) nel
+                // suo costo opportunita' composto su 30 anni @ 4% reale,
+                // coerente col resto delle metriche FIRE dell'app.
+                const excess = computeExcessLiquidityImpact({ emergencyFund, monthlyExpenses });
+                if (excess) {
+                    alerts.push({
+                        id: "emergency-excess",
+                        severity: "warning",
+                        icon: <Sparkles className="w-4 h-4" />,
+                        title: `Liquidita' eccessiva: ${months.toFixed(0)} mesi di copertura`,
+                        message: `Hai ${formatEuro(emergencyFund)} di fondo emergenza (consigliati 3-6 mesi, ovvero ${formatEuro(RECOMMENDED_EMERGENCY_MONTHS * monthlyExpenses)}). Il surplus di ${formatEuro(excess.excess)}, investito al ${EXCESS_LIQUIDITY_DEFAULT_REAL_RETURN_PCT}% reale per ${EXCESS_LIQUIDITY_DEFAULT_HORIZON_YEARS} anni, varrebbe ${formatEuro(excess.futureValueReal)} in potere d'acquisto odierno (di cui ${formatEuro(excess.compoundGain)} di soli interessi composti). Valuta di mobilizzarne una parte verso strumenti d'investimento.`,
+                    });
+                }
             } else if (months >= 12) {
                 alerts.push({
                     id: "emergency-good",
