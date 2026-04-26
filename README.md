@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.11`
+**Versione corrente:** `v1.10.12`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.12 - 26 aprile 2026 (UX — nuova KPI "Abbonamento piu' costoso" nel Tracker Abbonamenti)
+
+- **Problema iniziale** - il Tracker Abbonamenti (`src/components/subscription-tracker.tsx`) mostrava aggregati globali (`Costo Mensile`, `Costo Annuale`, `Costo Opportunita' a 30 anni`) ma NON evidenziava il singolo abbonamento piu' costoso. Per chi ha 6+ voci tracciate (Netflix, Spotify, Disney+, palestra, assicurazione auto, iCloud...) la lista diventa lunga e l'occhio si perde: l'utente vede "spendo €X/mese" ma non capisce su quale leva agire per primo. Mancava il classico insight Pareto ("l'80% del costo viene dal 20% degli abbonamenti"), che e' il modo piu' efficace per trasformare la consapevolezza in azione concreta — tagliare l'unico abbonamento dominante invece di micro-tagliare quelli piu' piccoli
+- **Cosa e' stato modificato** - aggiunta una nuova card KPI "Abbonamento piu' costoso" subito sotto la card `Costo Opportunita'` esistente. Mostra: nome del top spender, costo mensile normalizzato (annuali divisi per 12), quota percentuale sul totale mensile, costo annuo equivalente, e il valore composto reale a 30 anni se quella stessa cifra fosse investita al 4% reale (stesso default e stesso modulo della card aggregata). La card si attiva solo quando ci sono >= 2 abbonamenti (con uno solo coincide con la card aggregata, sarebbe ridondante). Palette ambra/arancio per differenziarla visivamente dal verde della "Costo Opportunita'" (verde = "se investissi, accumuleresti"; ambra = "leva di attenzione, taglia per primo")
+- **Implementazione tecnica** - estratta la matematica in un nuovo modulo puro `src/lib/finance/subscription-top-spender.ts` (zero side effect, una sola dipendenza interna su `subscription-opportunity.ts`) con la funzione `computeTopSubscriptionImpact(subscriptions, options?)` che ritorna `null` su lista vuota / tutti gli importi <= 0, altrimenti `{ name, monthlyNormalized, annualNormalized, percentOfTotal, futureValueReal, horizonYears, realReturnPct }`. Sanitizzazione preventiva su `amount` non finiti (NaN/Infinity vengono ignorati senza propagarsi a `monthlyNormalized` o `percentOfTotal`), normalizzazione frequenza annuale -> mensile (`/12`) per consentire il confronto tra abbonamenti eterogenei, riuso di `computeSubscriptionOpportunityCost` per il valore composto (UNICA fonte di verita' della matematica di compounding nel pannello, prima inline-duplicata). Suite test dedicata (`subscription-top-spender.test.ts`) con 12 casi: lista vuota, importi <= 0, normalizzazione frequenza annuale che batte mensile, somma percentuali = 100%, default canonici, override `years`/`realReturnPct`, monotonia future value, sanitizzazione NaN/Infinity, lista con un solo elemento (100%), stabilita' su pareggio (primo trovato vince), nome vuoto supportato. Suite totale: 417/417 verde (12 nuovi)
+- **Perche' migliora l'esperienza utente** - traduce un pattern lungo e disperso ("guarda la lista e individua manualmente il piu' costoso") in un singolo numero operativo ("X/mese, Y% del totale, +Z€ in 30 anni se lo tagli"). E' il pattern Pareto al servizio del comportamento finanziario: invece di chiedere all'utente uno sforzo cognitivo di confronto, l'app gli mostra DOVE agire e QUANTO vale agire. La normalizzazione automatica annuale->mensile rende il confronto giusto (un abbonamento da 600€/anno e' MOLTO piu' caro di uno da 30€/mese, ma la lista non lo grida); il valore composto al 4% reale per 30 anni traduce il taglio da "risparmio anno per anno" a "capitale FIRE in piu'", chiudendo lo stesso loop motivazionale della card aggregata ma su un'azione precisa e finita. Cosi' viene rispettato il claim "Effetto Composto" anche su decisioni piccole: tagliare l'abbonamento sbagliato all'inizio del percorso vale piu' di tagliarlo a meta'
 
 ### v1.10.11 - 26 aprile 2026 (bugfix matematico Coast FIRE: propagazione NaN/Infinity nel motore `computeFireTargetForRetirementAge`)
 
