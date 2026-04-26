@@ -85,8 +85,11 @@ export interface FireProjectionResult {
  *     dove i delta possono essere anche negativi (es. affitto netto positivo).
  */
 // Soglia minima di SWR per evitare divisioni per zero / target infiniti.
-// Coerente con `fire-sensitivity.ts` (UNICA fonte di verita' del progetto).
-const MIN_WITHDRAWAL_RATE_PCT = 0.1;
+// Coerente con `fire-sensitivity.ts` e riusata da `coast-fire.ts`
+// (UNICA fonte di verita' del progetto: ogni nuovo modulo che debba clampare
+// la SWR DEVE importare da qui per non re-introdurre la regressione "€NaN"
+// quando i campi delle preferenze arrivano vuoti / non finiti).
+export const MIN_WITHDRAWAL_RATE_PCT = 0.1;
 
 function sanitizeFinite(value: number, fallback = 0): number {
     return Number.isFinite(value) ? value : fallback;
