@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Repeat, CreditCard, Sparkles } from "lucide-react";
+import { Plus, Trash2, Repeat, CreditCard, Sparkles, TrendingDown } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { useAuth } from "@/contexts/auth-context";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
@@ -15,6 +15,7 @@ import {
     DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS,
     DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT,
 } from "@/lib/finance/subscription-opportunity";
+import { computeTopSubscriptionImpact } from "@/lib/finance/subscription-top-spender";
 
 interface Subscription {
     id: string;
@@ -113,6 +114,15 @@ export function SubscriptionTracker() {
     const opportunityCost = useMemo(
         () => computeSubscriptionOpportunityCost({ monthlyAmount: totals.monthly }),
         [totals.monthly],
+    );
+
+    // Pareto: l'abbonamento piu' costoso (normalizzato a costo mensile)
+    // di solito pesa una quota sproporzionata sul totale. Mostrarlo
+    // esplicitamente trasforma "ho tanti abbonamenti" in un'azione
+    // concreta ("taglia questo, libera Y all'anno e Z in 30 anni").
+    const topSubscription = useMemo(
+        () => computeTopSubscriptionImpact(subscriptions),
+        [subscriptions],
     );
 
     if (!loaded) return (
@@ -283,6 +293,38 @@ export function SubscriptionTracker() {
                                             di cui {formatEuro(opportunityCost.compoundGain)} di soli interessi composti
                                             <span className="mx-1">·</span>
                                             speso in abbonamenti: {formatEuro(opportunityCost.totalContributed)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {topSubscription && subscriptions.length >= 2 && (
+                            <div
+                                className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/70 p-4 dark:border-amber-900 dark:from-amber-950/30 dark:to-orange-950/20"
+                                title={`Tagliando "${topSubscription.name || "questo abbonamento"}" risparmieresti ${formatEuro(topSubscription.annualNormalized)} all'anno e, investendo la stessa cifra al ${topSubscription.realReturnPct}% reale per ${topSubscription.horizonYears} anni, accumuleresti ${formatEuro(topSubscription.futureValueReal)} in potere d'acquisto odierno.`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                                    <TrendingDown className="h-3 w-3" /> Abbonamento piu&apos; costoso
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        L&apos;abbonamento col costo mensile piu&apos; alto della tua lista (gli annuali vengono normalizzati dividendoli per 12). Tagliarlo per primo e&apos; il modo piu&apos; efficace per ridurre la spesa ricorrente: il valore composto mostra quanto accumuleresti investendo la stessa cifra al {DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale per {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni.
+                                    </InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-base font-bold text-amber-700 dark:text-amber-300">
+                                        {topSubscription.name || "(senza nome)"}
+                                    </div>
+                                    <div className="mt-1 text-2xl font-extrabold text-amber-700 dark:text-amber-300">
+                                        {formatEuro(topSubscription.monthlyNormalized)}<span className="text-sm font-bold text-amber-600/80 dark:text-amber-400/70">/mese</span>
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-amber-600/80 dark:text-amber-400/70">
+                                        {topSubscription.percentOfTotal.toFixed(0)}% del totale
+                                        <span className="mx-1">·</span>
+                                        {formatEuro(topSubscription.annualNormalized)}/anno
+                                    </div>
+                                    {topSubscription.futureValueReal > 0 && (
+                                        <div className="mt-1 text-[10px] text-muted-foreground">
+                                            tagliandolo: +{formatEuro(topSubscription.futureValueReal)} in {topSubscription.horizonYears} anni (euro odierni)
                                         </div>
                                     )}
                                 </div>
