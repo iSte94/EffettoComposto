@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank } from "lucide-react";
+import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank, CalendarMinus } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { projectInflation } from "@/lib/finance/inflation";
 import {
@@ -51,6 +51,7 @@ export function InflationCalculator() {
         purchasingPowerHalvingYears,
         purchasingPowerGap,
         monthlySavingsToPreservePurchasingPower,
+        averageMonthlyPurchasingPowerLoss,
     } = projection;
 
     // Etichetta compatta per il tempo di dimezzamento: intero se >= 10 anni
@@ -162,7 +163,7 @@ export function InflationCalculator() {
             </div>
 
             {(lostValue > 0 || halvingLabel) && (
-                <div className="grid gap-3 sm:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-6">
                     {lostValue > 0 && (
                         <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:col-span-3">
                             <span className="font-semibold text-foreground">Erosione inflazionistica</span>: tenendo {formatEuro(amount)} fermi
@@ -181,6 +182,21 @@ export function InflationCalculator() {
                                 <p className="mt-0.5 text-sm font-extrabold">{halvingLabel}</p>
                                 <p className="mt-0.5 text-[11px] text-rose-600/80 dark:text-rose-400/80">
                                     per perdere meta&apos; del potere d&apos;acquisto al {formatPercent(inflationRate)} annuo
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    {averageMonthlyPurchasingPowerLoss > 0 && (
+                        <div
+                            className="flex items-start gap-2 rounded-2xl border border-orange-200 bg-orange-50/60 px-4 py-3 text-xs text-orange-700 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-300 sm:col-span-1"
+                            title={`Spalmando linearmente la perdita totale di ${formatEuro(lostValue)} sui ${years * 12} mesi dell'orizzonte ottieni un'erosione mensile media di ${formatEuro(averageMonthlyPurchasingPowerLoss)}: e' il "costo nascosto" di tenere ${formatEuro(amount)} fermi, espresso in una scala mensile che puoi confrontare con le tue spese correnti.`}
+                        >
+                            <CalendarMinus className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Erosione Mensile Media</p>
+                                <p className="mt-0.5 text-sm font-extrabold">{formatEuro(averageMonthlyPurchasingPowerLoss)}/mese</p>
+                                <p className="mt-0.5 text-[11px] text-orange-600/80 dark:text-orange-400/80">
+                                    di potere d&apos;acquisto perso, in media, ogni mese
                                 </p>
                             </div>
                         </div>

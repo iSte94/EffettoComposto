@@ -78,6 +78,17 @@ export interface InflationProjectionResult {
      * rendimento nominale e' zero e su 0 quando non c'e' gap o years = 0.
      */
     monthlySavingsToPreservePurchasingPower: number;
+    /**
+     * Erosione mensile media del potere d'acquisto in euro, ottenuta
+     * spalmando linearmente la perdita totale (`lostValue`) sui mesi
+     * dell'orizzonte: `lostValue / (years * 12)`. E' una metrica di
+     * comunicazione (non un'esatta erosione del singolo mese, che e'
+     * decrescente nel tempo perche' applicata su una base ridotta) che
+     * traduce la perdita aggregata in un costo mensile concreto e
+     * confrontabile con le voci di spesa correnti dell'utente. Ritorna 0
+     * quando years = 0, amount = 0, inflazione <= 0 o input non finiti.
+     */
+    averageMonthlyPurchasingPowerLoss: number;
 }
 
 function sanitize(value: number, fallback = 0): number {
@@ -140,6 +151,9 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         nominalReturnPct,
         years,
     );
+    const totalMonths = years * 12;
+    const averageMonthlyPurchasingPowerLoss =
+        totalMonths > 0 && lostValue > 0 ? Math.round(lostValue / totalMonths) : 0;
 
     return {
         points,
@@ -153,6 +167,7 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         purchasingPowerHalvingYears,
         purchasingPowerGap,
         monthlySavingsToPreservePurchasingPower,
+        averageMonthlyPurchasingPowerLoss,
     };
 }
 
