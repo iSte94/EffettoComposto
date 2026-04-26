@@ -10,7 +10,39 @@
  */
 
 import type { PreRetirementPassiveIncomeAllocationMode } from "@/types";
-import { computeRealReturn } from "./fire-projection";
+import { computeRealReturn, MIN_WITHDRAWAL_RATE_PCT } from "./fire-projection";
+
+// === Sanitizzazione input (regressione #coast-fire-nan-propagation) ===
+//
+// Prima di questa hardening, `coast-fire.ts` accettava qualunque numero senza
+// difese: un singolo NaN o Infinity proveniente da un campo form svuotato,
+// da preferenze migrate male o da una `withdrawalRatePct` deserializzata come
+// stringa non numerica si propagava attraverso TUTTI i derivati (target FIRE,
+// PV pensione, PV rendite, Coast FIRE target dei tre scenari) producendo
+// "€NaN" nella dashboard Coast FIRE oppure - peggio - `fireTargetNet = 0`
+// con `withdrawalRatePct = +Infinity`, che faceva apparire l'utente come
+// "gia' FIRE" quando in realta' il calcolo si era corrotto.
+//
+// La fix replica la strategia gia' adottata in `fire-projection.ts` (vedi
+// commento "BUG FIX (NaN propagation)" su `projectFire`): ogni input numerico
+// passa per `sanitize`/`sanitizeNonNegative` PRIMA di partecipare a qualunque
+// formula. La SWR usa la stessa soglia minima `MIN_WITHDRAWAL_RATE_PCT`
+// gia' canonica per il motore FIRE, evitando la duplicazione del literal `0.1`
+// che la versione precedente clampava inline (e che falliva su NaN: in JS
+// `Math.max(0.1, NaN) === NaN`).
+function sanitize(value: number, fallback = 0): number {
+    return Number.isFinite(value) ? value : fallback;
+}
+
+function sanitizeNonNegative(value: number, fallback = 0): number {
+    const finite = sanitize(value, fallback);
+    return finite < 0 ? 0 : finite;
+}
+
+function sanitizeWithdrawalRatePct(value: number): number {
+    const finite = sanitize(value, MIN_WITHDRAWAL_RATE_PCT);
+    return finite < MIN_WITHDRAWAL_RATE_PCT ? MIN_WITHDRAWAL_RATE_PCT : finite;
+}
 
 export type CoastFireScenario = "bear" | "base" | "bull";
 
@@ -115,21 +147,36 @@ const SCENARIO_LABELS: Record<CoastFireScenario, string> = {
  *   PV = CF * (1 - (1+r)^-duration) / r / (1+r)^deferredYears
  */
 function presentValueOfAnnuity(annualCashflow: number, realReturn: number, deferredYears: number, duration: number): number {
-    if (annualCashflow === 0 || duration <= 0) return 0;
-    if (Math.abs(realReturn) < 1e-6) {
-        return annualCashflow * duration;
+    const safeCashflow = sanitize(annualCashflow);
+    const safeReturn = sanitize(realReturn);
+    const safeDuration = sanitizeNonNegative(duration);
+    const safeDeferred = sanitizeNonNegative(deferredYears);
+    if (safeCashflow === 0 || safeDuration <= 0) return 0;
+    // Guard: tasso reale <= -100% renderebbe `1 + safeReturn <= 0` e
+    // produrrebbe Math.pow di base non positiva con esponente non intero
+    // (NaN). In quello scenario degenere ricadiamo sulla rendita non scontata.
+    if (1 + safeReturn <= 0) {
+        return safeCashflow * safeDuration;
     }
-    const annuityFactor = (1 - Math.pow(1 + realReturn, -duration)) / realReturn;
-    const discount = Math.pow(1 + realReturn, -Math.max(0, deferredYears));
-    return annualCashflow * annuityFactor * discount;
+    if (Math.abs(safeReturn) < 1e-6) {
+        return safeCashflow * safeDuration;
+    }
+    const annuityFactor = (1 - Math.pow(1 + safeReturn, -safeDuration)) / safeReturn;
+    const discount = Math.pow(1 + safeReturn, -safeDeferred);
+    const result = safeCashflow * annuityFactor * discount;
+    return Number.isFinite(result) ? result : 0;
 }
 
 /** Anni necessari perché `capital` cresca fino a `target` a rendimento composto reale */
 function yearsToGrow(capital: number, target: number, realReturn: number): number | null {
-    if (capital <= 0 || target <= 0) return null;
-    if (capital >= target) return 0;
-    if (realReturn <= 0) return null;
-    return Math.log(target / capital) / Math.log(1 + realReturn);
+    const safeCapital = sanitize(capital);
+    const safeTarget = sanitize(target);
+    const safeReturn = sanitize(realReturn);
+    if (safeCapital <= 0 || safeTarget <= 0) return null;
+    if (safeCapital >= safeTarget) return 0;
+    if (safeReturn <= 0) return null;
+    const result = Math.log(safeTarget / safeCapital) / Math.log(1 + safeReturn);
+    return Number.isFinite(result) ? result : null;
 }
 
 function normalizePassiveIncomeStreams(
@@ -330,19 +377,34 @@ export function computeFireTargetForRetirementAge(
         lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
     } = input;
 
-    const annualExpenses = monthlyExpenses * 12;
-    const annualPension = Math.max(0, monthlyPublicPension * 12);
-    const pensionDeferredYears = Math.max(0, publicPensionAge - retirementAge);
-    const pensionDuration = Math.max(0, lifeExpectancy - Math.max(retirementAge, publicPensionAge));
+    // Sanitizza ogni input numerico PRIMA di derivarne quantita': qualunque
+    // NaN/Infinity in `monthlyExpenses`, `monthlyPublicPension`, le eta',
+    // i tassi o la SWR contaminerebbe `annualExpenses`, `swr`, `baseFireTarget`
+    // e a cascata `fireTargetNet` (mostrando "€NaN" o falsi traguardi).
+    const safeRetirementAge = sanitize(retirementAge);
+    const safePublicPensionAge = sanitize(publicPensionAge);
+    const safeLifeExpectancy = sanitize(lifeExpectancy, DEFAULT_LIFE_EXPECTANCY);
+    const safeMonthlyExpenses = sanitizeNonNegative(monthlyExpenses);
+    const safeMonthlyPublicPension = sanitizeNonNegative(monthlyPublicPension);
+    const safeMonthlyRealEstateIncome = sanitize(monthlyRealEstateIncome);
+
+    const annualExpenses = safeMonthlyExpenses * 12;
+    const annualPension = safeMonthlyPublicPension * 12;
+    const pensionDeferredYears = Math.max(0, safePublicPensionAge - safeRetirementAge);
+    const pensionDuration = Math.max(0, safeLifeExpectancy - Math.max(safeRetirementAge, safePublicPensionAge));
     const normalizedPassiveStreams = normalizePassiveIncomeStreams(
         undefined,
-        retirementAge,
-        lifeExpectancy,
-        monthlyRealEstateIncome,
+        safeRetirementAge,
+        safeLifeExpectancy,
+        safeMonthlyRealEstateIncome,
         passiveIncomeStreams,
     );
 
-    const swr = Math.max(0.1, withdrawalRatePct) / 100;
+    // Usa il MIN_WITHDRAWAL_RATE_PCT canonico: la fix originaria
+    // `Math.max(0.1, withdrawalRatePct)` falliva su NaN (ritorna NaN) e
+    // Infinity (produceva swr Infinito -> baseFireTarget = 0 -> falso "FIRE
+    // gia' raggiunto" se pensione/rendite > 0).
+    const swr = sanitizeWithdrawalRatePct(withdrawalRatePct) / 100;
     const baseFireTarget = annualExpenses / swr;
     const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario, applyTaxStamp);
 
@@ -351,23 +413,24 @@ export function computeFireTargetForRetirementAge(
         const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
         if (annualAmount === 0) return acc;
 
-        const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
-        const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
-        const effectiveStartAge = Math.max(retirementAge, streamStartAge);
-        const effectiveEndAge = Math.min(lifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
+        const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : safeRetirementAge;
+        const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : safeLifeExpectancy;
+        const effectiveStartAge = Math.max(safeRetirementAge, streamStartAge);
+        const effectiveEndAge = Math.min(safeLifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
         const duration = Math.max(0, effectiveEndAge - effectiveStartAge);
-        const deferredYears = Math.max(0, effectiveStartAge - retirementAge);
+        const deferredYears = Math.max(0, effectiveStartAge - safeRetirementAge);
         if (duration <= 0) return acc;
 
         return acc + presentValueOfAnnuity(annualAmount, realReturn, deferredYears, duration);
     }, 0);
 
+    const fireTargetNet = Math.max(0, sanitize(baseFireTarget) - sanitize(pensionPV) - sanitize(passivePV));
     return {
-        realReturnPct: realReturn * 100,
-        baseFireTarget,
-        fireTargetNet: Math.max(0, baseFireTarget - pensionPV - passivePV),
-        pensionPresentValue: pensionPV,
-        passiveIncomePresentValue: passivePV,
+        realReturnPct: sanitize(realReturn) * 100,
+        baseFireTarget: sanitize(baseFireTarget),
+        fireTargetNet,
+        pensionPresentValue: sanitize(pensionPV),
+        passiveIncomePresentValue: sanitize(passivePV),
     };
 }
 
@@ -405,12 +468,15 @@ export function buildPassiveIncomeBreakdown(
     } = input;
 
     const realReturn = getScenarioRealReturn(nominalReturnPct, inflationPct, scenario, applyTaxStamp);
-    const yearsToRetire = Math.max(0, retirementAge - currentAge);
+    const safeCurrentAge = sanitize(currentAge);
+    const safeRetirementAge = sanitize(retirementAge);
+    const safeLifeExpectancy = sanitize(lifeExpectancy, DEFAULT_LIFE_EXPECTANCY);
+    const yearsToRetire = Math.max(0, safeRetirementAge - safeCurrentAge);
     const normalizedPassiveStreams = normalizePassiveIncomeStreams(
-        currentAge,
-        retirementAge,
-        lifeExpectancy,
-        monthlyRealEstateIncome,
+        safeCurrentAge,
+        safeRetirementAge,
+        safeLifeExpectancy,
+        sanitize(monthlyRealEstateIncome),
         passiveIncomeStreams,
     );
 
@@ -418,16 +484,18 @@ export function buildPassiveIncomeBreakdown(
         const annualAmount = Number.isFinite(stream.annualAmount) ? stream.annualAmount : 0;
         if (annualAmount === 0) return [];
 
-        const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : retirementAge;
-        const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : lifeExpectancy;
-        const effectiveStartAge = Math.max(retirementAge, streamStartAge);
-        const effectiveEndAge = Math.min(lifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
+        const streamStartAge = Number.isFinite(stream.startAge) ? stream.startAge : safeRetirementAge;
+        const streamEndAge = Number.isFinite(stream.endAge) ? (stream.endAge as number) : safeLifeExpectancy;
+        const effectiveStartAge = Math.max(safeRetirementAge, streamStartAge);
+        const effectiveEndAge = Math.min(safeLifeExpectancy, Math.max(effectiveStartAge, streamEndAge));
         const durationYears = Math.max(0, effectiveEndAge - effectiveStartAge);
         if (durationYears <= 0) return [];
 
-        const deferredYears = Math.max(0, effectiveStartAge - retirementAge);
+        const deferredYears = Math.max(0, effectiveStartAge - safeRetirementAge);
         const presentValueAtRetirement = presentValueOfAnnuity(annualAmount, realReturn, deferredYears, durationYears);
-        const presentValueToday = presentValueAtRetirement / Math.pow(1 + realReturn, yearsToRetire);
+        const discountBase = 1 + sanitize(realReturn);
+        const discountFactor = discountBase > 0 ? Math.pow(discountBase, yearsToRetire) : 1;
+        const presentValueToday = sanitize(presentValueAtRetirement / (discountFactor || 1));
 
         return [{
             label: stream.label?.trim() || `Rendita ${index + 1}`,
@@ -461,7 +529,14 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
         lifeExpectancy = DEFAULT_LIFE_EXPECTANCY,
     } = input;
 
-    const yearsToRetire = Math.max(0, retirementAge - currentAge);
+    // Sanitizza eta' qui (anche se computeFireTargetForRetirementAge sanitizza
+    // a sua volta) perche' `yearsToRetire` partecipa a Math.pow(1+r, yearsToRetire),
+    // che con NaN/Infinity propagherebbe NaN nel `coastFireTarget` di tutti
+    // e tre gli scenari.
+    const safeCurrentAge = sanitize(currentAge);
+    const safeRetirementAge = sanitize(retirementAge);
+    const safeCurrentCapital = sanitizeNonNegative(currentCapital);
+    const yearsToRetire = Math.max(0, safeRetirementAge - safeCurrentAge);
     const baseTargetProjection = computeFireTargetForRetirementAge({
         retirementAge,
         publicPensionAge,
@@ -514,14 +589,18 @@ export function computeCoastFireScenarios(input: CoastFireInput): CoastFireResul
 
         // Coast FIRE target = target netto a retirement, meno il FV delle rendite
         // pre-FIRE effettivamente reinvestite, poi scontato a oggi.
-        const coastFireTarget = Math.max(
-            0,
-            (targetProjection.fireTargetNet - futureValueOfSavedPassiveIncome) / Math.pow(1 + realReturn, yearsToRetire),
-        );
+        // Guard: tasso reale <= -100% renderebbe la base di Math.pow non
+        // positiva e produrrebbe NaN; in tal caso lo sconto degenera a 1
+        // (nessuna capitalizzazione), come gia' fa `presentValueOfAnnuity`.
+        const discountBase = 1 + sanitize(realReturn);
+        const discountFactor = discountBase > 0 ? Math.pow(discountBase, yearsToRetire) : 1;
+        const rawCoastFireTarget = (sanitize(targetProjection.fireTargetNet) - sanitize(futureValueOfSavedPassiveIncome))
+            / (discountFactor || 1);
+        const coastFireTarget = Math.max(0, sanitize(rawCoastFireTarget));
 
-        const coastFireReached = currentCapital >= coastFireTarget;
-        const surplusOrGap = currentCapital - coastFireTarget;
-        const yearsToCoastFire = coastFireReached ? 0 : yearsToGrow(currentCapital, coastFireTarget, realReturn);
+        const coastFireReached = safeCurrentCapital >= coastFireTarget;
+        const surplusOrGap = safeCurrentCapital - coastFireTarget;
+        const yearsToCoastFire = coastFireReached ? 0 : yearsToGrow(safeCurrentCapital, coastFireTarget, realReturn);
 
         return {
             scenario: s,
