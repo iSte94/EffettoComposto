@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Snowflake, Flame, Scale, Zap } from "lucide-react";
+import { Plus, Trash2, Snowflake, Flame, Scale, Zap, Wallet, Percent, CalendarClock } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatPercent } from "@/lib/format";
 import { simulatePayoff } from "@/lib/finance/debt-strategy";
 import type { Debt } from "@/lib/finance/debt-strategy";
+import { computeDebtPortfolioSummary } from "@/lib/finance/debt-portfolio";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend, Cell,
@@ -46,6 +47,12 @@ export function DebtStrategy() {
             avalancheBaseline: simulatePayoff(validDebts, "avalanche", 0),
         };
     }, [debts, extraMonthly]);
+
+    // Riepilogo portafoglio: sintetizza l'esposizione attuale (saldo, tasso
+    // medio ponderato, somma rate minime) usando *tutti* i debiti con saldo > 0,
+    // anche quelli senza tasso o min payment compilati - cosi' la card resta
+    // utile mentre l'utente sta ancora inserendo i dati.
+    const portfolioSummary = useMemo(() => computeDebtPortfolioSummary(debts), [debts]);
 
     const extraImpact = useMemo(() => {
         if (!results || extraMonthly <= 0) return null;
@@ -160,6 +167,61 @@ export function DebtStrategy() {
                     </div>
                 </CardContent>
             </Card>
+
+            {portfolioSummary.activeCount > 0 && (
+                <Card className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-50/70 shadow-sm dark:border-slate-800 dark:bg-slate-900/40">
+                    <CardContent className="space-y-4 p-5 sm:p-6">
+                        <h4 className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
+                            <Wallet className="h-4 w-4 text-slate-500" /> Riepilogo Portafoglio Debiti
+                            <InfoTooltip>Fotografia attuale della tua esposizione: saldo totale, tasso medio ponderato per saldo (utile per valutare un consolidamento) e somma delle rate minime.</InfoTooltip>
+                        </h4>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            <div
+                                className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                                title={`Somma dei saldi residui di ${portfolioSummary.activeCount} debit${portfolioSummary.activeCount === 1 ? "o" : "i"} attiv${portfolioSummary.activeCount === 1 ? "o" : "i"}`}
+                            >
+                                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                    <Wallet className="h-3 w-3" /> Saldo Totale
+                                </p>
+                                <p className="mt-0.5 text-lg font-extrabold tabular-nums text-rose-600 dark:text-rose-400">
+                                    {formatEuro(portfolioSummary.totalBalance)}
+                                </p>
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                    {portfolioSummary.activeCount} debit{portfolioSummary.activeCount === 1 ? "o" : "i"} attiv{portfolioSummary.activeCount === 1 ? "o" : "i"}
+                                </p>
+                            </div>
+                            <div
+                                className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                                title="Tasso medio annuo ponderato sul saldo di ciascun debito: confrontalo con il TAN di un'eventuale surroga o consolidamento per capire se conviene."
+                            >
+                                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                    <Percent className="h-3 w-3" /> Tasso Medio Ponderato
+                                </p>
+                                <p className="mt-0.5 text-lg font-extrabold tabular-nums text-amber-600 dark:text-amber-400">
+                                    {formatPercent(portfolioSummary.weightedAverageRate)}
+                                </p>
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                    pesato per saldo
+                                </p>
+                            </div>
+                            <div
+                                className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
+                                title="Somma delle rate minime mensili: e' il flusso di cassa minimo richiesto ogni mese solo per non andare in default."
+                            >
+                                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                    <CalendarClock className="h-3 w-3" /> Rate Minime Totali
+                                </p>
+                                <p className="mt-0.5 text-lg font-extrabold tabular-nums text-foreground">
+                                    {formatEuro(portfolioSummary.totalMinPayment)}<span className="text-xs font-semibold text-muted-foreground">/mese</span>
+                                </p>
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                    impegno mensile minimo
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {results && (
                 <div className="grid gap-6 xl:grid-cols-2">
