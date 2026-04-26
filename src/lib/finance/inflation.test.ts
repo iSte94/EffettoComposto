@@ -216,4 +216,56 @@ describe("projectInflation", () => {
             expect(Number.isFinite(r.monthlySavingsToPreservePurchasingPower)).toBe(true);
         });
     });
+
+    describe("averageMonthlyPurchasingPowerLoss", () => {
+        it("e' la perdita totale spalmata sui mesi dell'orizzonte", () => {
+            // 100k @ 2% per 10 anni: lostValue ~= 17965 -> 17965 / 120 ~= 150 €/mese.
+            const r = projectInflation({ amount: 100000, inflationRatePct: 2, years: 10, nominalReturnPct: 0 });
+            const expected = Math.round(r.lostValue / (10 * 12));
+            expect(r.averageMonthlyPurchasingPowerLoss).toBe(expected);
+            // Sanity check sul valore numerico approssimato.
+            expect(r.averageMonthlyPurchasingPowerLoss).toBeGreaterThan(140);
+            expect(r.averageMonthlyPurchasingPowerLoss).toBeLessThan(160);
+        });
+
+        it("inflazione zero: nessuna erosione mensile", () => {
+            const r = projectInflation({ amount: 50000, inflationRatePct: 0, years: 20, nominalReturnPct: 5 });
+            expect(r.averageMonthlyPurchasingPowerLoss).toBe(0);
+        });
+
+        it("amount zero: nessuna erosione mensile (no NaN da divisione)", () => {
+            const r = projectInflation({ amount: 0, inflationRatePct: 3, years: 10, nominalReturnPct: 5 });
+            expect(r.averageMonthlyPurchasingPowerLoss).toBe(0);
+        });
+
+        it("years zero: nessuna erosione mensile (orizzonte nullo)", () => {
+            const r = projectInflation({ amount: 100000, inflationRatePct: 3, years: 0, nominalReturnPct: 5 });
+            expect(r.averageMonthlyPurchasingPowerLoss).toBe(0);
+        });
+
+        it("deflazione (inflazione negativa): nessuna erosione mensile (lostValue clampato a 0)", () => {
+            const r = projectInflation({ amount: 100000, inflationRatePct: -1, years: 10, nominalReturnPct: 0 });
+            expect(r.averageMonthlyPurchasingPowerLoss).toBe(0);
+        });
+
+        it("scala linearmente con il capitale a parita' di inflazione e orizzonte", () => {
+            const small = projectInflation({ amount: 10000, inflationRatePct: 3, years: 20, nominalReturnPct: 0 });
+            const big = projectInflation({ amount: 100000, inflationRatePct: 3, years: 20, nominalReturnPct: 0 });
+            // Il rapporto fra i due deve avvicinarsi a 10 (capitale 10x).
+            // Tolleranza generosa per assorbire gli arrotondamenti a euro intero.
+            const ratio = big.averageMonthlyPurchasingPowerLoss / small.averageMonthlyPurchasingPowerLoss;
+            expect(ratio).toBeCloseTo(10, 0);
+        });
+
+        it("input non finiti non producono NaN/Infinity", () => {
+            const r = projectInflation({
+                amount: Number.NaN,
+                inflationRatePct: Number.POSITIVE_INFINITY,
+                years: Number.NaN,
+                nominalReturnPct: Number.NaN,
+            });
+            expect(Number.isFinite(r.averageMonthlyPurchasingPowerLoss)).toBe(true);
+            expect(r.averageMonthlyPurchasingPowerLoss).toBe(0);
+        });
+    });
 });
