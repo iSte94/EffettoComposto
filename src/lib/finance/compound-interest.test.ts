@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeDelayCost, simulateCompoundInterest } from "./compound-interest";
+import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } from "./compound-interest";
 
 describe("simulateCompoundInterest", () => {
     it("anno 0 ha saldo = capitale iniziale e nessun interesse", () => {
@@ -249,6 +249,75 @@ describe("computeDelayCost", () => {
         });
         expect(result.nominalCost).toBe(0);
         expect(result.compoundLoss).toBe(0);
+    });
+});
+
+describe("effectiveAnnualRatePct", () => {
+    it("TAN 0% -> TAEG 0% (no compound da estrarre)", () => {
+        expect(effectiveAnnualRatePct(0)).toBe(0);
+    });
+
+    it("TAN 7% -> TAEG ~7.229% (capitalizzazione mensile)", () => {
+        // (1 + 0.07/12)^12 - 1 = 0.07229008...
+        const result = effectiveAnnualRatePct(7);
+        expect(result).toBeCloseTo(7.22901, 4);
+        // Spread positivo: il TAEG e' sempre > TAN per tassi positivi.
+        expect(result).toBeGreaterThan(7);
+    });
+
+    it("coerenza con la simulazione: il saldo a 1 anno cresce del TAEG (no contributi)", () => {
+        // Ogni euro investito senza versamenti aggiuntivi cresce, dopo 12 mesi
+        // di capitalizzazione, esattamente del TAEG. Questa e' la definizione
+        // operativa: il TAEG e' il rendimento annuo realmente percepito dalla
+        // simulazione, lo stesso numero che si vedrebbe a saldo dopo 12 mesi.
+        const tan = 7;
+        const expectedTaeg = effectiveAnnualRatePct(tan);
+        const sim = simulateCompoundInterest({
+            initialCapital: 10_000,
+            monthlyContribution: 0,
+            annualRatePct: tan,
+            years: 1,
+        });
+        const realizedYieldPct = (sim.finalBalance / 10_000 - 1) * 100;
+        expect(realizedYieldPct).toBeCloseTo(expectedTaeg, 6);
+    });
+
+    it("monotono crescente nel TAN positivo", () => {
+        expect(effectiveAnnualRatePct(3)).toBeLessThan(effectiveAnnualRatePct(5));
+        expect(effectiveAnnualRatePct(5)).toBeLessThan(effectiveAnnualRatePct(7));
+        expect(effectiveAnnualRatePct(7)).toBeLessThan(effectiveAnnualRatePct(10));
+    });
+
+    it("lo spread TAEG-TAN cresce col TAN (effetto compounding piu' forte)", () => {
+        const spread3 = effectiveAnnualRatePct(3) - 3;
+        const spread7 = effectiveAnnualRatePct(7) - 7;
+        const spread12 = effectiveAnnualRatePct(12) - 12;
+        // A tassi piu' alti il composto infrannuale "regala" piu' rendimento.
+        expect(spread7).toBeGreaterThan(spread3);
+        expect(spread12).toBeGreaterThan(spread7);
+        // Sanity: a TAN ragionevoli lo spread sta sotto il punto percentuale.
+        expect(spread7).toBeLessThan(0.5);
+    });
+
+    it("TAN negativo produce TAEG negativo ma piu' lieve (perdita attenuata dal composto)", () => {
+        // (1 - 0.05/12)^12 - 1 = -0.04887...
+        const result = effectiveAnnualRatePct(-5);
+        expect(result).toBeLessThan(0);
+        expect(result).toBeGreaterThan(-5); // attenuato rispetto al TAN
+        expect(result).toBeCloseTo(-4.887, 2);
+    });
+
+    it("input non finiti vengono sanificati a 0", () => {
+        expect(effectiveAnnualRatePct(Number.NaN)).toBe(0);
+        expect(effectiveAnnualRatePct(Number.POSITIVE_INFINITY)).toBe(0);
+        expect(effectiveAnnualRatePct(Number.NEGATIVE_INFINITY)).toBe(0);
+    });
+
+    it("TAN <= -1200% (fattore mensile <= 0): degenerazione a -100%", () => {
+        // 1 + (-1200)/100/12 = 0 -> 0^12 - 1 = -1 -> -100%
+        expect(effectiveAnnualRatePct(-1200)).toBe(-100);
+        // Sotto la soglia continua a restituire -100% (fattore negativo).
+        expect(effectiveAnnualRatePct(-2400)).toBe(-100);
     });
 });
 

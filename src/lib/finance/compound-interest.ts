@@ -115,6 +115,31 @@ function sanitizeFinite(value: number, fallback = 0): number {
 }
 
 /**
+ * Tasso annuo effettivo (TAEG-like) derivato da capitalizzazione mensile a
+ * partire dal tasso annuo nominale (TAN). Coerente con la convenzione del
+ * calcolatore: `monthlyRate = annualRatePct / 100 / 12` produce un rendimento
+ * annuo realmente pari a `(1 + monthlyRate)^12 - 1`, leggermente superiore al
+ * nominale per via dell'interesse sull'interesse infrannuale.
+ *
+ * Esempio: TAN 7% -> TAEG ~7.229% (lo 0.23% extra e' il "guadagno" del
+ * compounding mensile su quello annuale). E' la stessa idea della distinzione
+ * TAN/TAEG sui prestiti: numeri diversi che descrivono lo stesso flusso di
+ * cassa, e per questo va comunicata esplicitamente all'utente.
+ *
+ * Casi limite:
+ * - TAN <= -1200% (fattore mensile <= 0): il composto degenera, ritorna -100%.
+ * - TAN = 0 -> TAEG = 0 (nessun composto da estrarre).
+ * - Input non finiti -> 0 (sanificato).
+ */
+export function effectiveAnnualRatePct(annualRatePct: number): number {
+    const rate = sanitizeFinite(annualRatePct);
+    if (rate === 0) return 0;
+    const monthlyFactor = 1 + rate / 100 / 12;
+    if (monthlyFactor <= 0) return -100;
+    return (Math.pow(monthlyFactor, 12) - 1) * 100;
+}
+
+/**
  * Simula la crescita di un capitale iniziale con versamenti mensili costanti
  * e capitalizzazione mensile (tasso mensile = annualRate / 12 — convenzione
  * standard del calcolatore "interesse composto" base, identica al codice

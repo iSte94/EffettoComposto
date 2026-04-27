@@ -9,7 +9,7 @@ import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Re
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
-import { computeDelayCost, simulateCompoundInterest } from "@/lib/finance/compound-interest";
+import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } from "@/lib/finance/compound-interest";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend,
@@ -60,6 +60,16 @@ export function CompoundInterestCalculator() {
         const doublingYearsReal =
             realReturnPct > 0 ? Math.log(2) / Math.log(1 + realReturnPct / 100) : null;
 
+        // Tasso annuo effettivo (TAEG-equivalent): la simulazione capitalizza
+        // mensilmente, quindi il rendimento realmente percepito ogni anno e'
+        // (1 + TAN/12)^12 - 1, leggermente sopra il TAN. A 7% nominale il
+        // rendimento effettivo e' ~7.23%; mostrare la differenza chiarisce
+        // perche' il saldo finale e' un po' piu' alto di quanto si calcoli a
+        // mente con il TAN. Lo "spread" (TAEG - TAN) e' il "regalo" del
+        // compounding infrannuale.
+        const effectiveAnnualPct = effectiveAnnualRatePct(annualRate);
+        const compoundingSpreadPct = effectiveAnnualPct - annualRate;
+
         // Rendita FIRE teorica: applica il SWR di default al capitale finale.
         // Usiamo il valore REALE (deflazionato) perche' l'utente ragiona in
         // potere d'acquisto odierno quando valuta se la cifra "basta per
@@ -100,6 +110,8 @@ export function CompoundInterestCalculator() {
             delayCostNominal: delayCost?.nominalCost ?? null,
             delayMissedContributions: delayCost?.missedContributions ?? 0,
             delayCompoundLoss: delayCost?.compoundLoss ?? null,
+            effectiveAnnualPct,
+            compoundingSpreadPct,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -163,10 +175,22 @@ export function CompoundInterestCalculator() {
 
                             <div className="space-y-2">
                                 <div className="flex items-end justify-between">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rendimento Annuo (%)</Label>
+                                    <Label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        Rendimento Annuo (%)
+                                        <InfoTooltip iconClassName="w-3 h-3">Tasso annuo nominale (TAN). La simulazione capitalizza mensilmente, quindi il rendimento realmente percepito ogni anno e&apos; il TAEG-equivalente: (1 + TAN/12)<sup>12</sup> - 1, leggermente sopra il TAN per via dell&apos;interesse sull&apos;interesse infrannuale.</InfoTooltip>
+                                    </Label>
                                     <span className="font-bold text-purple-600 dark:text-purple-400">{annualRate.toFixed(1)}%</span>
                                 </div>
                                 <Slider value={[annualRate]} min={0} max={15} step={0.5} onValueChange={(value) => setAnnualRate(value[0])} />
+                                {result.compoundingSpreadPct > 0 && (
+                                    <p
+                                        className="text-[10px] text-muted-foreground"
+                                        title={`Capitalizzando mensilmente, il TAN del ${annualRate.toFixed(1)}% produce un rendimento annuo effettivo del ${result.effectiveAnnualPct.toFixed(2)}%. La differenza di ${result.compoundingSpreadPct.toFixed(2)} punti e' il "regalo" del compounding infrannuale (interesse sull'interesse calcolato 12 volte all'anno invece di una).`}
+                                    >
+                                        <span className="font-semibold text-purple-600/80 dark:text-purple-400/80">{result.effectiveAnnualPct.toFixed(2)}%</span>
+                                        <span className="ml-1">annuo effettivo (cap. mensile, +{result.compoundingSpreadPct.toFixed(2)} pp)</span>
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
