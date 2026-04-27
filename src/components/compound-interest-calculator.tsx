@@ -9,6 +9,7 @@ import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Re
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
+import { computeDelayCost, simulateCompoundInterest } from "@/lib/finance/compound-interest";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend,
@@ -27,58 +28,27 @@ export function CompoundInterestCalculator() {
     const [inflationRate, setInflationRate] = useState(2.5);
 
     const result = useMemo(() => {
-        const monthlyRate = annualRate / 100 / 12;
-        const chartData: { anno: number; label: string; Versato: number; Interessi: number; Totale: number }[] = [];
-
-        let balance = initialCapital;
-        let totalDeposited = initialCapital;
-        // Prima annualita' in cui gli interessi maturati superano il capitale versato (effetto compounding).
-        let crossoverYear: number | null = null;
-        // Capitale a fine "anno N - 1": ci serve come scenario di confronto per
-        // il "Costo del Ritardo": iniziare un anno dopo equivale, a parita' di
-        // orizzonte finale, a ottenere il saldo che oggi avresti dopo years-1
-        // anni (un anno in meno di accumulo + capitalizzazione).
-        let balanceMinusOne = initialCapital;
-
-        chartData.push({
-            anno: 0,
-            label: "Oggi",
-            Versato: initialCapital,
-            Interessi: 0,
-            Totale: initialCapital,
+        const sim = simulateCompoundInterest({
+            initialCapital,
+            monthlyContribution,
+            annualRatePct: annualRate,
+            years,
         });
 
-        for (let year = 1; year <= years; year++) {
-            for (let month = 1; month <= 12; month++) {
-                balance = balance * (1 + monthlyRate) + monthlyContribution;
-                totalDeposited += monthlyContribution;
-            }
-            if (year === years - 1) {
-                balanceMinusOne = balance;
-            }
-            const interestAccrued = balance - totalDeposited;
-            if (crossoverYear === null && interestAccrued > totalDeposited) {
-                crossoverYear = year;
-            }
-            chartData.push({
-                anno: year,
-                label: `Anno ${year}`,
-                Versato: Math.round(totalDeposited),
-                Interessi: Math.round(interestAccrued),
-                Totale: Math.round(balance),
-            });
-        }
-        // Edge case: con orizzonte di 1 solo anno, "anno N - 1" == oggi (capitale iniziale).
-        if (years <= 1) {
-            balanceMinusOne = initialCapital;
-        }
+        const chartData = sim.chartData.map((point) => ({
+            anno: point.year,
+            label: point.label,
+            Versato: point.deposited,
+            Interessi: point.interest,
+            Totale: point.total,
+        }));
 
         // Valore reale a potere d'acquisto odierno: deflaziona il nominale finale.
         const inflationFactor = Math.pow(1 + inflationRate / 100, years);
-        const realFinalBalance = inflationFactor > 0 ? balance / inflationFactor : balance;
+        const realFinalBalance = inflationFactor > 0 ? sim.finalBalance / inflationFactor : sim.finalBalance;
         // Guadagno reale: crescita effettiva del potere d'acquisto rispetto a quanto versato.
         // Se negativo, l'inflazione ha eroso piu' di quanto il rendimento abbia prodotto.
-        const realGain = realFinalBalance - totalDeposited;
+        const realGain = realFinalBalance - sim.totalDeposited;
 
         // Tempo di raddoppio: ln(2) / ln(1+r), formula esatta (piu' accurata
         // della Regola del 72). `null` se r <= 0 (il capitale non raddoppia mai
@@ -94,35 +64,32 @@ export function CompoundInterestCalculator() {
         // Usiamo il valore REALE (deflazionato) perche' l'utente ragiona in
         // potere d'acquisto odierno quando valuta se la cifra "basta per
         // vivere"; il valore nominale e' solo informativo/secondario.
-        // Formula: rendita_annua = capitale * SWR; rendita_mensile = /12.
         const swrFactor = DEFAULT_SWR_PCT / 100;
         const fireMonthlyIncomeReal = Math.max(0, (realFinalBalance * swrFactor) / 12);
-        const fireMonthlyIncomeNominal = Math.max(0, (balance * swrFactor) / 12);
+        const fireMonthlyIncomeNominal = Math.max(0, (sim.finalBalance * swrFactor) / 12);
 
-        // Costo del Ritardo (1 anno): a parita' di orizzonte, rinviare di 12 mesi
-        // l'inizio del piano significa accumulare/capitalizzare per un anno in
-        // meno. La differenza fra "capitale finale oggi" e "capitale finale se
-        // avessi iniziato fra un anno" quantifica il costo della procrastinazione
-        // ed e' tipicamente sproporzionato rispetto a quanto si rinuncia a
-        // versare in 12 mesi (e' il guadagno NETTO di compound che si perde).
-        // Disponibile solo per orizzonti >= 2 anni (con 1 anno il confronto
-        // degenera al capitale iniziale).
-        const delayCostNominal = years >= 2 ? Math.max(0, balance - balanceMinusOne) : null;
-        const delayMissedContributions = years >= 2 ? monthlyContribution * 12 : 0;
-        // Quota della perdita imputabile esclusivamente al compounding mancato
-        // (al netto dei 12 versamenti che non hai fatto): il vero "regalo" che
-        // l'effetto composto fa a chi inizia un anno prima.
-        const delayCompoundLoss =
-            delayCostNominal !== null
-                ? Math.max(0, delayCostNominal - delayMissedContributions)
-                : null;
+        // Costo del Ritardo (12 mesi): differenza fra "iniziare oggi" e
+        // "iniziare fra 12 mesi" a PARITA' di orizzonte finale. Calcolato
+        // dal modulo `compound-interest.ts` che simula esplicitamente lo
+        // scenario "delay" (12 mesi senza contributi, lump iniziale che
+        // capitalizza comunque). Disponibile solo per orizzonti >= 2 anni
+        // (sotto la soglia il confronto e' troppo rumoroso da comunicare).
+        const delayCost = years >= 2
+            ? computeDelayCost({
+                initialCapital,
+                monthlyContribution,
+                annualRatePct: annualRate,
+                years,
+                delayMonths: 12,
+            })
+            : null;
 
         return {
-            finalBalance: balance,
-            totalDeposited,
-            totalInterest: balance - totalDeposited,
+            finalBalance: sim.finalBalance,
+            totalDeposited: sim.totalDeposited,
+            totalInterest: sim.totalInterest,
             chartData,
-            crossoverYear,
+            crossoverYear: sim.crossoverYear,
             realFinalBalance,
             realGain,
             doublingYearsNominal,
@@ -130,9 +97,9 @@ export function CompoundInterestCalculator() {
             realReturnPct,
             fireMonthlyIncomeReal,
             fireMonthlyIncomeNominal,
-            delayCostNominal,
-            delayMissedContributions,
-            delayCompoundLoss,
+            delayCostNominal: delayCost?.nominalCost ?? null,
+            delayMissedContributions: delayCost?.missedContributions ?? 0,
+            delayCompoundLoss: delayCost?.compoundLoss ?? null,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
