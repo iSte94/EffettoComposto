@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Snowflake, Flame, Scale, Zap, Wallet, Percent, CalendarClock } from "lucide-react";
+import { Plus, Trash2, Snowflake, Flame, Scale, Zap, Wallet, Percent, CalendarClock, Banknote } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { simulatePayoff } from "@/lib/finance/debt-strategy";
@@ -173,9 +173,9 @@ export function DebtStrategy() {
                     <CardContent className="space-y-4 p-5 sm:p-6">
                         <h4 className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-200">
                             <Wallet className="h-4 w-4 text-slate-500" /> Riepilogo Portafoglio Debiti
-                            <InfoTooltip>Fotografia attuale della tua esposizione: saldo totale, tasso medio ponderato per saldo (utile per valutare un consolidamento) e somma delle rate minime.</InfoTooltip>
+                            <InfoTooltip>Fotografia attuale della tua esposizione: saldo totale, tasso medio ponderato per saldo (utile per valutare un consolidamento), somma delle rate minime e costo mensile dei soli interessi.</InfoTooltip>
                         </h4>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             <div
                                 className="rounded-2xl border border-border/60 bg-background/70 px-4 py-3"
                                 title={`Somma dei saldi residui di ${portfolioSummary.activeCount} debit${portfolioSummary.activeCount === 1 ? "o" : "i"} attiv${portfolioSummary.activeCount === 1 ? "o" : "i"}`}
@@ -216,6 +216,25 @@ export function DebtStrategy() {
                                 </p>
                                 <p className="mt-0.5 text-[10px] text-muted-foreground">
                                     impegno mensile minimo
+                                </p>
+                            </div>
+                            <div
+                                className="rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 dark:border-rose-900 dark:bg-rose-950/30"
+                                title={`A saldo invariato il portafoglio matura ${formatEuro(portfolioSummary.monthlyInterestCost)} di soli interessi nel mese corrente (${formatEuro(portfolioSummary.monthlyInterestCost * 12)}/anno). E' il "tassametro" del debito: ogni euro di rata che paghi sotto questa soglia non riduce il capitale, copre solo gli interessi.`}
+                            >
+                                <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-rose-500">
+                                    <Banknote className="h-3 w-3" /> Costo Mensile Interessi
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        Quanto il tuo portafoglio brucia in soli interessi questo mese a saldo invariato (somma di saldo &times; tasso / 12 per ogni debito attivo). E&apos; il &quot;tassametro&quot; del debito: una rata mensile che resta sotto questa soglia non riduce il capitale, copre solo gli interessi. Confrontalo con le tue spese ricorrenti per cogliere il peso reale del debito.
+                                    </InfoTooltip>
+                                </p>
+                                <p className="mt-0.5 text-lg font-extrabold tabular-nums text-rose-600 dark:text-rose-400">
+                                    {formatEuro(portfolioSummary.monthlyInterestCost)}<span className="text-xs font-semibold text-rose-500/80">/mese</span>
+                                </p>
+                                <p className="mt-0.5 text-[10px] text-muted-foreground">
+                                    {portfolioSummary.monthlyInterestCost > 0
+                                        ? `${formatEuro(portfolioSummary.monthlyInterestCost * 12)}/anno solo di interessi`
+                                        : "nessun interesse a saldo invariato"}
                                 </p>
                             </div>
                         </div>
