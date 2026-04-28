@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass, Layers } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } from "@/lib/finance/compound-interest";
+import { computeCapitalMultiplier } from "@/lib/finance/capital-multiplier";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend,
@@ -78,6 +79,18 @@ export function CompoundInterestCalculator() {
         const fireMonthlyIncomeReal = Math.max(0, (realFinalBalance * swrFactor) / 12);
         const fireMonthlyIncomeNominal = Math.max(0, (sim.finalBalance * swrFactor) / 12);
 
+        // Multiplicatore del capitale: "ogni € versato → €X" (nominale e reale).
+        // Conceptualmente complementare alla card "% da interessi composti"
+        // (stessa matematica, prospettiva inversa) e l'UNICA KPI che traduce
+        // il piano di accumulo nel suo "rendimento moltiplicativo" in potere
+        // d'acquisto odierno. Modulo puro `capital-multiplier.ts` con test
+        // dedicati per blindare la coerenza con il resto del calcolatore.
+        const multiplier = computeCapitalMultiplier({
+            finalBalance: sim.finalBalance,
+            realFinalBalance,
+            totalDeposited: sim.totalDeposited,
+        });
+
         // Costo del Ritardo (12 mesi): differenza fra "iniziare oggi" e
         // "iniziare fra 12 mesi" a PARITA' di orizzonte finale. Calcolato
         // dal modulo `compound-interest.ts` che simula esplicitamente lo
@@ -112,6 +125,8 @@ export function CompoundInterestCalculator() {
             delayCompoundLoss: delayCost?.compoundLoss ?? null,
             effectiveAnnualPct,
             compoundingSpreadPct,
+            nominalMultiplier: multiplier.nominalMultiplier,
+            realMultiplier: multiplier.realMultiplier,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -239,6 +254,36 @@ export function CompoundInterestCalculator() {
                             </span>
                             <InfoTooltip iconClassName="w-3 h-3">Quota del capitale finale generata esclusivamente dagli interessi sugli interessi (effetto compounding), non dai versamenti diretti.</InfoTooltip>
                         </div>
+
+                        {result.nominalMultiplier !== null && (
+                            <div
+                                className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-fuchsia-50/70 p-4 dark:border-violet-900 dark:from-violet-950/30 dark:to-fuchsia-950/20"
+                                title={`Ogni € versato si trasforma in ${result.nominalMultiplier.toFixed(2)}€ nominali a fine piano${result.realMultiplier !== null ? ` (${result.realMultiplier.toFixed(2)}€ in potere d'acquisto odierno, al netto del ${inflationRate.toFixed(1)}% di inflazione)` : ""}.`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                                    <Layers className="h-3 w-3" /> Multiplicatore del Capitale
+                                    <InfoTooltip iconClassName="w-3 h-3">Quante volte ogni € versato si moltiplica a fine piano. Il valore nominale (sopra) e&apos; quello che vedi a saldo; il valore reale (sotto) e&apos; il moltiplicatore in potere d&apos;acquisto odierno, al netto dell&apos;inflazione: e&apos; la misura piu&apos; onesta dell&apos;effetto composto perche&apos; tiene conto del fatto che i € futuri valgono meno di quelli odierni. Quando il moltiplicatore reale e&apos; &lt; 1 vuol dire che, nonostante il saldo nominale sia cresciuto, hai perso potere d&apos;acquisto.</InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-violet-700 dark:text-violet-300">
+                                        Ogni 1€ <span className="text-violet-500">→</span> {result.nominalMultiplier.toFixed(2)}€
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-violet-600/80 dark:text-violet-400/70">
+                                        nominali a fine piano ({years} anni @ {annualRate.toFixed(1)}%)
+                                    </div>
+                                    {result.realMultiplier !== null && (
+                                        <div
+                                            className={`mt-2 text-sm font-bold ${result.realMultiplier >= 1 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}
+                                        >
+                                            {result.realMultiplier.toFixed(2)}€ in euro odierni
+                                            {result.realMultiplier < 1 && (
+                                                <span className="ml-1 text-[10px] font-semibold">(potere d&apos;acquisto perso)</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="rounded-3xl border border-border/70 bg-card/80 p-4 text-center backdrop-blur-xl">
