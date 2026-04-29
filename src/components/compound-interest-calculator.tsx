@@ -5,14 +5,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2 } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass, Layers } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
+import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } from "@/lib/finance/compound-interest";
+import { computeCapitalMultiplier } from "@/lib/finance/capital-multiplier";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend,
 } from "recharts";
+
+// SWR (Safe Withdrawal Rate) di default usato nel resto dell'app per calcoli
+// FIRE (vedi DEFAULT_FIRE_WITHDRAWAL_RATE in fire-metrics.ts). Piu' conservativo
+// del classico 4% Trinity, prudente per orizzonti lunghi tipici italiani.
+const DEFAULT_SWR_PCT = 3.25;
 
 export function CompoundInterestCalculator() {
     const [initialCapital, setInitialCapital] = useState(10000);
@@ -22,46 +29,27 @@ export function CompoundInterestCalculator() {
     const [inflationRate, setInflationRate] = useState(2.5);
 
     const result = useMemo(() => {
-        const monthlyRate = annualRate / 100 / 12;
-        const chartData: { anno: number; label: string; Versato: number; Interessi: number; Totale: number }[] = [];
-
-        let balance = initialCapital;
-        let totalDeposited = initialCapital;
-        // Prima annualita' in cui gli interessi maturati superano il capitale versato (effetto compounding).
-        let crossoverYear: number | null = null;
-
-        chartData.push({
-            anno: 0,
-            label: "Oggi",
-            Versato: initialCapital,
-            Interessi: 0,
-            Totale: initialCapital,
+        const sim = simulateCompoundInterest({
+            initialCapital,
+            monthlyContribution,
+            annualRatePct: annualRate,
+            years,
         });
 
-        for (let year = 1; year <= years; year++) {
-            for (let month = 1; month <= 12; month++) {
-                balance = balance * (1 + monthlyRate) + monthlyContribution;
-                totalDeposited += monthlyContribution;
-            }
-            const interestAccrued = balance - totalDeposited;
-            if (crossoverYear === null && interestAccrued > totalDeposited) {
-                crossoverYear = year;
-            }
-            chartData.push({
-                anno: year,
-                label: `Anno ${year}`,
-                Versato: Math.round(totalDeposited),
-                Interessi: Math.round(interestAccrued),
-                Totale: Math.round(balance),
-            });
-        }
+        const chartData = sim.chartData.map((point) => ({
+            anno: point.year,
+            label: point.label,
+            Versato: point.deposited,
+            Interessi: point.interest,
+            Totale: point.total,
+        }));
 
         // Valore reale a potere d'acquisto odierno: deflaziona il nominale finale.
         const inflationFactor = Math.pow(1 + inflationRate / 100, years);
-        const realFinalBalance = inflationFactor > 0 ? balance / inflationFactor : balance;
+        const realFinalBalance = inflationFactor > 0 ? sim.finalBalance / inflationFactor : sim.finalBalance;
         // Guadagno reale: crescita effettiva del potere d'acquisto rispetto a quanto versato.
         // Se negativo, l'inflazione ha eroso piu' di quanto il rendimento abbia prodotto.
-        const realGain = realFinalBalance - totalDeposited;
+        const realGain = realFinalBalance - sim.totalDeposited;
 
         // Tempo di raddoppio: ln(2) / ln(1+r), formula esatta (piu' accurata
         // della Regola del 72). `null` se r <= 0 (il capitale non raddoppia mai
@@ -73,17 +61,72 @@ export function CompoundInterestCalculator() {
         const doublingYearsReal =
             realReturnPct > 0 ? Math.log(2) / Math.log(1 + realReturnPct / 100) : null;
 
+        // Tasso annuo effettivo (TAEG-equivalent): la simulazione capitalizza
+        // mensilmente, quindi il rendimento realmente percepito ogni anno e'
+        // (1 + TAN/12)^12 - 1, leggermente sopra il TAN. A 7% nominale il
+        // rendimento effettivo e' ~7.23%; mostrare la differenza chiarisce
+        // perche' il saldo finale e' un po' piu' alto di quanto si calcoli a
+        // mente con il TAN. Lo "spread" (TAEG - TAN) e' il "regalo" del
+        // compounding infrannuale.
+        const effectiveAnnualPct = effectiveAnnualRatePct(annualRate);
+        const compoundingSpreadPct = effectiveAnnualPct - annualRate;
+
+        // Rendita FIRE teorica: applica il SWR di default al capitale finale.
+        // Usiamo il valore REALE (deflazionato) perche' l'utente ragiona in
+        // potere d'acquisto odierno quando valuta se la cifra "basta per
+        // vivere"; il valore nominale e' solo informativo/secondario.
+        const swrFactor = DEFAULT_SWR_PCT / 100;
+        const fireMonthlyIncomeReal = Math.max(0, (realFinalBalance * swrFactor) / 12);
+        const fireMonthlyIncomeNominal = Math.max(0, (sim.finalBalance * swrFactor) / 12);
+
+        // Multiplicatore del capitale: "ogni € versato → €X" (nominale e reale).
+        // Conceptualmente complementare alla card "% da interessi composti"
+        // (stessa matematica, prospettiva inversa) e l'UNICA KPI che traduce
+        // il piano di accumulo nel suo "rendimento moltiplicativo" in potere
+        // d'acquisto odierno. Modulo puro `capital-multiplier.ts` con test
+        // dedicati per blindare la coerenza con il resto del calcolatore.
+        const multiplier = computeCapitalMultiplier({
+            finalBalance: sim.finalBalance,
+            realFinalBalance,
+            totalDeposited: sim.totalDeposited,
+        });
+
+        // Costo del Ritardo (12 mesi): differenza fra "iniziare oggi" e
+        // "iniziare fra 12 mesi" a PARITA' di orizzonte finale. Calcolato
+        // dal modulo `compound-interest.ts` che simula esplicitamente lo
+        // scenario "delay" (12 mesi senza contributi, lump iniziale che
+        // capitalizza comunque). Disponibile solo per orizzonti >= 2 anni
+        // (sotto la soglia il confronto e' troppo rumoroso da comunicare).
+        const delayCost = years >= 2
+            ? computeDelayCost({
+                initialCapital,
+                monthlyContribution,
+                annualRatePct: annualRate,
+                years,
+                delayMonths: 12,
+            })
+            : null;
+
         return {
-            finalBalance: balance,
-            totalDeposited,
-            totalInterest: balance - totalDeposited,
+            finalBalance: sim.finalBalance,
+            totalDeposited: sim.totalDeposited,
+            totalInterest: sim.totalInterest,
             chartData,
-            crossoverYear,
+            crossoverYear: sim.crossoverYear,
             realFinalBalance,
             realGain,
             doublingYearsNominal,
             doublingYearsReal,
             realReturnPct,
+            fireMonthlyIncomeReal,
+            fireMonthlyIncomeNominal,
+            delayCostNominal: delayCost?.nominalCost ?? null,
+            delayMissedContributions: delayCost?.missedContributions ?? 0,
+            delayCompoundLoss: delayCost?.compoundLoss ?? null,
+            effectiveAnnualPct,
+            compoundingSpreadPct,
+            nominalMultiplier: multiplier.nominalMultiplier,
+            realMultiplier: multiplier.realMultiplier,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -147,10 +190,22 @@ export function CompoundInterestCalculator() {
 
                             <div className="space-y-2">
                                 <div className="flex items-end justify-between">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Rendimento Annuo (%)</Label>
+                                    <Label className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                        Rendimento Annuo (%)
+                                        <InfoTooltip iconClassName="w-3 h-3">Tasso annuo nominale (TAN). La simulazione capitalizza mensilmente, quindi il rendimento realmente percepito ogni anno e&apos; il TAEG-equivalente: (1 + TAN/12)<sup>12</sup> - 1, leggermente sopra il TAN per via dell&apos;interesse sull&apos;interesse infrannuale.</InfoTooltip>
+                                    </Label>
                                     <span className="font-bold text-purple-600 dark:text-purple-400">{annualRate.toFixed(1)}%</span>
                                 </div>
                                 <Slider value={[annualRate]} min={0} max={15} step={0.5} onValueChange={(value) => setAnnualRate(value[0])} />
+                                {result.compoundingSpreadPct > 0 && (
+                                    <p
+                                        className="text-[10px] text-muted-foreground"
+                                        title={`Capitalizzando mensilmente, il TAN del ${annualRate.toFixed(1)}% produce un rendimento annuo effettivo del ${result.effectiveAnnualPct.toFixed(2)}%. La differenza di ${result.compoundingSpreadPct.toFixed(2)} punti e' il "regalo" del compounding infrannuale (interesse sull'interesse calcolato 12 volte all'anno invece di una).`}
+                                    >
+                                        <span className="font-semibold text-purple-600/80 dark:text-purple-400/80">{result.effectiveAnnualPct.toFixed(2)}%</span>
+                                        <span className="ml-1">annuo effettivo (cap. mensile, +{result.compoundingSpreadPct.toFixed(2)} pp)</span>
+                                    </p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
@@ -199,6 +254,36 @@ export function CompoundInterestCalculator() {
                             </span>
                             <InfoTooltip iconClassName="w-3 h-3">Quota del capitale finale generata esclusivamente dagli interessi sugli interessi (effetto compounding), non dai versamenti diretti.</InfoTooltip>
                         </div>
+
+                        {result.nominalMultiplier !== null && (
+                            <div
+                                className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50/80 to-fuchsia-50/70 p-4 dark:border-violet-900 dark:from-violet-950/30 dark:to-fuchsia-950/20"
+                                title={`Ogni € versato si trasforma in ${result.nominalMultiplier.toFixed(2)}€ nominali a fine piano${result.realMultiplier !== null ? ` (${result.realMultiplier.toFixed(2)}€ in potere d'acquisto odierno, al netto del ${inflationRate.toFixed(1)}% di inflazione)` : ""}.`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-violet-600 dark:text-violet-400">
+                                    <Layers className="h-3 w-3" /> Multiplicatore del Capitale
+                                    <InfoTooltip iconClassName="w-3 h-3">Quante volte ogni € versato si moltiplica a fine piano. Il valore nominale (sopra) e&apos; quello che vedi a saldo; il valore reale (sotto) e&apos; il moltiplicatore in potere d&apos;acquisto odierno, al netto dell&apos;inflazione: e&apos; la misura piu&apos; onesta dell&apos;effetto composto perche&apos; tiene conto del fatto che i € futuri valgono meno di quelli odierni. Quando il moltiplicatore reale e&apos; &lt; 1 vuol dire che, nonostante il saldo nominale sia cresciuto, hai perso potere d&apos;acquisto.</InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-violet-700 dark:text-violet-300">
+                                        Ogni 1€ <span className="text-violet-500">→</span> {result.nominalMultiplier.toFixed(2)}€
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-violet-600/80 dark:text-violet-400/70">
+                                        nominali a fine piano ({years} anni @ {annualRate.toFixed(1)}%)
+                                    </div>
+                                    {result.realMultiplier !== null && (
+                                        <div
+                                            className={`mt-2 text-sm font-bold ${result.realMultiplier >= 1 ? "text-emerald-700 dark:text-emerald-300" : "text-rose-700 dark:text-rose-300"}`}
+                                        >
+                                            {result.realMultiplier.toFixed(2)}€ in euro odierni
+                                            {result.realMultiplier < 1 && (
+                                                <span className="ml-1 text-[10px] font-semibold">(potere d&apos;acquisto perso)</span>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <div className="rounded-3xl border border-border/70 bg-card/80 p-4 text-center backdrop-blur-xl">
@@ -276,6 +361,60 @@ export function CompoundInterestCalculator() {
                                 </div>
                             </div>
                         </div>
+
+                        <div
+                            className="rounded-3xl border border-orange-200 bg-gradient-to-br from-orange-50/70 to-amber-50/60 p-4 dark:border-orange-900 dark:from-orange-950/30 dark:to-amber-950/20"
+                            title={`Al ${DEFAULT_SWR_PCT}% SWR (Safe Withdrawal Rate), il capitale reale finale di ${formatEuro(result.realFinalBalance)} puo' sostenere un prelievo mensile di circa ${formatEuro(result.fireMonthlyIncomeReal)} in potere d'acquisto odierno, teoricamente a tempo indefinito.`}
+                        >
+                            <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400">
+                                <Flame className="h-3 w-3" /> Rendita Mensile FIRE
+                                <InfoTooltip iconClassName="w-3 h-3">Rendita mensile teorica generata dal capitale finale applicando un Safe Withdrawal Rate del {DEFAULT_SWR_PCT}% (prudente rispetto al classico 4% Trinity). Il valore principale e&apos; espresso in potere d&apos;acquisto odierno (euro reali), cosi&apos; puoi confrontarlo subito con le tue spese mensili attuali e capire se il capitale accumulato basterebbe per vivere di rendita.</InfoTooltip>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-2xl font-extrabold text-orange-700 dark:text-orange-300">
+                                    {formatEuro(result.fireMonthlyIncomeReal)}<span className="text-sm font-semibold text-orange-600/80 dark:text-orange-400/80">/mese</span>
+                                </div>
+                                <div className="mt-0.5 text-[10px] text-orange-600/80 dark:text-orange-400/70">
+                                    in euro odierni, al {DEFAULT_SWR_PCT}% SWR
+                                </div>
+                                {result.fireMonthlyIncomeNominal > result.fireMonthlyIncomeReal + 1 && (
+                                    <div className="mt-1 text-[10px] text-muted-foreground">
+                                        nominali fra {years} anni: {formatEuro(result.fireMonthlyIncomeNominal)}/mese
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {result.delayCostNominal !== null && result.delayCostNominal > 0 && (
+                            <div
+                                className="rounded-3xl border border-rose-200 bg-gradient-to-br from-rose-50/70 to-amber-50/60 p-4 dark:border-rose-900 dark:from-rose-950/30 dark:to-amber-950/20"
+                                title={`Rinviando di 12 mesi l'inizio del piano (a parita' di orizzonte di ${years} anni) il capitale finale scende di ${formatEuro(result.delayCostNominal)}: ${formatEuro(result.delayMissedContributions)} sono i 12 versamenti mancati, ${formatEuro(result.delayCompoundLoss ?? 0)} e' il compounding che non hai messo al lavoro.`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-rose-600 dark:text-rose-400">
+                                    <Hourglass className="h-3 w-3" /> Costo del Ritardo (1 anno)
+                                    <InfoTooltip iconClassName="w-3 h-3">A parita&apos; di orizzonte finale, iniziare a investire 12 mesi piu&apos; tardi ti fa perdere questo importo a fine piano. Comprende i 12 contributi non versati e, soprattutto, il compounding che NON ha potuto lavorare per quei 12 mesi extra: il compound &eacute; quasi sempre la quota piu&apos; pesante e cresce esponenzialmente con l&apos;orizzonte. E&apos; il numero che traduce in euro il costo della procrastinazione.</InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-300">
+                                        -{formatEuro(result.delayCostNominal)}
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-rose-600/80 dark:text-rose-400/70">
+                                        in meno a fine piano se inizi fra 12 mesi
+                                    </div>
+                                    {result.delayCompoundLoss !== null && result.delayCompoundLoss > 0 && (
+                                        <div className="mt-1 text-[10px] text-muted-foreground">
+                                            di cui {formatEuro(result.delayCompoundLoss)} di solo compound mancato
+                                            {result.delayMissedContributions > 0 && (
+                                                <>
+                                                    <span className="mx-1">&middot;</span>
+                                                    {formatEuro(result.delayMissedContributions)} di versamenti saltati
+                                                </>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
 

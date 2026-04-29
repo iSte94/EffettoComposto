@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingDown, Euro, Calendar, Percent, Hourglass } from "lucide-react";
+import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank, CalendarMinus, ShieldCheck } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { projectInflation } from "@/lib/finance/inflation";
 import {
@@ -49,6 +49,11 @@ export function InflationCalculator() {
         equivalentFutureCapital,
         realReturnPct,
         purchasingPowerHalvingYears,
+        purchasingPowerGap,
+        monthlySavingsToPreservePurchasingPower,
+        averageMonthlyPurchasingPowerLoss,
+        realInvestmentAdvantage,
+        realInvestmentAdvantagePct,
     } = projection;
 
     // Etichetta compatta per il tempo di dimezzamento: intero se >= 10 anni
@@ -160,7 +165,7 @@ export function InflationCalculator() {
             </div>
 
             {(lostValue > 0 || halvingLabel) && (
-                <div className="grid gap-3 sm:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-6">
                     {lostValue > 0 && (
                         <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:col-span-3">
                             <span className="font-semibold text-foreground">Erosione inflazionistica</span>: tenendo {formatEuro(amount)} fermi
@@ -183,6 +188,103 @@ export function InflationCalculator() {
                             </div>
                         </div>
                     )}
+                    {averageMonthlyPurchasingPowerLoss > 0 && (
+                        <div
+                            className="flex items-start gap-2 rounded-2xl border border-orange-200 bg-orange-50/60 px-4 py-3 text-xs text-orange-700 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-300 sm:col-span-1"
+                            title={`Spalmando linearmente la perdita totale di ${formatEuro(lostValue)} sui ${years * 12} mesi dell'orizzonte ottieni un'erosione mensile media di ${formatEuro(averageMonthlyPurchasingPowerLoss)}: e' il "costo nascosto" di tenere ${formatEuro(amount)} fermi, espresso in una scala mensile che puoi confrontare con le tue spese correnti.`}
+                        >
+                            <CalendarMinus className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-orange-500">Erosione Mensile Media</p>
+                                <p className="mt-0.5 text-sm font-extrabold">{formatEuro(averageMonthlyPurchasingPowerLoss)}/mese</p>
+                                <p className="mt-0.5 text-[11px] text-orange-600/80 dark:text-orange-400/80">
+                                    di potere d&apos;acquisto perso, in media, ogni mese
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {amount > 0 && years > 0 && (
+                <div
+                    className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-xs ${
+                        monthlySavingsToPreservePurchasingPower > 0
+                            ? "border-indigo-200 bg-indigo-50/70 text-indigo-800 dark:border-indigo-900 dark:bg-indigo-950/30 dark:text-indigo-200"
+                            : "border-emerald-200 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+                    }`}
+                    title={
+                        monthlySavingsToPreservePurchasingPower > 0
+                            ? `Per coprire il gap di ${formatEuro(purchasingPowerGap)} fra ${formatEuro(equivalentFutureCapital)} necessari e ${formatEuro(finalNominal)} prodotti dal solo capitale iniziale investito al ${formatPercent(nominalReturn)} annuo.`
+                            : `Il rendimento nominale del ${formatPercent(nominalReturn)} supera l'inflazione del ${formatPercent(inflationRate)}: il capitale iniziale investito preserva gia' il potere d'acquisto.`
+                    }
+                >
+                    <PiggyBank
+                        className={`mt-0.5 h-4 w-4 shrink-0 ${
+                            monthlySavingsToPreservePurchasingPower > 0
+                                ? "text-indigo-500 dark:text-indigo-400"
+                                : "text-emerald-500 dark:text-emerald-400"
+                        }`}
+                        aria-hidden
+                    />
+                    <div className="flex-1">
+                        <p
+                            className={`text-[10px] font-bold uppercase tracking-widest ${
+                                monthlySavingsToPreservePurchasingPower > 0
+                                    ? "text-indigo-500 dark:text-indigo-400"
+                                    : "text-emerald-500 dark:text-emerald-400"
+                            }`}
+                        >
+                            Risparmio Mensile Necessario
+                        </p>
+                        {monthlySavingsToPreservePurchasingPower > 0 ? (
+                            <>
+                                <p className="mt-0.5 text-sm font-extrabold">
+                                    {formatEuro(monthlySavingsToPreservePurchasingPower)}/mese
+                                </p>
+                                <p className="mt-0.5 text-[11px] leading-snug text-indigo-700/80 dark:text-indigo-300/80">
+                                    da versare oltre al capitale iniziale, al {formatPercent(nominalReturn)} annuo, per
+                                    raggiungere i {formatEuro(equivalentFutureCapital)} che ti servono fra {years} anni
+                                    e preservare l&apos;attuale potere d&apos;acquisto.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="mt-0.5 text-sm font-extrabold">Nessuno</p>
+                                <p className="mt-0.5 text-[11px] leading-snug text-emerald-700/80 dark:text-emerald-300/80">
+                                    il solo capitale iniziale investito al {formatPercent(nominalReturn)} supera il
+                                    capitale equivalente futuro di {formatEuro(equivalentFutureCapital)}: il potere
+                                    d&apos;acquisto e&apos; preservato senza nuovi versamenti.
+                                </p>
+                            </>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {realInvestmentAdvantage > 0 && (
+                <div
+                    className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+                    title={`Investendo ${formatEuro(amount)} al ${formatPercent(nominalReturn)} nominale per ${years} anni il valore reale finale (${formatEuro(finalReal)} in euro odierni) supera di ${formatEuro(realInvestmentAdvantage)} il potere d'acquisto residuo del cash tenuto fermo (${formatEuro(finalPurchasingPower)}). E' la quota di potere d'acquisto preservata grazie all'investimento, espressa nella stessa scala del capitale iniziale.`}
+                >
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                    <div className="flex-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 dark:text-emerald-400">
+                            Vantaggio Reale dell&apos;Investire
+                        </p>
+                        <p className="mt-0.5 text-sm font-extrabold">
+                            +{formatEuro(realInvestmentAdvantage)} di potere d&apos;acquisto preservato
+                            {realInvestmentAdvantagePct > 0 && (
+                                <span className="ml-1 text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-300/80">
+                                    (+{formatPercent(realInvestmentAdvantagePct, 0)} sul capitale iniziale)
+                                </span>
+                            )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-emerald-700/80 dark:text-emerald-300/80">
+                            rispetto a tenere {formatEuro(amount)} fermi per {years} anni: e&apos; quanto investire al
+                            {" "}{formatPercent(nominalReturn)} nominale ti restituisce in euro odierni in piu&apos; rispetto al cash eroso dall&apos;inflazione.
+                        </p>
+                    </div>
                 </div>
             )}
 

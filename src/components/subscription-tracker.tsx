@@ -6,9 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Repeat, CreditCard } from "lucide-react";
+import { Plus, Trash2, Repeat, CreditCard, Sparkles, TrendingDown, Flame } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { useAuth } from "@/contexts/auth-context";
+import { InfoTooltip } from "@/components/ui/info-tooltip";
+import {
+    computeSubscriptionOpportunityCost,
+    DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS,
+    DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT,
+} from "@/lib/finance/subscription-opportunity";
+import { computeTopSubscriptionImpact } from "@/lib/finance/subscription-top-spender";
+import {
+    computeSubscriptionFireCapital,
+    DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT,
+} from "@/lib/finance/subscription-fire-capital";
 
 interface Subscription {
     id: string;
@@ -98,6 +109,37 @@ export function SubscriptionTracker() {
         }
         return { monthly, annual: monthly * 12 };
     }, [subscriptions]);
+
+    // Costo opportunita' composto: traduce la spesa mensile aggregata nel
+    // capitale (in potere d'acquisto odierno) che avresti accumulato
+    // investendo la stessa cifra al rendimento reale di default per
+    // l'orizzonte di default. E' il "latte factor" sotto il claim
+    // "Effetto Composto" - chiude il cerchio fra abbonamenti e FIRE.
+    const opportunityCost = useMemo(
+        () => computeSubscriptionOpportunityCost({ monthlyAmount: totals.monthly }),
+        [totals.monthly],
+    );
+
+    // Pareto: l'abbonamento piu' costoso (normalizzato a costo mensile)
+    // di solito pesa una quota sproporzionata sul totale. Mostrarlo
+    // esplicitamente trasforma "ho tanti abbonamenti" in un'azione
+    // concreta ("taglia questo, libera Y all'anno e Z in 30 anni").
+    const topSubscription = useMemo(
+        () => computeTopSubscriptionImpact(subscriptions),
+        [subscriptions],
+    );
+
+    // Capitale FIRE necessario per finanziare gli abbonamenti A VITA al SWR
+    // di default: chiude il cerchio col tema FIRE traducendo i costi
+    // ricorrenti nel patrimonio investito che, prelevandone il 3.25% all'anno,
+    // li copre indefinitamente (la "regola del Nx" applicata agli abbonamenti).
+    // Complementa il "Costo Opportunita'" (montante a 30 anni se investissi):
+    // qui la prospettiva e' duale, "quanto patrimonio mi serve per non doverci
+    // piu' lavorare per pagarli". Modulo puro `subscription-fire-capital.ts`.
+    const fireCapital = useMemo(
+        () => computeSubscriptionFireCapital({ monthlyAmount: totals.monthly }),
+        [totals.monthly],
+    );
 
     if (!loaded) return (
         <Card className="overflow-hidden rounded-3xl border border-border/70 bg-card/80 shadow-md backdrop-blur-xl">
@@ -243,6 +285,92 @@ export function SubscriptionTracker() {
                                 <div className="text-xl font-extrabold text-rose-600 dark:text-rose-400">{formatEuro(totals.annual)}</div>
                             </div>
                         </div>
+
+                        {totals.monthly > 0 && (
+                            <div
+                                className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-teal-50/70 p-4 dark:border-emerald-900 dark:from-emerald-950/30 dark:to-teal-950/20"
+                                title={`Investendo ${formatEuro(totals.monthly)}/mese al ${DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale annuo per ${DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni accumuleresti ${formatEuro(opportunityCost.futureValueReal)} in potere d'acquisto odierno (di cui ${formatEuro(opportunityCost.compoundGain)} di soli interessi composti).`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600 dark:text-emerald-400">
+                                    <Sparkles className="h-3 w-3" /> Costo Opportunita&apos; a {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} Anni
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        Quanto avresti accumulato investendo la stessa cifra mensile al {DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale annuo per {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni, capitalizzazione mensile. Valore espresso in potere d&apos;acquisto odierno (al netto dell&apos;inflazione), confrontabile direttamente con la spesa attuale. E&apos; il classico &quot;latte factor&quot;: piccoli costi ricorrenti diventano grandi capitali grazie all&apos;effetto composto.
+                                    </InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">
+                                        {formatEuro(opportunityCost.futureValueReal)}
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-emerald-600/80 dark:text-emerald-400/70">
+                                        in euro odierni, al {DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale per {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni
+                                    </div>
+                                    {opportunityCost.compoundGain > 0 && (
+                                        <div className="mt-1 text-[10px] text-muted-foreground">
+                                            di cui {formatEuro(opportunityCost.compoundGain)} di soli interessi composti
+                                            <span className="mx-1">·</span>
+                                            speso in abbonamenti: {formatEuro(opportunityCost.totalContributed)}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {totals.monthly > 0 && fireCapital.requiredFireCapital > 0 && (
+                            <div
+                                className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-amber-50/70 p-4 dark:border-orange-900 dark:from-orange-950/30 dark:to-amber-950/20"
+                                title={`Per coprire ${formatEuro(totals.annual)}/anno di abbonamenti a vita prelevando il ${DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT}% reale all'anno, ti serve un capitale investito di ${formatEuro(fireCapital.requiredFireCapital)} (regola del ${fireCapital.capitalMultiplier.toFixed(1)}x: ogni € di spesa annuale richiede ${fireCapital.capitalMultiplier.toFixed(1)} € di capitale).`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400">
+                                    <Flame className="h-3 w-3" /> Capitale FIRE Necessario
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        Patrimonio investito che, prelevandone il {DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT}% reale all&apos;anno (Safe Withdrawal Rate di default dell&apos;app, prudente rispetto al classico 4% Trinity), copre <strong>per sempre</strong> il costo annuale degli abbonamenti senza intaccare il capitale. E&apos; la &quot;regola del {fireCapital.capitalMultiplier.toFixed(1)}x&quot; applicata ai costi ricorrenti: prospettiva duale al &quot;Costo Opportunita&apos;&quot; (cosa accumuleresti investendo) -- qui invece misuri il patrimonio richiesto per affrancarti dal lavoro su questa spesa.
+                                    </InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-orange-700 dark:text-orange-300">
+                                        {formatEuro(fireCapital.requiredFireCapital)}
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-orange-600/80 dark:text-orange-400/70">
+                                        per coprire {formatEuro(totals.annual)}/anno al {DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT}% SWR
+                                    </div>
+                                    <div className="mt-1 text-[10px] text-muted-foreground">
+                                        regola del {fireCapital.capitalMultiplier.toFixed(1)}x sul costo annuale
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {topSubscription && subscriptions.length >= 2 && (
+                            <div
+                                className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50/80 to-orange-50/70 p-4 dark:border-amber-900 dark:from-amber-950/30 dark:to-orange-950/20"
+                                title={`Tagliando "${topSubscription.name || "questo abbonamento"}" risparmieresti ${formatEuro(topSubscription.annualNormalized)} all'anno e, investendo la stessa cifra al ${topSubscription.realReturnPct}% reale per ${topSubscription.horizonYears} anni, accumuleresti ${formatEuro(topSubscription.futureValueReal)} in potere d'acquisto odierno.`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-amber-600 dark:text-amber-400">
+                                    <TrendingDown className="h-3 w-3" /> Abbonamento piu&apos; costoso
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        L&apos;abbonamento col costo mensile piu&apos; alto della tua lista (gli annuali vengono normalizzati dividendoli per 12). Tagliarlo per primo e&apos; il modo piu&apos; efficace per ridurre la spesa ricorrente: il valore composto mostra quanto accumuleresti investendo la stessa cifra al {DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT}% reale per {DEFAULT_SUBSCRIPTION_OPPORTUNITY_HORIZON_YEARS} anni.
+                                    </InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-base font-bold text-amber-700 dark:text-amber-300">
+                                        {topSubscription.name || "(senza nome)"}
+                                    </div>
+                                    <div className="mt-1 text-2xl font-extrabold text-amber-700 dark:text-amber-300">
+                                        {formatEuro(topSubscription.monthlyNormalized)}<span className="text-sm font-bold text-amber-600/80 dark:text-amber-400/70">/mese</span>
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-amber-600/80 dark:text-amber-400/70">
+                                        {topSubscription.percentOfTotal.toFixed(0)}% del totale
+                                        <span className="mx-1">·</span>
+                                        {formatEuro(topSubscription.annualNormalized)}/anno
+                                    </div>
+                                    {topSubscription.futureValueReal > 0 && (
+                                        <div className="mt-1 text-[10px] text-muted-foreground">
+                                            tagliandolo: +{formatEuro(topSubscription.futureValueReal)} in {topSubscription.horizonYears} anni (euro odierni)
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </>
                 )}
             </CardContent>

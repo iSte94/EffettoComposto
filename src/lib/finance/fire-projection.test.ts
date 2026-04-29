@@ -290,3 +290,123 @@ describe('fireDelayMonths', () => {
         expect(fireDelayMonths(base, base)).toBe(0);
     });
 });
+
+describe('projectFire — sanitizzazione input non finiti (regressione NaN)', () => {
+    // Bug storico: i clamp `Math.max(0, x)` e `Math.max(0.1, x)` non protegevano
+    // contro NaN/Infinity. Un singolo input non finito (campo form svuotato,
+    // preferenza corrotta, division by zero a monte) si propagava silenziosamente
+    // come NaN in `fireTarget`, `capital` e tutti i punti del chart, mostrando
+    // "€NaN" all'utente e marcando il piano come "irraggiungibile" in pieno
+    // contrasto con i parametri sani sotto.
+    const sanitaryParams = {
+        startingCapital: 100_000,
+        monthlySavings: 1_500,
+        monthlyExpensesAtFire: 2_000,
+        expectedReturnPct: 6,
+        inflationPct: 2,
+        withdrawalRatePct: 4,
+        currentAge: 30,
+        retirementAge: 65,
+    };
+
+    it('withdrawalRatePct = NaN non produce fireTarget NaN', () => {
+        const result = projectFire({ ...sanitaryParams, withdrawalRatePct: Number.NaN });
+        expect(Number.isFinite(result.fireTarget)).toBe(true);
+        expect(result.fireTarget).toBeGreaterThan(0);
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+            expect(Number.isFinite(p.target)).toBe(true);
+        }
+    });
+
+    it('monthlyExpensesAtFire = NaN non corrompe il capitale post-pensione', () => {
+        const result = projectFire({
+            ...sanitaryParams,
+            monthlyExpensesAtFire: Number.NaN,
+            currentAge: 70, // gia' in pensione: il cashflow sarebbe -NaN se non sanitizzato
+            retirementAge: 65,
+        });
+        expect(Number.isFinite(result.fireTarget)).toBe(true);
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+            expect(p.capital).toBeGreaterThanOrEqual(0);
+        }
+    });
+
+    it('startingCapital = NaN parte da 0, non da NaN', () => {
+        const result = projectFire({ ...sanitaryParams, startingCapital: Number.NaN });
+        expect(result.chartData[0].capital).toBe(0);
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+        }
+    });
+
+    it('monthlySavings = NaN non propaga NaN nel capitale', () => {
+        const result = projectFire({ ...sanitaryParams, monthlySavings: Number.NaN });
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+            expect(p.capital).toBeGreaterThanOrEqual(0);
+        }
+    });
+
+    it('Infinity in oneTimeOutflow viene normalizzato a 0 (no outflow), non propaga -Infinity', () => {
+        // Sanitizzazione conservativa: un input Infinity (corruzione/overflow) NON
+        // deve azzerare il capitale dell'utente. Cade su 0 (nessun esborso) e il
+        // capitale parte intero, garantendo robustezza > "fail open" su NaN/Inf.
+        const result = projectFire({
+            ...sanitaryParams,
+            oneTimeOutflow: Number.POSITIVE_INFINITY,
+        });
+        expect(result.chartData[0].capital).toBe(sanitaryParams.startingCapital);
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+        }
+    });
+
+    it('tutti gli input NaN producono comunque output finiti (degraded ma stabile)', () => {
+        const result = projectFire({
+            startingCapital: Number.NaN,
+            monthlySavings: Number.NaN,
+            monthlyExpensesAtFire: Number.NaN,
+            expectedReturnPct: Number.NaN,
+            inflationPct: Number.NaN,
+            withdrawalRatePct: Number.NaN,
+            currentAge: Number.NaN,
+            retirementAge: Number.NaN,
+        });
+        expect(Number.isFinite(result.fireTarget)).toBe(true);
+        expect(Number.isFinite(result.yearsToFire)).toBe(true);
+        expect(Number.isFinite(result.monthsToFire)).toBe(true);
+        expect(Number.isFinite(result.ageAtFire)).toBe(true);
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+            expect(Number.isFinite(p.target)).toBe(true);
+            expect(Number.isFinite(p.age)).toBe(true);
+            expect(Number.isFinite(p.year)).toBe(true);
+        }
+    });
+
+    it('plannedCapitalDeltaByMonth con NaN non corrompe il capitale', () => {
+        const result = projectFire({
+            ...sanitaryParams,
+            plannedCapitalDeltaByMonth: [0, Number.NaN, 0, 50_000, Number.POSITIVE_INFINITY],
+        });
+        for (const p of result.chartData) {
+            expect(Number.isFinite(p.capital)).toBe(true);
+            expect(p.capital).toBeGreaterThanOrEqual(0);
+        }
+    });
+
+    it('withdrawalRatePct = 0 viene clampato alla soglia minima 0.1% (target finito)', () => {
+        const result = projectFire({ ...sanitaryParams, withdrawalRatePct: 0 });
+        // Con SWR clampato a 0.1%, fireTarget = annualExpenses / 0.001 = 24_000_000
+        expect(Number.isFinite(result.fireTarget)).toBe(true);
+        expect(result.fireTarget).toBeCloseTo(24_000_000, 0);
+    });
+
+    it('withdrawalRatePct negativo viene clampato alla soglia minima', () => {
+        const result = projectFire({ ...sanitaryParams, withdrawalRatePct: -5 });
+        expect(Number.isFinite(result.fireTarget)).toBe(true);
+        expect(result.fireTarget).toBeGreaterThan(0);
+    });
+});

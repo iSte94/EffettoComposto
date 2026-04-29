@@ -265,6 +265,150 @@ describe("computeCoastFireScenarios", () => {
         expect(retireToday.fireTargetNet).toBeGreaterThan(retireAtPlan.fireTargetNet);
     });
 
+    // ===== REGRESSION: NaN / Infinity propagation =====
+    //
+    // Prima di questa hardening qualunque input non finito (NaN, ±Infinity)
+    // proveniente da un campo form svuotato, da preferenze deserializzate
+    // come stringhe vuote o da scenari migrati male si propagava attraverso
+    // tutta la catena Coast FIRE producendo "€NaN" nella dashboard, oppure
+    // - peggio - un `fireTargetNet = 0` con `withdrawalRatePct = +Infinity`
+    // che faceva apparire l'utente come "gia' FIRE" senza esserlo. La
+    // sanitizzazione mirror-a quella di `projectFire` (vedi commento
+    // "BUG FIX (NaN propagation)" in `fire-projection.ts`).
+
+    it("REGRESSION: withdrawalRatePct = NaN non corrompe i target (€NaN bug)", () => {
+        const result = computeCoastFireScenarios({
+            ...baseInput,
+            withdrawalRatePct: Number.NaN,
+        });
+
+        for (const s of result.scenarios) {
+            expect(Number.isFinite(s.fireTargetNet)).toBe(true);
+            expect(Number.isFinite(s.coastFireTarget)).toBe(true);
+            expect(Number.isFinite(s.pensionPresentValue)).toBe(true);
+            expect(s.coastFireTarget).toBeGreaterThan(0);
+        }
+        expect(Number.isFinite(result.baseFireTarget)).toBe(true);
+    });
+
+    it("REGRESSION: withdrawalRatePct = +Infinity non produce falso 'gia' FIRE'", () => {
+        // Con il vecchio `Math.max(0.1, Infinity) = Infinity`, baseFireTarget
+        // = annualExpenses / Infinity = 0, e quindi fireTargetNet = 0:
+        // l'utente sembrava aver gia' raggiunto il FIRE pur avendo input rotto.
+        const result = computeCoastFireScenarios({
+            ...baseInput,
+            withdrawalRatePct: Number.POSITIVE_INFINITY,
+        });
+
+        for (const s of result.scenarios) {
+            expect(Number.isFinite(s.fireTargetNet)).toBe(true);
+            expect(s.fireTargetNet).toBeGreaterThan(0);
+        }
+    });
+
+    it("REGRESSION: monthlyExpenses = NaN non corrompe baseFireTarget", () => {
+        const result = computeFireTargetForRetirementAge({
+            retirementAge: 60,
+            publicPensionAge: 67,
+            monthlyExpenses: Number.NaN,
+            monthlyPublicPension: 1_500,
+            withdrawalRatePct: 3.25,
+            nominalReturnPct: 6,
+            inflationPct: 2,
+        });
+        expect(Number.isFinite(result.baseFireTarget)).toBe(true);
+        expect(Number.isFinite(result.fireTargetNet)).toBe(true);
+        expect(Number.isFinite(result.pensionPresentValue)).toBe(true);
+        expect(result.baseFireTarget).toBe(0);
+    });
+
+    it("REGRESSION: monthlyPublicPension = NaN non gonfia il target", () => {
+        const result = computeFireTargetForRetirementAge({
+            retirementAge: 60,
+            publicPensionAge: 67,
+            monthlyExpenses: 2_500,
+            monthlyPublicPension: Number.NaN,
+            withdrawalRatePct: 3.25,
+            nominalReturnPct: 6,
+            inflationPct: 2,
+        });
+        expect(Number.isFinite(result.fireTargetNet)).toBe(true);
+        expect(result.pensionPresentValue).toBe(0);
+        // Con pensione = 0 (per sanitizzazione) il target lordo = target netto.
+        expect(result.fireTargetNet).toBeCloseTo(result.baseFireTarget, 6);
+    });
+
+    it("REGRESSION: nominalReturnPct = NaN non corrompe il rendimento reale", () => {
+        const result = computeFireTargetForRetirementAge({
+            retirementAge: 60,
+            publicPensionAge: 67,
+            monthlyExpenses: 2_500,
+            monthlyPublicPension: 1_500,
+            withdrawalRatePct: 3.25,
+            nominalReturnPct: Number.NaN,
+            inflationPct: 2,
+        });
+        expect(Number.isFinite(result.realReturnPct)).toBe(true);
+        expect(Number.isFinite(result.fireTargetNet)).toBe(true);
+        expect(Number.isFinite(result.pensionPresentValue)).toBe(true);
+        expect(Number.isFinite(result.passiveIncomePresentValue)).toBe(true);
+    });
+
+    it("REGRESSION: currentAge = NaN non corrompe il Coast FIRE target di scenario", () => {
+        // Math.pow(1+r, NaN) = NaN -> coastFireTarget = NaN. Verifichiamo
+        // che il discountFactor degeneri a 1 in modo difensivo.
+        const result = computeCoastFireScenarios({
+            ...baseInput,
+            currentAge: Number.NaN,
+        });
+
+        for (const s of result.scenarios) {
+            expect(Number.isFinite(s.coastFireTarget)).toBe(true);
+            expect(s.coastFireTarget).toBeGreaterThanOrEqual(0);
+        }
+    });
+
+    it("REGRESSION: tutti gli input numerici NaN producono comunque risultati finiti", () => {
+        // Stress test "ogni campo del form svuotato": il calcolo non deve
+        // esplodere ne' produrre €NaN nella UI.
+        const result = computeCoastFireScenarios({
+            currentAge: Number.NaN,
+            retirementAge: Number.NaN,
+            publicPensionAge: Number.NaN,
+            currentCapital: Number.NaN,
+            monthlyExpenses: Number.NaN,
+            monthlyPublicPension: Number.NaN,
+            monthlyRealEstateIncome: Number.NaN,
+            withdrawalRatePct: Number.NaN,
+            nominalReturnPct: Number.NaN,
+            inflationPct: Number.NaN,
+        });
+
+        expect(Number.isFinite(result.baseFireTarget)).toBe(true);
+        for (const s of result.scenarios) {
+            expect(Number.isFinite(s.fireTargetNet)).toBe(true);
+            expect(Number.isFinite(s.coastFireTarget)).toBe(true);
+            expect(Number.isFinite(s.pensionPresentValue)).toBe(true);
+            expect(Number.isFinite(s.passiveIncomePresentValue)).toBe(true);
+            expect(Number.isFinite(s.surplusOrGap)).toBe(true);
+            expect(Number.isFinite(s.realReturnPct)).toBe(true);
+        }
+    });
+
+    it("REGRESSION: schedule dinamica con input non finiti produce array di numeri finiti", () => {
+        const schedule = buildDynamicFireTargetSchedule({
+            currentAge: 35,
+            maxYears: 10,
+            publicPensionAge: 67,
+            monthlyExpenses: 2_500,
+            monthlyPublicPension: 1_200,
+            withdrawalRatePct: Number.NaN,
+            nominalReturnPct: 6,
+            inflationPct: 2,
+        });
+        expect(schedule.every((value) => Number.isFinite(value))).toBe(true);
+    });
+
     it("la schedule dinamica parte dal target retire-now e converge al target pianificato", () => {
         const schedule = buildDynamicFireTargetSchedule({
             currentAge: baseInput.currentAge,

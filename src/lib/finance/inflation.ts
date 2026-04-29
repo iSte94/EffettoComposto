@@ -62,6 +62,53 @@ export interface InflationProjectionResult {
      * piu' accurata della Regola del 72 (che approssima a 72/i%).
      */
     purchasingPowerHalvingYears: number | null;
+    /**
+     * Gap (in euro nominali) fra il capitale equivalente futuro necessario
+     * per preservare il potere d'acquisto e quanto il lump sum iniziale
+     * produrrebbe a fine orizzonte investito al rendimento nominale scelto.
+     * Zero quando l'investimento del solo capitale iniziale copre gia'
+     * l'erosione inflazionistica.
+     */
+    purchasingPowerGap: number;
+    /**
+     * Risparmio mensile aggiuntivo necessario, investito al rendimento
+     * nominale, per colmare `purchasingPowerGap` nell'orizzonte `years`.
+     * Usa la formula della rendita: PMT = gap / [((1+m)^N - 1) / m] con
+     * m = tasso mensile e N = mesi totali. Cade su `gap / N` quando il
+     * rendimento nominale e' zero e su 0 quando non c'e' gap o years = 0.
+     */
+    monthlySavingsToPreservePurchasingPower: number;
+    /**
+     * Erosione mensile media del potere d'acquisto in euro, ottenuta
+     * spalmando linearmente la perdita totale (`lostValue`) sui mesi
+     * dell'orizzonte: `lostValue / (years * 12)`. E' una metrica di
+     * comunicazione (non un'esatta erosione del singolo mese, che e'
+     * decrescente nel tempo perche' applicata su una base ridotta) che
+     * traduce la perdita aggregata in un costo mensile concreto e
+     * confrontabile con le voci di spesa correnti dell'utente. Ritorna 0
+     * quando years = 0, amount = 0, inflazione <= 0 o input non finiti.
+     */
+    averageMonthlyPurchasingPowerLoss: number;
+    /**
+     * Vantaggio reale dell'investire (in euro odierni): differenza fra il
+     * valore reale dell'investimento al rendimento nominale scelto e il
+     * potere d'acquisto residuo del capitale tenuto fermo. Risponde alla
+     * domanda "quanti euro di potere d'acquisto preservo IN PIU' investendo
+     * invece di lasciare il capitale fermo, per `years` anni?". Clampato
+     * a zero quando il rendimento reale e' nullo o negativo (caso in cui
+     * tenere cash non sarebbe peggio dell'investire) per evitare numeri
+     * scoraggianti che la card UI gia' nasconde.
+     */
+    realInvestmentAdvantage: number;
+    /**
+     * Vantaggio reale dell'investire espresso come percentuale del capitale
+     * iniziale (`realInvestmentAdvantage / amount * 100`). Permette di
+     * comunicare il delta in modo scalabile ("investire preserva X% in piu'
+     * del tuo capitale rispetto a tenerlo fermo") e di confrontare scenari
+     * con capitali diversi. Zero quando amount = 0 o quando il vantaggio
+     * assoluto e' zero.
+     */
+    realInvestmentAdvantagePct: number;
 }
 
 function sanitize(value: number, fallback = 0): number {
@@ -118,6 +165,20 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
     const purchasingPowerHalvingYears =
         inflationRatePct > 0 ? Math.log(2) / Math.log(1 + inflationRatePct / 100) : null;
 
+    const purchasingPowerGap = Math.max(0, equivalentFutureCapital - finalNominal);
+    const monthlySavingsToPreservePurchasingPower = computeMonthlySavingsForGap(
+        purchasingPowerGap,
+        nominalReturnPct,
+        years,
+    );
+    const totalMonths = years * 12;
+    const averageMonthlyPurchasingPowerLoss =
+        totalMonths > 0 && lostValue > 0 ? Math.round(lostValue / totalMonths) : 0;
+
+    const realInvestmentAdvantage = Math.max(0, finalReal - finalPurchasingPower);
+    const realInvestmentAdvantagePct =
+        amount > 0 && realInvestmentAdvantage > 0 ? (realInvestmentAdvantage / amount) * 100 : 0;
+
     return {
         points,
         realReturnPct,
@@ -128,5 +189,35 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         lostPercent,
         equivalentFutureCapital,
         purchasingPowerHalvingYears,
+        purchasingPowerGap,
+        monthlySavingsToPreservePurchasingPower,
+        averageMonthlyPurchasingPowerLoss,
+        realInvestmentAdvantage,
+        realInvestmentAdvantagePct,
     };
+}
+
+/**
+ * Rata mensile necessaria per raggiungere `gap` euro nominali in `years` anni
+ * investendo ad `annualReturnPct` (versamenti a fine periodo, capitalizzazione
+ * mensile). Formula chiusa della rendita futura:
+ *     FV = PMT * [((1+m)^N - 1) / m]   =>   PMT = FV / [((1+m)^N - 1) / m]
+ * con degenerazione a `gap / N` per rendimento nullo. Ritorna 0 se non serve
+ * risparmiare (gap nullo, orizzonte nullo, o input non finiti).
+ */
+function computeMonthlySavingsForGap(
+    gap: number,
+    annualReturnPct: number,
+    years: number,
+): number {
+    if (!Number.isFinite(gap) || gap <= 0) return 0;
+    if (!Number.isFinite(years) || years <= 0) return 0;
+    const months = Math.max(1, Math.round(years * 12));
+    const monthlyRate = annualReturnPct / 100 / 12;
+    if (Math.abs(monthlyRate) < 1e-9) {
+        return Math.round(gap / months);
+    }
+    const annuityFactor = (Math.pow(1 + monthlyRate, months) - 1) / monthlyRate;
+    if (!Number.isFinite(annuityFactor) || annuityFactor <= 0) return 0;
+    return Math.round(gap / annuityFactor);
 }
