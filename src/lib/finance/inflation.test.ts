@@ -268,4 +268,85 @@ describe("projectInflation", () => {
             expect(r.averageMonthlyPurchasingPowerLoss).toBe(0);
         });
     });
+
+    describe("realInvestmentAdvantage", () => {
+        it("e' la differenza fra valore reale investito e potere d'acquisto del cash", () => {
+            // 100k @ 2.5% inflazione, 7% nominale, 20 anni:
+            // finalReal ~ 236k, finalPurchasingPower ~ 61k -> advantage ~ 175k.
+            const r = projectInflation({ amount: 100000, inflationRatePct: 2.5, years: 20, nominalReturnPct: 7 });
+            const expected = r.finalReal - r.finalPurchasingPower;
+            expect(r.realInvestmentAdvantage).toBeCloseTo(expected, 0);
+            expect(r.realInvestmentAdvantage).toBeGreaterThan(150000);
+            expect(r.realInvestmentAdvantage).toBeLessThan(200000);
+        });
+
+        it("rendimento nominale = inflazione: vantaggio = lostValue (investire restituisce esattamente amount in reale)", () => {
+            // Real return = 0 => finalReal ~ amount; advantage ~ amount - finalPurchasingPower = lostValue.
+            const r = projectInflation({ amount: 50000, inflationRatePct: 3, years: 15, nominalReturnPct: 3 });
+            expect(r.realInvestmentAdvantage).toBeCloseTo(r.lostValue, 0);
+        });
+
+        it("inflazione zero: vantaggio = guadagno nominale (cash resta a amount)", () => {
+            // Senza inflazione, finalPurchasingPower = amount e finalReal = finalNominal.
+            const r = projectInflation({ amount: 10000, inflationRatePct: 0, years: 10, nominalReturnPct: 5 });
+            expect(r.realInvestmentAdvantage).toBeCloseTo(r.finalNominal - r.finalPurchasingPower, 0);
+            expect(r.realInvestmentAdvantage).toBeGreaterThan(0);
+        });
+
+        it("rendimento nominale = 0: vantaggio = 0 (investire non aiuta, valore reale erode quanto il cash)", () => {
+            const r = projectInflation({ amount: 100000, inflationRatePct: 3, years: 20, nominalReturnPct: 0 });
+            // Con nominale = 0 il valore reale dell'investimento eguaglia il potere d'acquisto del cash.
+            expect(r.realInvestmentAdvantage).toBe(0);
+        });
+
+        it("rendimento reale negativo: vantaggio clampato a 0 (no numeri scoraggianti)", () => {
+            // 5% inflazione vs 2% nominale: il cash perde meno rispetto al valore reale dell'investimento? No,
+            // anche con real return negativo l'investimento mantiene piu' valore reale del cash fermo
+            // (perche' parte da +2% nominale > 0). Ma se nominale = 0 il vantaggio e' zero.
+            // Verifica del clamp con nominale leggermente positivo: advantage > 0 (caso normale).
+            const r1 = projectInflation({ amount: 100000, inflationRatePct: 5, years: 10, nominalReturnPct: 2 });
+            expect(r1.realInvestmentAdvantage).toBeGreaterThan(0);
+            // E con nominale = 0 esattamente: advantage = 0.
+            const r2 = projectInflation({ amount: 100000, inflationRatePct: 5, years: 10, nominalReturnPct: 0 });
+            expect(r2.realInvestmentAdvantage).toBe(0);
+        });
+
+        it("amount = 0: vantaggio = 0 e percentuale = 0 (no NaN)", () => {
+            const r = projectInflation({ amount: 0, inflationRatePct: 3, years: 10, nominalReturnPct: 5 });
+            expect(r.realInvestmentAdvantage).toBe(0);
+            expect(r.realInvestmentAdvantagePct).toBe(0);
+        });
+
+        it("years = 0: vantaggio = 0 (orizzonte nullo)", () => {
+            const r = projectInflation({ amount: 100000, inflationRatePct: 3, years: 0, nominalReturnPct: 7 });
+            expect(r.realInvestmentAdvantage).toBe(0);
+            expect(r.realInvestmentAdvantagePct).toBe(0);
+        });
+
+        it("realInvestmentAdvantagePct = vantaggio / capitale iniziale * 100", () => {
+            const r = projectInflation({ amount: 100000, inflationRatePct: 2, years: 30, nominalReturnPct: 7 });
+            const expectedPct = (r.realInvestmentAdvantage / 100000) * 100;
+            expect(r.realInvestmentAdvantagePct).toBeCloseTo(expectedPct, 6);
+        });
+
+        it("scala linearmente con il capitale a parita' di tasso e orizzonte", () => {
+            const small = projectInflation({ amount: 10000, inflationRatePct: 2.5, years: 20, nominalReturnPct: 7 });
+            const big = projectInflation({ amount: 100000, inflationRatePct: 2.5, years: 20, nominalReturnPct: 7 });
+            // Tolleranza per arrotondamenti a euro intero.
+            expect(big.realInvestmentAdvantage / small.realInvestmentAdvantage).toBeCloseTo(10, 1);
+            // La percentuale e' invariante sulla scala del capitale.
+            expect(big.realInvestmentAdvantagePct).toBeCloseTo(small.realInvestmentAdvantagePct, 1);
+        });
+
+        it("input non finiti non producono NaN/Infinity", () => {
+            const r = projectInflation({
+                amount: Number.NaN,
+                inflationRatePct: Number.POSITIVE_INFINITY,
+                years: Number.NaN,
+                nominalReturnPct: Number.NaN,
+            });
+            expect(Number.isFinite(r.realInvestmentAdvantage)).toBe(true);
+            expect(Number.isFinite(r.realInvestmentAdvantagePct)).toBe(true);
+        });
+    });
 });

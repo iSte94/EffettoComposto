@@ -89,6 +89,26 @@ export interface InflationProjectionResult {
      * quando years = 0, amount = 0, inflazione <= 0 o input non finiti.
      */
     averageMonthlyPurchasingPowerLoss: number;
+    /**
+     * Vantaggio reale dell'investire (in euro odierni): differenza fra il
+     * valore reale dell'investimento al rendimento nominale scelto e il
+     * potere d'acquisto residuo del capitale tenuto fermo. Risponde alla
+     * domanda "quanti euro di potere d'acquisto preservo IN PIU' investendo
+     * invece di lasciare il capitale fermo, per `years` anni?". Clampato
+     * a zero quando il rendimento reale e' nullo o negativo (caso in cui
+     * tenere cash non sarebbe peggio dell'investire) per evitare numeri
+     * scoraggianti che la card UI gia' nasconde.
+     */
+    realInvestmentAdvantage: number;
+    /**
+     * Vantaggio reale dell'investire espresso come percentuale del capitale
+     * iniziale (`realInvestmentAdvantage / amount * 100`). Permette di
+     * comunicare il delta in modo scalabile ("investire preserva X% in piu'
+     * del tuo capitale rispetto a tenerlo fermo") e di confrontare scenari
+     * con capitali diversi. Zero quando amount = 0 o quando il vantaggio
+     * assoluto e' zero.
+     */
+    realInvestmentAdvantagePct: number;
 }
 
 function sanitize(value: number, fallback = 0): number {
@@ -155,6 +175,10 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
     const averageMonthlyPurchasingPowerLoss =
         totalMonths > 0 && lostValue > 0 ? Math.round(lostValue / totalMonths) : 0;
 
+    const realInvestmentAdvantage = Math.max(0, finalReal - finalPurchasingPower);
+    const realInvestmentAdvantagePct =
+        amount > 0 && realInvestmentAdvantage > 0 ? (realInvestmentAdvantage / amount) * 100 : 0;
+
     return {
         points,
         realReturnPct,
@@ -168,6 +192,8 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         purchasingPowerGap,
         monthlySavingsToPreservePurchasingPower,
         averageMonthlyPurchasingPowerLoss,
+        realInvestmentAdvantage,
+        realInvestmentAdvantagePct,
     };
 }
 

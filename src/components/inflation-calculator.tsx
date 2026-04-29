@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank, CalendarMinus } from "lucide-react";
+import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank, CalendarMinus, ShieldCheck } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { projectInflation } from "@/lib/finance/inflation";
 import {
@@ -52,6 +52,8 @@ export function InflationCalculator() {
         purchasingPowerGap,
         monthlySavingsToPreservePurchasingPower,
         averageMonthlyPurchasingPowerLoss,
+        realInvestmentAdvantage,
+        realInvestmentAdvantagePct,
     } = projection;
 
     // Etichetta compatta per il tempo di dimezzamento: intero se >= 10 anni
@@ -256,6 +258,32 @@ export function InflationCalculator() {
                                 </p>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {realInvestmentAdvantage > 0 && (
+                <div
+                    className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+                    title={`Investendo ${formatEuro(amount)} al ${formatPercent(nominalReturn)} nominale per ${years} anni il valore reale finale (${formatEuro(finalReal)} in euro odierni) supera di ${formatEuro(realInvestmentAdvantage)} il potere d'acquisto residuo del cash tenuto fermo (${formatEuro(finalPurchasingPower)}). E' la quota di potere d'acquisto preservata grazie all'investimento, espressa nella stessa scala del capitale iniziale.`}
+                >
+                    <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                    <div className="flex-1">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 dark:text-emerald-400">
+                            Vantaggio Reale dell&apos;Investire
+                        </p>
+                        <p className="mt-0.5 text-sm font-extrabold">
+                            +{formatEuro(realInvestmentAdvantage)} di potere d&apos;acquisto preservato
+                            {realInvestmentAdvantagePct > 0 && (
+                                <span className="ml-1 text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-300/80">
+                                    (+{formatPercent(realInvestmentAdvantagePct, 0)} sul capitale iniziale)
+                                </span>
+                            )}
+                        </p>
+                        <p className="mt-0.5 text-[11px] leading-snug text-emerald-700/80 dark:text-emerald-300/80">
+                            rispetto a tenere {formatEuro(amount)} fermi per {years} anni: e&apos; quanto investire al
+                            {" "}{formatPercent(nominalReturn)} nominale ti restituisce in euro odierni in piu&apos; rispetto al cash eroso dall&apos;inflazione.
+                        </p>
                     </div>
                 </div>
             )}
