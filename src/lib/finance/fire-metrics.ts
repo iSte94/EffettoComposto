@@ -6,7 +6,7 @@ import {
     sumRealEstateAnnualNetIncome,
 } from "./real-estate";
 
-const DEFAULT_FIRE_WITHDRAWAL_RATE = 3.25;
+export const DEFAULT_FIRE_WITHDRAWAL_RATE = 3.25;
 const DEFAULT_FIRE_EXPECTED_RETURN = 6;
 const DEFAULT_EXPECTED_INFLATION = 2;
 const DEFAULT_PUBLIC_PENSION_AGE = 67;

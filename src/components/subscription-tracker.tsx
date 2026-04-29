@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Trash2, Repeat, CreditCard, Sparkles, TrendingDown } from "lucide-react";
+import { Plus, Trash2, Repeat, CreditCard, Sparkles, TrendingDown, Flame } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { useAuth } from "@/contexts/auth-context";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
@@ -16,6 +16,10 @@ import {
     DEFAULT_SUBSCRIPTION_OPPORTUNITY_REAL_RETURN_PCT,
 } from "@/lib/finance/subscription-opportunity";
 import { computeTopSubscriptionImpact } from "@/lib/finance/subscription-top-spender";
+import {
+    computeSubscriptionFireCapital,
+    DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT,
+} from "@/lib/finance/subscription-fire-capital";
 
 interface Subscription {
     id: string;
@@ -123,6 +127,18 @@ export function SubscriptionTracker() {
     const topSubscription = useMemo(
         () => computeTopSubscriptionImpact(subscriptions),
         [subscriptions],
+    );
+
+    // Capitale FIRE necessario per finanziare gli abbonamenti A VITA al SWR
+    // di default: chiude il cerchio col tema FIRE traducendo i costi
+    // ricorrenti nel patrimonio investito che, prelevandone il 3.25% all'anno,
+    // li copre indefinitamente (la "regola del Nx" applicata agli abbonamenti).
+    // Complementa il "Costo Opportunita'" (montante a 30 anni se investissi):
+    // qui la prospettiva e' duale, "quanto patrimonio mi serve per non doverci
+    // piu' lavorare per pagarli". Modulo puro `subscription-fire-capital.ts`.
+    const fireCapital = useMemo(
+        () => computeSubscriptionFireCapital({ monthlyAmount: totals.monthly }),
+        [totals.monthly],
     );
 
     if (!loaded) return (
@@ -295,6 +311,31 @@ export function SubscriptionTracker() {
                                             speso in abbonamenti: {formatEuro(opportunityCost.totalContributed)}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {totals.monthly > 0 && fireCapital.requiredFireCapital > 0 && (
+                            <div
+                                className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50/80 to-amber-50/70 p-4 dark:border-orange-900 dark:from-orange-950/30 dark:to-amber-950/20"
+                                title={`Per coprire ${formatEuro(totals.annual)}/anno di abbonamenti a vita prelevando il ${DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT}% reale all'anno, ti serve un capitale investito di ${formatEuro(fireCapital.requiredFireCapital)} (regola del ${fireCapital.capitalMultiplier.toFixed(1)}x: ogni € di spesa annuale richiede ${fireCapital.capitalMultiplier.toFixed(1)} € di capitale).`}
+                            >
+                                <div className="mb-1 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-orange-600 dark:text-orange-400">
+                                    <Flame className="h-3 w-3" /> Capitale FIRE Necessario
+                                    <InfoTooltip iconClassName="w-3 h-3">
+                                        Patrimonio investito che, prelevandone il {DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT}% reale all&apos;anno (Safe Withdrawal Rate di default dell&apos;app, prudente rispetto al classico 4% Trinity), copre <strong>per sempre</strong> il costo annuale degli abbonamenti senza intaccare il capitale. E&apos; la &quot;regola del {fireCapital.capitalMultiplier.toFixed(1)}x&quot; applicata ai costi ricorrenti: prospettiva duale al &quot;Costo Opportunita&apos;&quot; (cosa accumuleresti investendo) -- qui invece misuri il patrimonio richiesto per affrancarti dal lavoro su questa spesa.
+                                    </InfoTooltip>
+                                </div>
+                                <div className="text-center">
+                                    <div className="text-2xl font-extrabold text-orange-700 dark:text-orange-300">
+                                        {formatEuro(fireCapital.requiredFireCapital)}
+                                    </div>
+                                    <div className="mt-0.5 text-[10px] text-orange-600/80 dark:text-orange-400/70">
+                                        per coprire {formatEuro(totals.annual)}/anno al {DEFAULT_SUBSCRIPTION_FIRE_SWR_PCT}% SWR
+                                    </div>
+                                    <div className="mt-1 text-[10px] text-muted-foreground">
+                                        regola del {fireCapital.capitalMultiplier.toFixed(1)}x sul costo annuale
+                                    </div>
                                 </div>
                             </div>
                         )}
