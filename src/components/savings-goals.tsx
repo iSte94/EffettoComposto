@@ -8,12 +8,13 @@ import { Label } from "@/components/ui/label";
 import {
     Target, Plus, Trash2, Pencil, Check, X,
     Home, PiggyBank, TrendingUp, Plane, Sparkles, CircleDot,
-    Zap, AlertTriangle, Clock, CalendarClock, Activity,
+    Zap, AlertTriangle, Clock, CalendarClock, Activity, Hourglass,
 } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInMonths, parseISO } from "date-fns";
 import { it } from "date-fns/locale";
+import { computeSavingsGoalsCompletion } from "@/lib/finance/savings-goals-completion";
 
 interface SavingsGoal {
     id: string;
@@ -92,6 +93,19 @@ const CATEGORIES: {
 
 function getCategoryInfo(category: string) {
     return CATEGORIES.find((item) => item.value === category) || CATEGORIES[0];
+}
+
+// "5 mesi" / "1 anno" / "2 anni e 3 mesi" — pluralizzazione italiana e
+// soppressione dei "0 mesi" residui quando il totale e' un multiplo di 12.
+function formatMonthsCompact(months: number): string {
+    const m = Math.max(0, Math.round(months));
+    if (m < 12) return `${m} mes${m === 1 ? "e" : "i"}`;
+    const years = Math.floor(m / 12);
+    const remaining = m % 12;
+    const yearsLabel = `${years} ann${years === 1 ? "o" : "i"}`;
+    if (remaining === 0) return yearsLabel;
+    const monthsLabel = `${remaining} mes${remaining === 1 ? "e" : "i"}`;
+    return `${yearsLabel} e ${monthsLabel}`;
 }
 
 function getEstimatedDate(current: number, target: number, createdAt: string): string | null {
@@ -348,6 +362,7 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
         totalHistoricalMonthly,
         completedCount,
         sortedGoals,
+        completion,
     } = useMemo(() => {
         const targetSum = goals.reduce((sum, goal) => sum + goal.targetAmount, 0);
         const currentSum = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
@@ -381,6 +396,12 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
             return aDeadline - bDeadline;
         });
 
+        // Tempo stimato al completamento di TUTTI i goal attivi al ritmo
+        // storico aggregato. Indipendente dalle deadline (che invece guidano
+        // "Ritmo richiesto") e dai goal completati: e' una scadenza realistica
+        // per l'intera roadmap, non per i singoli obiettivi.
+        const completionResult = computeSavingsGoalsCompletion(goals);
+
         return {
             totalTarget: targetSum,
             totalCurrent: currentSum,
@@ -390,6 +411,7 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
             totalHistoricalMonthly: historicalMonthlySum,
             completedCount: completed,
             sortedGoals: decorated,
+            completion: completionResult,
         };
     }, [goals]);
 
@@ -519,6 +541,28 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                             </p>
                         </div>
                     </div>
+                    {completion.monthsToCompletion !== null && completion.estimatedCompletionDate && (
+                        <div
+                            className="mt-4 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-xs text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+                            title={`Al ritmo storico aggregato di ${formatEuro(completion.aggregateMonthlyPace)}/mese sui ${completion.activeGoals} obiettiv${completion.activeGoals === 1 ? "o" : "i"} attiv${completion.activeGoals === 1 ? "o" : "i"}, mancano ${formatEuro(completion.totalRemaining)}: vengono completati tutti in ~${formatMonthsCompact(completion.monthsToCompletion)}. Indipendente dalle scadenze impostate sui singoli goal.`}
+                        >
+                            <Hourglass className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                            <div className="flex-1">
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 dark:text-emerald-400">
+                                    Tempo Stimato al Completamento Totale
+                                </p>
+                                <p className="mt-0.5 text-sm font-extrabold">
+                                    {formatMonthsCompact(completion.monthsToCompletion)}
+                                    <span className="ml-1.5 text-[10px] font-normal text-emerald-600/80 dark:text-emerald-300/80">
+                                        entro {format(completion.estimatedCompletionDate, "MMM yyyy", { locale: it })}
+                                    </span>
+                                </p>
+                                <p className="mt-0.5 text-[11px] leading-snug text-emerald-700/80 dark:text-emerald-300/80">
+                                    al ritmo storico di {formatEuro(completion.aggregateMonthlyPace)}/mese su {completion.activeGoals} obiettiv{completion.activeGoals === 1 ? "o" : "i"} attiv{completion.activeGoals === 1 ? "o" : "i"} (mancano {formatEuro(completion.totalRemaining)}).
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
