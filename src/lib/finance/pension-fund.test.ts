@@ -101,6 +101,99 @@ describe('liquidatePensionFund', () => {
         expect(r.cashLump).toBe(0);
         expect(r.monthlyAnnuity).toBe(0);
     });
+
+    // === REGRESSION: pension-liquidation-nan-propagation ===
+    //
+    // Prima del fix solo `pensionCap` era sanitizzato. Un NaN/undefined su
+    // qualunque altro input numerico (exitTaxRate, accessAge, lifeExpectancy)
+    // bypassava i clamp `Math.max/min` (che ritornano NaN su input NaN, NON
+    // il fallback) e produceva `monthlyAnnuity: NaN` / `netCapital: NaN`.
+    // Quel NaN veniva poi sommato a `tempCap` in fire-dashboard e a `runCap`
+    // in tutti i 10k run Monte Carlo, corrompendo le proiezioni FIRE.
+
+    it('REGRESSION: NaN exitTaxRate cae a 0% senza propagare NaN', () => {
+        const r = liquidatePensionFund({
+            pensionCap: 100000,
+            exitTaxRate: Number.NaN,
+            exitMode: 'annuity',
+            accessAge: 62,
+            lifeExpectancy: 85,
+        });
+        // Senza tassazione il netto coincide col capitale lordo.
+        expect(Number.isFinite(r.monthlyAnnuity)).toBe(true);
+        expect(Number.isFinite(r.netCapital)).toBe(true);
+        expect(r.netCapital).toBeCloseTo(100000, 6);
+        expect(r.monthlyAnnuity).toBeCloseTo(100000 / ((85 - 62) * 12), 6);
+    });
+
+    it('REGRESSION: undefined exitTaxRate cae a 0% senza propagare NaN', () => {
+        const r = liquidatePensionFund({
+            pensionCap: 100000,
+            exitTaxRate: undefined as unknown as number,
+            exitMode: 'annuity',
+            accessAge: 62,
+            lifeExpectancy: 85,
+        });
+        expect(Number.isFinite(r.monthlyAnnuity)).toBe(true);
+        expect(Number.isFinite(r.netCapital)).toBe(true);
+        expect(r.netCapital).toBeCloseTo(100000, 6);
+    });
+
+    it('REGRESSION: NaN accessAge non corrompe annuityMonths', () => {
+        const r = liquidatePensionFund({
+            pensionCap: 100000,
+            exitTaxRate: 15,
+            exitMode: 'annuity',
+            accessAge: Number.NaN,
+            lifeExpectancy: 85,
+        });
+        expect(Number.isFinite(r.monthlyAnnuity)).toBe(true);
+        expect(Number.isFinite(r.netCapital)).toBe(true);
+        // accessAge sanificato a 0 -> 85*12 = 1020 mesi
+        expect(r.netCapital).toBeCloseTo(85000, 6);
+        expect(r.monthlyAnnuity).toBeCloseTo(85000 / 1020, 6);
+    });
+
+    it('REGRESSION: NaN lifeExpectancy non corrompe annuityMonths', () => {
+        const r = liquidatePensionFund({
+            pensionCap: 100000,
+            exitTaxRate: 15,
+            exitMode: 'annuity',
+            accessAge: 62,
+            lifeExpectancy: Number.NaN,
+        });
+        expect(Number.isFinite(r.monthlyAnnuity)).toBe(true);
+        expect(Number.isFinite(r.netCapital)).toBe(true);
+        // lifeExpectancy sanificato a 0; (0 - 62)*12 = -744 -> Math.max(1, -744) = 1.
+        expect(r.netCapital).toBeCloseTo(85000, 6);
+        expect(r.monthlyAnnuity).toBeCloseTo(85000, 6);
+    });
+
+    it('REGRESSION: tutti gli input non finiti non producono mai NaN', () => {
+        const r = liquidatePensionFund({
+            pensionCap: 100000,
+            exitTaxRate: Number.POSITIVE_INFINITY,
+            exitMode: 'hybrid',
+            accessAge: Number.NaN,
+            lifeExpectancy: Number.NaN,
+        });
+        expect(Number.isFinite(r.cashLump)).toBe(true);
+        expect(Number.isFinite(r.monthlyAnnuity)).toBe(true);
+        expect(Number.isFinite(r.netCapital)).toBe(true);
+    });
+
+    it('clamps Infinity exit tax rate to 100%', () => {
+        const r = liquidatePensionFund({
+            pensionCap: 100000,
+            exitTaxRate: Number.POSITIVE_INFINITY,
+            exitMode: 'annuity',
+            accessAge: 62,
+            lifeExpectancy: 85,
+        });
+        // Tax = 100% -> netto = 0
+        expect(r.netCapital).toBeCloseTo(0, 6);
+        expect(r.monthlyAnnuity).toBeCloseTo(0, 6);
+    });
 });
 
 describe('shouldLiquidatePensionFund (bug regression)', () => {

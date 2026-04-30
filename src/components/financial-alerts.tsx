@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank, CalendarClock } from "lucide-react";
+import { AlertTriangle, TrendingDown, Target, ShieldCheck, Flame, Clock, PiggyBank, CalendarClock, Hourglass, Sparkles } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import {
     buildPlannedEventsSummary,
@@ -9,6 +9,17 @@ import {
     monthsBetweenYearMonths,
     simulateLiquidityPath,
 } from "@/lib/finance/planned-events";
+import {
+    estimateYearsToFire,
+    FIRE_YEARS_MAX,
+} from "@/lib/finance/fire-years";
+import {
+    computeExcessLiquidityImpact,
+    EXCESS_LIQUIDITY_DEFAULT_HORIZON_YEARS,
+    EXCESS_LIQUIDITY_DEFAULT_REAL_RETURN_PCT,
+    EXCESS_LIQUIDITY_TRIGGER_MONTHS,
+    RECOMMENDED_EMERGENCY_MONTHS,
+} from "@/lib/finance/excess-liquidity";
 import type { PlannedFinancialEvent } from "@/types";
 
 export interface FinancialData {
@@ -89,6 +100,22 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                     title: "Fondo emergenza sotto la soglia",
                     message: `${months.toFixed(1)} mesi di copertura. Considera di portarlo a 6 mesi.`,
                 });
+            } else if (months >= EXCESS_LIQUIDITY_TRIGGER_MONTHS) {
+                // Liquidita' eccessiva: oltre i 18 mesi di copertura il fondo
+                // emergenza non e' piu' "prudenza" ma "denaro inattivo".
+                // Traduciamo l'eccedenza (sopra i 6 mesi raccomandati) nel
+                // suo costo opportunita' composto su 30 anni @ 4% reale,
+                // coerente col resto delle metriche FIRE dell'app.
+                const excess = computeExcessLiquidityImpact({ emergencyFund, monthlyExpenses });
+                if (excess) {
+                    alerts.push({
+                        id: "emergency-excess",
+                        severity: "warning",
+                        icon: <Sparkles className="w-4 h-4" />,
+                        title: `Liquidita' eccessiva: ${months.toFixed(0)} mesi di copertura`,
+                        message: `Hai ${formatEuro(emergencyFund)} di fondo emergenza (consigliati 3-6 mesi, ovvero ${formatEuro(RECOMMENDED_EMERGENCY_MONTHS * monthlyExpenses)}). Il surplus di ${formatEuro(excess.excess)}, investito al ${EXCESS_LIQUIDITY_DEFAULT_REAL_RETURN_PCT}% reale per ${EXCESS_LIQUIDITY_DEFAULT_HORIZON_YEARS} anni, varrebbe ${formatEuro(excess.futureValueReal)} in potere d'acquisto odierno (di cui ${formatEuro(excess.compoundGain)} di soli interessi composti). Valuta di mobilizzarne una parte verso strumenti d'investimento.`,
+                    });
+                }
             } else if (months >= 12) {
                 alerts.push({
                     id: "emergency-good",
@@ -145,6 +172,47 @@ export function useFinancialAlerts(data: FinancialData): Alert[] {
                     icon: <Flame className="w-4 h-4" />,
                     title: `FIRE al ${fireProgress.toFixed(0)}%`,
                     message: "Sei sulla buona strada! Manca poco al traguardo.",
+                });
+            }
+        }
+
+        // Tempo stimato al FIRE in base al tasso di risparmio attuale.
+        // Insight complementare alla progress bar configurata dall'utente:
+        // traduce reddito/spese/risparmio in un numero concreto di anni
+        // (modello "shockingly simple math" di MMM, in euro reali). Lo
+        // mostriamo solo quando NON e' gia' attivo l'alert "FIRE raggiunto"
+        // per non duplicare l'esito.
+        if (
+            monthlyIncome && monthlyIncome > 0 &&
+            monthlyExpenses && monthlyExpenses > 0 &&
+            monthlySavings !== undefined && monthlySavings > 0 &&
+            !(fireProgress !== undefined && fireProgress >= 100)
+        ) {
+            const fireYears = estimateYearsToFire({
+                monthlyIncome,
+                monthlyExpenses,
+                monthlySavings,
+                netWorth,
+            });
+            if (fireYears && !fireYears.alreadyFire && fireYears.yearsToFire >= 0.5) {
+                const yearsLabel = fireYears.capped
+                    ? `oltre ${FIRE_YEARS_MAX} anni`
+                    : fireYears.yearsToFire >= 10
+                        ? `~${Math.round(fireYears.yearsToFire)} anni`
+                        : `~${fireYears.yearsToFire.toFixed(1)} anni`;
+                const severity: Alert["severity"] = fireYears.capped
+                    ? "warning"
+                    : fireYears.yearsToFire <= 15
+                        ? "success"
+                        : fireYears.yearsToFire <= 30
+                            ? "warning"
+                            : "warning";
+                alerts.push({
+                    id: "fire-years-estimate",
+                    severity,
+                    icon: <Hourglass className="w-4 h-4" />,
+                    title: `Tempo stimato al FIRE: ${yearsLabel}`,
+                    message: `Con un tasso di risparmio del ${fireYears.savingsRatePct.toFixed(0)}% (${formatEuro(monthlySavings)}/mese) e ipotizzando un rendimento reale del ${fireYears.realReturnPct.toFixed(1)}% e SWR ${fireYears.swrPct}%, raggiungerai il target di ${formatEuro(fireYears.fireTarget)} in ${yearsLabel}. Aumenta il tasso di risparmio per accorciarli sensibilmente.`,
                 });
             }
         }

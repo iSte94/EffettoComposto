@@ -2,6 +2,8 @@
 // Riceve parametri e esegue 10k simulazioni senza bloccare la UI
 
 import { allocatePreRetirementPassiveIncomeAnnual } from "@/lib/finance/coast-fire";
+import { applyMonteCarloAnnualReturn } from "@/lib/finance/monte-carlo-helpers";
+import { liquidatePensionFund } from "@/lib/finance/pension-fund";
 
 interface MonteCarloParams {
     startingCapital: number;
@@ -115,7 +117,11 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                 const yearRealReturn = applyTaxStamp ? (realReturnDecimal - 0.002) : realReturnDecimal;
                 const randomYearReturn = randomNormal(yearRealReturn, stdDevDecimal);
 
-                runCap = runCap * (1 + randomYearReturn);
+                // BUG FIX: con volatilita' alte (>=20%) la coda sinistra della
+                // normale puo' produrre randomYearReturn < -1, facendo flippare
+                // il segno del capitale. La helper clampa a -100% di perdita
+                // massima e garantisce capitale >= 0. Vedi monte-carlo-helpers.ts.
+                runCap = applyMonteCarloAnnualReturn(runCap, randomYearReturn).nextCapital;
 
                 if (isRetired) {
                     const annualPublicPension = yAge >= publicPensionAge ? expectedPublicPension * 12 : 0;
@@ -158,7 +164,9 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                 // Pension Fund Pot: grows with stochastic return (no bollo)
                 if (runPensionCap > 0 || totalAnnualPensionContribution > 0) {
                     const pfRandomReturn = randomNormal(realReturnDecimal, stdDevDecimal); // No bollo
-                    runPensionCap = runPensionCap * (1 + pfRandomReturn);
+                    // Stesso clamping di runCap: il fondo pensione non puo'
+                    // andare in negativo per movimenti di mercato.
+                    runPensionCap = applyMonteCarloAnnualReturn(runPensionCap, pfRandomReturn).nextCapital;
                     if (!isRetired && totalAnnualPensionContribution > 0) {
                         runPensionCap += totalAnnualPensionContribution;
                     }
@@ -167,15 +175,24 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                     // era gia' oltre l'accesso, o per eta' non intere. Ora si usa un
                     // flag idempotente con confronto >=.
                     if (!runPensionAccessed && yAge >= pensionFundAccessAge && runPensionCap > 0) {
-                        const taxRate = Math.min(100, Math.max(0, pensionFundExitTaxRate));
-                        const net = runPensionCap * (1 - taxRate / 100);
-                        const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
-                        if (pensionExitMode === "hybrid") {
-                            runCap += net * 0.5;
-                            runPensionAnnuity = (net * 0.5) / annuityMonths;
-                        } else {
-                            runPensionAnnuity = net / annuityMonths;
-                        }
+                        // BUG FIX (regressione "pension-liquidation-nan-propagation"):
+                        // prima la liquidazione era duplicata inline qui con la
+                        // stessa fragilita' di pension-fund.ts: Math.max(0, NaN)
+                        // ritorna NaN, non 0 — quindi un singolo
+                        // pensionFundExitTaxRate / lifeExpectancy / accessAge non
+                        // finito contaminava `runCap` per tutti i 10k run del Monte
+                        // Carlo, trasformando la "probabilita' di successo" in NaN.
+                        // Ora si usa la funzione centralizzata che sanitizza ogni
+                        // input e garantisce ritorni finiti in ogni scenario.
+                        const liq = liquidatePensionFund({
+                            pensionCap: runPensionCap,
+                            exitTaxRate: pensionFundExitTaxRate,
+                            exitMode: pensionExitMode,
+                            accessAge: pensionFundAccessAge,
+                            lifeExpectancy,
+                        });
+                        runCap += liq.cashLump;
+                        runPensionAnnuity = liq.monthlyAnnuity;
                         runPensionCap = 0;
                         runPensionAccessed = true;
                     }
