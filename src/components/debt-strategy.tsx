@@ -5,16 +5,30 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Snowflake, Flame, Scale, Zap, Wallet, Percent, CalendarClock, Banknote } from "lucide-react";
+import { Plus, Trash2, Snowflake, Flame, Scale, Zap, Wallet, Percent, CalendarClock, Banknote, CalendarCheck2 } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { simulatePayoff } from "@/lib/finance/debt-strategy";
 import type { Debt } from "@/lib/finance/debt-strategy";
 import { computeDebtPortfolioSummary } from "@/lib/finance/debt-portfolio";
+import { addMonths, format } from "date-fns";
+import { it } from "date-fns/locale";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend, Cell,
 } from "recharts";
+
+// `simulatePayoff` cappa l'orizzonte massimo a 600 mesi (50 anni): se l'estinzione
+// richiede esattamente quel valore, il budget non basta a chiudere i debiti e una
+// "data di liberazione" sarebbe fuorviante (ipotesi di insolvenza). In quel caso
+// la funzione ritorna null cosi' la UI puo' nascondere il chip data senza dover
+// duplicare la soglia magica.
+const MAX_PAYOFF_MONTHS = 600;
+
+function formatDebtFreedomDate(months: number, now: Date = new Date()): string | null {
+    if (!Number.isFinite(months) || months <= 0 || months >= MAX_PAYOFF_MONTHS) return null;
+    return format(addMonths(now, Math.ceil(months)), "MMMM yyyy", { locale: it });
+}
 
 export function DebtStrategy() {
     const [debts, setDebts] = useState<Debt[]>([
@@ -261,6 +275,22 @@ export function DebtStrategy() {
                                     <div className="text-2xl font-extrabold text-red-500">{formatEuro(results.snowball.totalInterest)}</div>
                                 </div>
                             </div>
+                            {(() => {
+                                const freedomDate = formatDebtFreedomDate(results.snowball.months);
+                                if (!freedomDate) return null;
+                                return (
+                                    <div
+                                        className="flex items-center gap-2 rounded-2xl border border-blue-200 bg-blue-100/60 px-3 py-2 text-[11px] text-blue-700 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-300"
+                                        title={`Mantenendo le rate minime + ${formatEuro(extraMonthly)}/mese di extra con la strategia Snowball, l'ultimo debito si estingue ad ${freedomDate}.`}
+                                    >
+                                        <CalendarCheck2 className="h-3.5 w-3.5 shrink-0 text-blue-500 dark:text-blue-400" aria-hidden />
+                                        <span>
+                                            <span className="font-bold uppercase tracking-wider">Libero dal debito</span>
+                                            <span className="ml-1 font-extrabold capitalize">{freedomDate}</span>
+                                        </span>
+                                    </div>
+                                );
+                            })()}
                             <div className="rounded-2xl bg-background/60 p-3 text-[10px] text-blue-700 dark:text-blue-300">
                                 <span className="font-bold">Ordine:</span> {results.snowball.order.join(" -> ")}
                             </div>
@@ -284,6 +314,22 @@ export function DebtStrategy() {
                                     <div className="text-2xl font-extrabold text-red-500">{formatEuro(results.avalanche.totalInterest)}</div>
                                 </div>
                             </div>
+                            {(() => {
+                                const freedomDate = formatDebtFreedomDate(results.avalanche.months);
+                                if (!freedomDate) return null;
+                                return (
+                                    <div
+                                        className="flex items-center gap-2 rounded-2xl border border-orange-200 bg-orange-100/60 px-3 py-2 text-[11px] text-orange-700 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-300"
+                                        title={`Mantenendo le rate minime + ${formatEuro(extraMonthly)}/mese di extra con la strategia Avalanche, l'ultimo debito si estingue ad ${freedomDate}.`}
+                                    >
+                                        <CalendarCheck2 className="h-3.5 w-3.5 shrink-0 text-orange-500 dark:text-orange-400" aria-hidden />
+                                        <span>
+                                            <span className="font-bold uppercase tracking-wider">Libero dal debito</span>
+                                            <span className="ml-1 font-extrabold capitalize">{freedomDate}</span>
+                                        </span>
+                                    </div>
+                                );
+                            })()}
                             <div className="rounded-2xl bg-background/60 p-3 text-[10px] text-orange-700 dark:text-orange-300">
                                 <span className="font-bold">Ordine:</span> {results.avalanche.order.join(" -> ")}
                             </div>
