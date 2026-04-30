@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.25`
+**Versione corrente:** `v1.10.26`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.26 - 30 aprile 2026 (UX — "Punto di Svolta" visibile direttamente sul grafico nel Calcolatore Interesse Composto)
+
+- **Problema iniziale** — il `Calcolatore Interesse Composto` (`src/components/compound-interest-calculator.tsx`) calcolava gia' il `crossoverYear`, cioe' il primo anno in cui gli interessi maturati superano il capitale versato (l'effetto compounding "prende il sopravvento"), e lo mostrava in due punti: la card laterale "Punto di Svolta" e una riga evidenziata in ambra nella tabella sotto al grafico. Mancava pero' il marcatore visivo sul grafico stesso, che e' l'elemento dominante della pagina: l'utente doveva fare un salto cognitivo "leggi Anno X dal pannello → cerca il punto sull'asse X" per collegare i tre artefatti
+- **Cosa e' stato modificato** — aggiunta una `ReferenceLine` di Recharts sul grafico `AreaChart` ancorata a `Anno {crossoverYear}` con linea tratteggiata ambra coerente con il colore gia' usato per il punto di svolta nelle altre due viste, label `Punto di Svolta · Anno N` posizionata in alto a destra e `ifOverflow="extendDomain"` per i casi limite. La linea appare solo quando `crossoverYear !== null` (con orizzonti corti o rendimenti bassi puo' non essere raggiunto e in quel caso continuiamo a mostrare `—`). Nessuna nuova dipendenza, nessun nuovo calcolo: riusa il valore gia' presente nel `useMemo` esistente
+- **Perche' migliora l'esperienza utente** — unifica il racconto narrativo del calcolatore: card laterale (numero), grafico (linea verticale ambra) e tabella (riga evidenziata) ora dicono la stessa cosa nello stesso colore, e l'utente vede immediatamente sul grafico quando l'area viola degli "Interessi" supera quella blu del "Versato". E' il momento didatticamente piu' importante della curva ed era l'unico spazio dove non veniva esplicitato visivamente
+- **Manutenibilita'** — modifica chirurgica (~17 righe) sul singolo componente. `ReferenceLine` e' gia' usata in 5 altri grafici dell'app (`fire-dashboard`, `net-worth-projection`, `underwater-drawdown-chart`, `budget-trend-chart`, `advisor/fire-impact-chart`) quindi il pattern e' consolidato. Suite test invariata e tutta verde
 
 ### v1.10.25 - 30 aprile 2026 (UX — nuova KPI "Tempo Stimato al Completamento Totale" negli Obiettivi di Risparmio)
 
