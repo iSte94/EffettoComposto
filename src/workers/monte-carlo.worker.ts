@@ -3,6 +3,7 @@
 
 import { allocatePreRetirementPassiveIncomeAnnual } from "@/lib/finance/coast-fire";
 import { applyMonteCarloAnnualReturn } from "@/lib/finance/monte-carlo-helpers";
+import { liquidatePensionFund } from "@/lib/finance/pension-fund";
 
 interface MonteCarloParams {
     startingCapital: number;
@@ -174,15 +175,24 @@ self.onmessage = (e: MessageEvent<MonteCarloParams>) => {
                     // era gia' oltre l'accesso, o per eta' non intere. Ora si usa un
                     // flag idempotente con confronto >=.
                     if (!runPensionAccessed && yAge >= pensionFundAccessAge && runPensionCap > 0) {
-                        const taxRate = Math.min(100, Math.max(0, pensionFundExitTaxRate));
-                        const net = runPensionCap * (1 - taxRate / 100);
-                        const annuityMonths = Math.max(1, (lifeExpectancy - pensionFundAccessAge) * 12);
-                        if (pensionExitMode === "hybrid") {
-                            runCap += net * 0.5;
-                            runPensionAnnuity = (net * 0.5) / annuityMonths;
-                        } else {
-                            runPensionAnnuity = net / annuityMonths;
-                        }
+                        // BUG FIX (regressione "pension-liquidation-nan-propagation"):
+                        // prima la liquidazione era duplicata inline qui con la
+                        // stessa fragilita' di pension-fund.ts: Math.max(0, NaN)
+                        // ritorna NaN, non 0 — quindi un singolo
+                        // pensionFundExitTaxRate / lifeExpectancy / accessAge non
+                        // finito contaminava `runCap` per tutti i 10k run del Monte
+                        // Carlo, trasformando la "probabilita' di successo" in NaN.
+                        // Ora si usa la funzione centralizzata che sanitizza ogni
+                        // input e garantisce ritorni finiti in ogni scenario.
+                        const liq = liquidatePensionFund({
+                            pensionCap: runPensionCap,
+                            exitTaxRate: pensionFundExitTaxRate,
+                            exitMode: pensionExitMode,
+                            accessAge: pensionFundAccessAge,
+                            lifeExpectancy,
+                        });
+                        runCap += liq.cashLump;
+                        runPensionAnnuity = liq.monthlyAnnuity;
                         runPensionCap = 0;
                         runPensionAccessed = true;
                     }
