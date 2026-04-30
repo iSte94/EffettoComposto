@@ -13,7 +13,7 @@ import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } fr
 import { computeCapitalMultiplier } from "@/lib/finance/capital-multiplier";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-    CartesianGrid, Legend,
+    CartesianGrid, Legend, ReferenceLine,
 } from "recharts";
 
 // SWR (Safe Withdrawal Rate) di default usato nel resto dell'app per calcoli
@@ -454,6 +454,22 @@ export function CompoundInterestCalculator() {
                                         <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: "var(--muted-foreground)" }} />
                                         <Area type="monotone" dataKey="Versato" stackId="1" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorVersato)" />
                                         <Area type="monotone" dataKey="Interessi" stackId="1" stroke="#a855f7" strokeWidth={2} fillOpacity={1} fill="url(#colorInteressi)" />
+                                        {result.crossoverYear !== null && (
+                                            <ReferenceLine
+                                                x={`Anno ${result.crossoverYear}`}
+                                                stroke="#f59e0b"
+                                                strokeDasharray="4 4"
+                                                strokeWidth={1.5}
+                                                ifOverflow="extendDomain"
+                                                label={{
+                                                    value: `Punto di Svolta · Anno ${result.crossoverYear}`,
+                                                    position: "insideTopRight",
+                                                    fill: "#b45309",
+                                                    fontSize: 10,
+                                                    fontWeight: 700,
+                                                }}
+                                            />
+                                        )}
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
