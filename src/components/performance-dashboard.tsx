@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, Gauge, Target, Percent, Activity, BarChart3, LineChart as LineChartIcon, AlertCircle } from "lucide-react";
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatEuroSigned, formatPercentSigned } from "@/lib/format";
 import { MonthlyReturnsHeatmap } from "@/components/performance/monthly-returns-heatmap";
 import { UnderwaterDrawdownChart } from "@/components/performance/underwater-drawdown-chart";
 import { DividendCalendar } from "@/components/performance/dividend-calendar";
@@ -53,8 +53,7 @@ const PERIOD_LABELS: { value: Period; label: string }[] = [
 ];
 
 function formatPct(v: number | null | undefined, decimals = 1): string {
-    if (v == null || !Number.isFinite(v)) return "—";
-    return `${v >= 0 ? "+" : ""}${v.toFixed(decimals)}%`;
+    return formatPercentSigned(v ?? Number.NaN, decimals);
 }
 
 function formatSharpe(v: number | null): string {
@@ -280,7 +279,7 @@ export function PerformanceDashboard({ user }: PerformanceDashboardProps) {
                                 <div>
                                     <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Contributi netti</div>
                                     <div className={`text-sm font-extrabold tabular-nums ${m.totalCashFlow > 0 ? "text-emerald-600" : m.totalCashFlow < 0 ? "text-rose-600" : ""}`}>
-                                        {m.totalCashFlow >= 0 ? "+" : ""}{formatEuro(m.totalCashFlow)}
+                                        {formatEuroSigned(m.totalCashFlow)}
                                     </div>
                                 </div>
                                 <div>

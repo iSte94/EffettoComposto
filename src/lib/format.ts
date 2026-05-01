@@ -16,6 +16,24 @@ export const formatPercent = (value: number, decimals: number = 1): string => {
     return `${value.toFixed(decimals)}%`;
 };
 
+// Variante "con segno esplicito": antepone "+" ai valori non negativi cosi' il
+// segno comunica direzione anche quando si guarda solo il numero (delta,
+// cashflow, variazioni di performance). I valori negativi gia' contengono il
+// minus tramite formatEuro/Number#toFixed, quindi non vanno raddoppiati.
+// I valori non finiti restano em-dash come negli altri formatter — questo evita
+// che NaN/Infinity emergano in UI come "+NaN%" o "+€NaN".
+export const formatEuroSigned = (value: number): string => {
+    if (!Number.isFinite(value)) return NON_FINITE_PLACEHOLDER;
+    if (value < 0) return formatEuro(value);
+    return `+${formatEuro(value)}`;
+};
+
+export const formatPercentSigned = (value: number, decimals: number = 1): string => {
+    if (!Number.isFinite(value)) return NON_FINITE_PLACEHOLDER;
+    if (value < 0) return formatPercent(value, decimals);
+    return `+${formatPercent(value, decimals)}`;
+};
+
 // Formattazione compatta per KPI e dashboard dove lo spazio orizzontale e'
 // limitato (es. header mobile). Sotto 10.000 usa il formato completo per
 // preservare la precisione; sopra usa K/M con una sola cifra decimale eliminando

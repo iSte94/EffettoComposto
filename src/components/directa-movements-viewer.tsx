@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatEuroSigned, formatPercentSigned } from "@/lib/format";
 import {
   Upload, FileText, TrendingUp, TrendingDown, ArrowDownUp,
   Wallet, Receipt, PiggyBank, BarChart3, ArrowUpRight,
@@ -210,7 +210,7 @@ const PIE_COLORS = [
 ];
 
 const fmtEuro = (v: number) => formatEuro(Math.round(v));
-const fmtEuroSigned = (v: number) => (v >= 0 ? "+" : "") + formatEuro(Math.round(v));
+const fmtEuroSigned = (v: number) => formatEuroSigned(Math.round(v));
 
 // ---------- Sub-components ----------
 
@@ -815,13 +815,13 @@ export function DirectaMovementsViewer() {
         />
         <KpiCard
           icon={BadgePercent} label="Rendimento semplice"
-          value={`${plSummary.pctReturn >= 0 ? "+" : ""}${plSummary.pctReturn.toFixed(1)}%`}
+          value={formatPercentSigned(plSummary.pctReturn)}
           color="bg-indigo-500"
           sub="sul capitale chiuso"
         />
         <KpiCard
           icon={TrendingUp} label="MWR (XIRR annuo)"
-          value={plSummary.portfolioMwr !== null ? `${plSummary.portfolioMwr >= 0 ? "+" : ""}${plSummary.portfolioMwr.toFixed(1)}%` : "N/D"}
+          value={plSummary.portfolioMwr !== null ? formatPercentSigned(plSummary.portfolioMwr) : "N/D"}
           color="bg-violet-500"
           sub="rendimento ponderato per capitale"
         />
@@ -896,11 +896,11 @@ export function DirectaMovementsViewer() {
                         {fmtEuroSigned(t.pl)}
                       </td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${t.pctReturn >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                        {t.pctReturn >= 0 ? "+" : ""}{t.pctReturn.toFixed(1)}%
+                        {formatPercentSigned(t.pctReturn)}
                       </td>
                       <td className={`px-3 py-2.5 text-right font-semibold ${t.annualizedReturn !== null ? (t.annualizedReturn >= 0 ? "text-emerald-500" : "text-rose-500") : "text-muted-foreground"}`}>
                         {t.annualizedReturn !== null
-                          ? `${t.annualizedReturn >= 0 ? "+" : ""}${t.annualizedReturn.toFixed(1)}%/a`
+                          ? `${formatPercentSigned(t.annualizedReturn)}/a`
                           : "-"
                         }
                       </td>
@@ -908,7 +908,7 @@ export function DirectaMovementsViewer() {
                         {t.mwr !== null
                           ? <div className="flex items-center justify-end gap-1">
                               {t.mwr >= 0 ? <ArrowUpRight className="size-3" /> : <ArrowDownRight className="size-3" />}
-                              {t.mwr >= 0 ? "+" : ""}{t.mwr.toFixed(1)}%
+                              {formatPercentSigned(t.mwr)}
                             </div>
                           : "-"
                         }
@@ -923,7 +923,7 @@ export function DirectaMovementsViewer() {
                             />
                           </div>
                           <span className={`font-semibold ${t.pl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                            {contribPct >= 0 ? "+" : ""}{contribPct.toFixed(1)}%
+                            {formatPercentSigned(contribPct)}
                           </span>
                         </div>
                       </td>

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatPercentSigned } from "@/lib/format";
 import { Printer, TrendingUp, Wallet, PieChart as PieChartIcon, Flame, Building2, Gift, FileText } from "lucide-react";
 
 interface AssetRecordLite {
@@ -46,8 +46,7 @@ const SECTION_CONFIG = {
 type SectionId = keyof typeof SECTION_CONFIG;
 
 function fmtPct(v: number | null | undefined, decimals = 1): string {
-    if (v == null || !Number.isFinite(v)) return "—";
-    return `${v >= 0 ? "+" : ""}${v.toFixed(decimals)}%`;
+    return formatPercentSigned(v ?? Number.NaN, decimals);
 }
 
 function ReportContent() {

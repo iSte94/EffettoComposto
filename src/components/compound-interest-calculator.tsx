@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass, Layers } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatEuroSigned } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import {
     computeDelayCost,
@@ -333,7 +333,7 @@ export function CompoundInterestCalculator() {
                                 <InfoTooltip iconClassName="w-3 h-3">Crescita effettiva del potere d&apos;acquisto: valore reale finale meno totale versato. Se positivo hai davvero arricchito il tuo capitale al netto dell&apos;inflazione; se negativo l&apos;inflazione ha eroso piu&apos; di quanto il rendimento abbia prodotto, nonostante il saldo nominale sembri cresciuto.</InfoTooltip>
                             </div>
                             <div className={`text-center text-2xl font-extrabold ${result.realGain >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-                                {result.realGain >= 0 ? "+" : ""}{formatEuro(result.realGain)}
+                                {formatEuroSigned(result.realGain)}
                             </div>
                             <div className="mt-1 text-center text-[10px] text-muted-foreground">
                                 {result.realGain >= 0

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatEuroSigned } from "@/lib/format";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 
 interface ProfitabilityAnalysisProps {
@@ -41,7 +41,7 @@ export function ProfitabilityAnalysis({
                 <div className={`flex flex-col items-center justify-center rounded-2xl border p-5 text-center bg-white/75 dark:bg-slate-900/70 ${cashflow >= 0 ? "border-emerald-200 dark:border-emerald-900" : "border-red-200 dark:border-red-900"}`}>
                     <div className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">Cashflow Mensile</div>
                     <div className={`text-3xl font-extrabold ${cashflow >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                        {cashflow >= 0 ? "+" : ""}{formatEuro(cashflow)}
+                        {formatEuroSigned(cashflow)}
                     </div>
                     <div className="mt-1"><InfoTooltip iconClassName="w-3 h-3">Ricavo mensile netto dall&apos;affitto dopo aver sottratto rata mutuo, spese condominiali, tasse e manutenzione ordinaria.</InfoTooltip></div>
                 </div>
@@ -81,7 +81,7 @@ export function ProfitabilityAnalysis({
                                 </InfoTooltip>
                             </div>
                             <span className={`text-3xl font-extrabold tracking-tight ${pureRealEstateProfit >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-                                {pureRealEstateProfit >= 0 ? "+" : ""}{formatEuro(pureRealEstateProfit)}
+                                {formatEuroSigned(pureRealEstateProfit)}
                             </span>
                         </div>
                     </div>
