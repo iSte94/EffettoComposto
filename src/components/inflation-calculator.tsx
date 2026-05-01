@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank, CalendarMinus, ShieldCheck } from "lucide-react";
+import { TrendingDown, Euro, Calendar, Percent, Hourglass, PiggyBank, CalendarMinus, ShieldCheck, Sparkles } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
 import { projectInflation } from "@/lib/finance/inflation";
 import {
@@ -54,6 +54,7 @@ export function InflationCalculator() {
         averageMonthlyPurchasingPowerLoss,
         realInvestmentAdvantage,
         realInvestmentAdvantagePct,
+        realValueDoublingYears,
     } = projection;
 
     // Etichetta compatta per il tempo di dimezzamento: intero se >= 10 anni
@@ -64,6 +65,15 @@ export function InflationCalculator() {
         : purchasingPowerHalvingYears >= 10
             ? `${Math.round(purchasingPowerHalvingYears)} anni`
             : `${purchasingPowerHalvingYears.toFixed(1)} anni`;
+
+    // Stessa logica narrativa applicata al raddoppio reale: precisione
+    // decimale sotto i 10 anni per differenziare rendimenti alti, intera
+    // sopra perche' la scala decennale assorbe la precisione sub-annuale.
+    const doublingLabel = realValueDoublingYears === null
+        ? null
+        : realValueDoublingYears >= 10
+            ? `${Math.round(realValueDoublingYears)} anni`
+            : `${realValueDoublingYears.toFixed(1)} anni`;
 
     return (
         <div className="space-y-6">
@@ -164,7 +174,7 @@ export function InflationCalculator() {
                 </div>
             </div>
 
-            {(lostValue > 0 || halvingLabel) && (
+            {(lostValue > 0 || halvingLabel || doublingLabel) && (
                 <div className="grid gap-3 sm:grid-cols-6">
                     {lostValue > 0 && (
                         <div className="rounded-2xl border border-border/70 bg-muted/30 px-4 py-3 text-xs text-muted-foreground sm:col-span-3">
@@ -199,6 +209,21 @@ export function InflationCalculator() {
                                 <p className="mt-0.5 text-sm font-extrabold">{formatEuro(averageMonthlyPurchasingPowerLoss)}/mese</p>
                                 <p className="mt-0.5 text-[11px] text-orange-600/80 dark:text-orange-400/80">
                                     di potere d&apos;acquisto perso, in media, ogni mese
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    {doublingLabel && (
+                        <div
+                            className="flex items-start gap-2 rounded-2xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-xs text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300 sm:col-span-3"
+                            title={`Investendo al ${formatPercent(nominalReturn)} nominale con ${formatPercent(inflationRate)} di inflazione il rendimento reale e' ${formatPercent(realReturnPct)}: a quel ritmo il valore reale dell'investimento raddoppia (1 € diventa 2 € di potere d'acquisto odierno) dopo circa ${doublingLabel}. E' la dualita' "carrot" del Tempo di Dimezzamento: il compounding batte davvero l'inflazione solo se il rendimento reale e' positivo.`}
+                        >
+                            <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-400" aria-hidden />
+                            <div>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-500 dark:text-emerald-400">Tempo di Raddoppio Reale</p>
+                                <p className="mt-0.5 text-sm font-extrabold">{doublingLabel}</p>
+                                <p className="mt-0.5 text-[11px] text-emerald-600/80 dark:text-emerald-400/80">
+                                    per raddoppiare il potere d&apos;acquisto investendo al {formatPercent(realReturnPct)} reale annuo
                                 </p>
                             </div>
                         </div>
