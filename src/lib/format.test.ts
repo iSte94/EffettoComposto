@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatEuro, formatEuroCompact, formatPercent } from './format';
+import { formatEuro, formatEuroCompact, formatEuroSigned, formatPercent, formatPercentSigned } from './format';
 
 describe('formatEuro', () => {
     it('formats zero', () => {
@@ -106,5 +106,56 @@ describe('formatPercent', () => {
         expect(formatPercent(Number.NEGATIVE_INFINITY)).toBe('\u2014');
         // Placeholder coerente anche cambiando la precisione richiesta
         expect(formatPercent(Number.NaN, 3)).toBe('\u2014');
+    });
+});
+
+describe('formatEuroSigned', () => {
+    it('prepends + to positive values', () => {
+        expect(formatEuroSigned(1500)).toBe(`+${formatEuro(1500)}`);
+        expect(formatEuroSigned(1500)).toMatch(/^\+\u20ac/);
+    });
+
+    it('prepends + to zero', () => {
+        // Lo zero e' considerato "non negativo" e riceve il segno: scelta
+        // coerente con la convenzione gia' diffusa nei componenti (cashflow,
+        // delta) prima dell'introduzione del helper.
+        expect(formatEuroSigned(0)).toBe(`+${formatEuro(0)}`);
+    });
+
+    it('does not double the minus for negatives', () => {
+        const result = formatEuroSigned(-5000);
+        expect(result).toBe(formatEuro(-5000));
+        expect(result).not.toMatch(/^\+/);
+    });
+
+    it('returns em-dash for non-finite values', () => {
+        expect(formatEuroSigned(Number.NaN)).toBe('\u2014');
+        expect(formatEuroSigned(Number.POSITIVE_INFINITY)).toBe('\u2014');
+        expect(formatEuroSigned(Number.NEGATIVE_INFINITY)).toBe('\u2014');
+    });
+});
+
+describe('formatPercentSigned', () => {
+    it('prepends + to positive values', () => {
+        expect(formatPercentSigned(12.345)).toBe('+12.3%');
+    });
+
+    it('prepends + to zero', () => {
+        expect(formatPercentSigned(0)).toBe('+0.0%');
+    });
+
+    it('keeps the minus sign for negatives without doubling', () => {
+        expect(formatPercentSigned(-5.5)).toBe('-5.5%');
+    });
+
+    it('respects custom decimals', () => {
+        expect(formatPercentSigned(12.345, 2)).toBe('+12.35%');
+        expect(formatPercentSigned(-5.5, 0)).toBe('-6%');
+    });
+
+    it('returns em-dash for non-finite values', () => {
+        expect(formatPercentSigned(Number.NaN)).toBe('\u2014');
+        expect(formatPercentSigned(Number.POSITIVE_INFINITY)).toBe('\u2014');
+        expect(formatPercentSigned(Number.NEGATIVE_INFINITY)).toBe('\u2014');
     });
 });

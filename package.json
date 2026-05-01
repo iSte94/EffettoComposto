@@ -1,6 +1,6 @@
 {
   "name": "effetto-composto",
-  "version": "1.10.28",
+  "version": "1.10.29",
   "private": true,
   "scripts": {
     "dev": "next dev",

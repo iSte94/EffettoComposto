@@ -40,7 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatEuro } from "@/lib/format";
+import { formatEuro, formatEuroSigned } from "@/lib/format";
 import { calculateRemainingDebt, getInstallmentAmountForMonth } from "@/lib/finance/loans";
 import { broadcastFinancialDataChanged } from "@/lib/client-data-events";
 import { cn } from "@/lib/utils";
@@ -918,7 +918,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                             </div>
                             {loading ? <Skeleton className="mb-2 h-9 w-32 rounded-xl" /> : <>
                                 <div className={cn("mb-2 text-2xl font-bold min-[390px]:text-3xl", monthlyCashflow >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                                    {monthlyCashflow >= 0 ? "+" : ""}{formatEuro(monthlyCashflow)}
+                                    {formatEuroSigned(monthlyCashflow)}
                                 </div>
                                 <div className="flex flex-col gap-1.5 border-t border-slate-100/50 pt-2 text-xs font-medium">
                                     <div className="flex items-center justify-between px-1 text-emerald-600"><span>Reddito:</span><span>+{formatEuro(grossIncome)}/m</span></div>
@@ -985,7 +985,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     <CardDescription className="text-sm text-slate-500">Indicatori operativi per capire subito se intervenire su liquidita, spese o leva.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="grid gap-3 p-5 min-[420px]:grid-cols-2 sm:p-6">
-                                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Cashflow Atteso</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", monthlyCashflow >= 0 ? "text-emerald-600" : "text-rose-600")}>{monthlyCashflow >= 0 ? "+" : ""}{formatEuro(monthlyCashflow)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Entrate nette di affitti e redditi meno rate, immobili e spese personali.</p></div>
+                                    <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Cashflow Atteso</div><div className={cn("mt-3 text-2xl font-extrabold tabular-nums", monthlyCashflow >= 0 ? "text-emerald-600" : "text-rose-600")}>{formatEuroSigned(monthlyCashflow)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Entrate nette di affitti e redditi meno rate, immobili e spese personali.</p></div>
                                     <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Mesi di Sopravvivenza</div><div className="mt-3 flex items-end gap-2"><span className="text-2xl font-extrabold text-slate-900">{survivalMonths.toFixed(1)}</span><span className="pb-1 text-sm text-slate-500">mesi</span></div><p className="mt-2 text-xs leading-5 text-slate-500">{runwayText}. Basato su liquidita e fondo emergenza utilizzabili.</p></div>
                                     <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Liquidita Utile</div><div className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{formatEuro(totalLiquidForSurvival)}</div><p className="mt-2 text-xs leading-5 text-slate-500">Disponibilita immediata per coprire spese ricorrenti o imprevisti.</p></div>
                                     <div className={insetStatClass}><div className="text-[11px] font-bold uppercase tracking-[0.2em] text-slate-500">Peso Debiti</div><div className="mt-3 text-2xl font-extrabold text-slate-900 tabular-nums">{debtWeightPercent.toFixed(1)}%</div><p className="mt-2 text-xs leading-5 text-slate-500">Quota delle passivita rispetto agli asset che stai monitorando ora.</p></div>
