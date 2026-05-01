@@ -271,3 +271,95 @@ function simulateBalance(
     }
     return balance;
 }
+
+export interface InflationAdjustedTotalsParams {
+    /** Capitale iniziale in euro (>= 0). E' al tempo 0, quindi gia' in euro odierni. */
+    initialCapital: number;
+    /** Versamento mensile costante in euro (>= 0). */
+    monthlyContribution: number;
+    /** Inflazione annua attesa in percentuale (es. 2.5 per 2,5%). */
+    inflationRatePct: number;
+    /** Orizzonte in anni (intero, >= 0). I valori frazionari vengono troncati. */
+    years: number;
+}
+
+export interface InflationAdjustedTotalsResult {
+    /**
+     * Somma dei versamenti deflazionata al potere d'acquisto di OGGI.
+     * Ogni contributo mensile viene scontato per (1 + inflazione)^(m/12), cosi'
+     * sommando il capitale iniziale (gia' in euro odierni) e i contributi
+     * "tradotti" si ottiene un valore che e' confrontabile direttamente con il
+     * saldo finale REALE (anch'esso espresso in euro odierni).
+     */
+    realTotalDeposited: number;
+    /**
+     * Somma NOMINALE dei versamenti (capitale iniziale + 12·N·contributo).
+     * Esposta per confronto / display.
+     */
+    nominalTotalDeposited: number;
+}
+
+/**
+ * Calcola la somma dei versamenti deflazionata al potere d'acquisto di oggi.
+ *
+ * === BUG FIX (regressione "real-gain-mixes-real-and-nominal") ===
+ *
+ * Il calcolatore mostrava il "Guadagno Reale" come:
+ *
+ *     realGain = realFinalBalance - totalDeposited     (mix reale / nominale)
+ *
+ * dove `realFinalBalance` e' il saldo nominale finale DEFLAZIONATO al potere
+ * d'acquisto di oggi e `totalDeposited` e' la somma NOMINALE di tutti i
+ * versamenti (capitale iniziale + 12·N contributi mensili). Il confronto
+ * apples-to-oranges sotto-stimava sistematicamente il guadagno reale ogni
+ * volta che era presente un PAC: un €100 versato in anno 10 viene contato a
+ * potere d'acquisto piu' alto del suo reale valore di oggi (1/1.02^10 ≈ €82).
+ *
+ * Caso canonico: 10.000€ iniziali + 100€/mese, 2% rendimento, 2% inflazione,
+ * 20 anni. Il rendimento reale (Fisher) e' esattamente 0%, quindi il
+ * guadagno reale dovrebbe essere ~0€. Il calcolatore segnalava invece
+ * −4.125€ di "perdita reale", scoraggiando un piano di accumulo che in
+ * realta' preserva perfettamente il potere d'acquisto.
+ *
+ * Fix: ogni contributo viene deflazionato al tasso di inflazione per il
+ * numero di mesi trascorsi dall'inizio, COSI' la sottrazione finale ha
+ * entrambi i lati in euro di OGGI.
+ *
+ *     realTotalDeposited = initialCapital
+ *                        + Σ_m  contributo / (1 + inflazione)^(m/12)
+ *     realGain           = realFinalBalance - realTotalDeposited
+ *
+ * Inflazione zero: realTotalDeposited == nominalTotalDeposited (proprieta'
+ * di sanity-check). Inflazione positiva: realTotalDeposited <
+ * nominalTotalDeposited (i contributi futuri valgono meno di oggi).
+ * Deflazione totale <= -100%: usiamo come fattore neutro 1 per evitare
+ * divisioni per zero o per valori negativi (scenario degenere irrealistico).
+ */
+export function computeInflationAdjustedTotals(
+    params: InflationAdjustedTotalsParams,
+): InflationAdjustedTotalsResult {
+    const initialCapital = Math.max(0, sanitizeFinite(params.initialCapital));
+    const monthlyContribution = Math.max(0, sanitizeFinite(params.monthlyContribution));
+    const inflationRatePct = sanitizeFinite(params.inflationRatePct);
+    const years = Math.max(0, Math.floor(sanitizeFinite(params.years)));
+
+    const totalMonths = years * 12;
+    const monthlyInflationFactor = Math.pow(1 + inflationRatePct / 100, 1 / 12);
+
+    let realTotalDeposited = initialCapital;
+    let cumulativeInflationFactor = 1;
+
+    for (let m = 1; m <= totalMonths; m++) {
+        cumulativeInflationFactor *= monthlyInflationFactor;
+        // Guard: deflazione totale <= -100% (cumulativeInflationFactor <= 0)
+        // produrrebbe division-by-zero o segno errato. Trattiamo il contributo
+        // come gia' in euro odierni in quel caso degenere.
+        const safeFactor = cumulativeInflationFactor > 0 ? cumulativeInflationFactor : 1;
+        realTotalDeposited += monthlyContribution / safeFactor;
+    }
+
+    return {
+        realTotalDeposited,
+        nominalTotalDeposited: initialCapital + monthlyContribution * totalMonths,
+    };
+}

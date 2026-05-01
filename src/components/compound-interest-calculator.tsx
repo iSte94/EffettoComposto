@@ -9,7 +9,12 @@ import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Re
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
-import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } from "@/lib/finance/compound-interest";
+import {
+    computeDelayCost,
+    computeInflationAdjustedTotals,
+    effectiveAnnualRatePct,
+    simulateCompoundInterest,
+} from "@/lib/finance/compound-interest";
 import { computeCapitalMultiplier } from "@/lib/finance/capital-multiplier";
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -47,9 +52,18 @@ export function CompoundInterestCalculator() {
         // Valore reale a potere d'acquisto odierno: deflaziona il nominale finale.
         const inflationFactor = Math.pow(1 + inflationRate / 100, years);
         const realFinalBalance = inflationFactor > 0 ? sim.finalBalance / inflationFactor : sim.finalBalance;
-        // Guadagno reale: crescita effettiva del potere d'acquisto rispetto a quanto versato.
-        // Se negativo, l'inflazione ha eroso piu' di quanto il rendimento abbia prodotto.
-        const realGain = realFinalBalance - sim.totalDeposited;
+        // Guadagno reale: per essere coerente con `realFinalBalance` (espresso
+        // in euro odierni) anche il totale versato va deflazionato a potere
+        // d'acquisto di oggi. Sottrarre il nominale grezzo era un mix
+        // apples-to-oranges che sotto-stimava sistematicamente il guadagno
+        // reale (vedi `computeInflationAdjustedTotals` per il bug fix).
+        const adjustedTotals = computeInflationAdjustedTotals({
+            initialCapital,
+            monthlyContribution,
+            inflationRatePct: inflationRate,
+            years,
+        });
+        const realGain = realFinalBalance - adjustedTotals.realTotalDeposited;
 
         // Tempo di raddoppio: ln(2) / ln(1+r), formula esatta (piu' accurata
         // della Regola del 72). `null` se r <= 0 (il capitale non raddoppia mai

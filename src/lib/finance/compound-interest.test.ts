@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { computeDelayCost, effectiveAnnualRatePct, simulateCompoundInterest } from "./compound-interest";
+import {
+    computeDelayCost,
+    computeInflationAdjustedTotals,
+    effectiveAnnualRatePct,
+    simulateCompoundInterest,
+} from "./compound-interest";
+import { computeRealReturn } from "./fire-projection";
 
 describe("simulateCompoundInterest", () => {
     it("anno 0 ha saldo = capitale iniziale e nessun interesse", () => {
@@ -318,6 +324,189 @@ describe("effectiveAnnualRatePct", () => {
         expect(effectiveAnnualRatePct(-1200)).toBe(-100);
         // Sotto la soglia continua a restituire -100% (fattore negativo).
         expect(effectiveAnnualRatePct(-2400)).toBe(-100);
+    });
+});
+
+describe("computeInflationAdjustedTotals", () => {
+    it("inflazione zero: realTotalDeposited == nominalTotalDeposited (sanity)", () => {
+        const r = computeInflationAdjustedTotals({
+            initialCapital: 10_000,
+            monthlyContribution: 300,
+            inflationRatePct: 0,
+            years: 20,
+        });
+        expect(r.nominalTotalDeposited).toBe(10_000 + 300 * 240);
+        expect(r.realTotalDeposited).toBeCloseTo(r.nominalTotalDeposited, 6);
+    });
+
+    it("inflazione positiva: realTotalDeposited < nominalTotalDeposited (i contributi futuri valgono meno)", () => {
+        const r = computeInflationAdjustedTotals({
+            initialCapital: 10_000,
+            monthlyContribution: 300,
+            inflationRatePct: 2,
+            years: 20,
+        });
+        expect(r.realTotalDeposited).toBeLessThan(r.nominalTotalDeposited);
+        // L'iniziale e' al tempo 0, NON viene deflazionato. La differenza e' tutta sui contributi.
+        const realContribsOnly = r.realTotalDeposited - 10_000;
+        const nominalContribsOnly = r.nominalTotalDeposited - 10_000;
+        expect(realContribsOnly).toBeLessThan(nominalContribsOnly);
+        // Stima: con 2% / 20 anni, i contributi reali sono ~80% del nominale.
+        expect(realContribsOnly / nominalContribsOnly).toBeGreaterThan(0.7);
+        expect(realContribsOnly / nominalContribsOnly).toBeLessThan(0.9);
+    });
+
+    it("solo capitale iniziale, no contributi: real == nominal == initial", () => {
+        const r = computeInflationAdjustedTotals({
+            initialCapital: 50_000,
+            monthlyContribution: 0,
+            inflationRatePct: 5,
+            years: 10,
+        });
+        expect(r.realTotalDeposited).toBe(50_000);
+        expect(r.nominalTotalDeposited).toBe(50_000);
+    });
+
+    it("years = 0: solo iniziale, nessun contributo da deflazionare", () => {
+        const r = computeInflationAdjustedTotals({
+            initialCapital: 10_000,
+            monthlyContribution: 300,
+            inflationRatePct: 3,
+            years: 0,
+        });
+        expect(r.realTotalDeposited).toBe(10_000);
+        expect(r.nominalTotalDeposited).toBe(10_000);
+    });
+
+    it("input non finiti / negativi vengono sanificati a 0", () => {
+        const r = computeInflationAdjustedTotals({
+            initialCapital: -1_000,
+            monthlyContribution: Number.NaN,
+            inflationRatePct: Number.POSITIVE_INFINITY,
+            years: -5,
+        });
+        expect(r.realTotalDeposited).toBe(0);
+        expect(r.nominalTotalDeposited).toBe(0);
+    });
+
+    it("verifica indipendente: sommatoria deflazionata mese per mese", () => {
+        // Replica indipendente dell'algoritmo per blindare il calcolo:
+        // realTotalDeposited = initial + Σ_{m=1..N*12} contributo / (1+i)^(m/12)
+        const initialCapital = 5_000;
+        const monthlyContribution = 250;
+        const inflationRatePct = 3;
+        const years = 5;
+        const monthlyFactor = Math.pow(1 + inflationRatePct / 100, 1 / 12);
+
+        let expected = initialCapital;
+        let cumulativeFactor = 1;
+        for (let m = 1; m <= years * 12; m++) {
+            cumulativeFactor *= monthlyFactor;
+            expected += monthlyContribution / cumulativeFactor;
+        }
+
+        const r = computeInflationAdjustedTotals({
+            initialCapital,
+            monthlyContribution,
+            inflationRatePct,
+            years,
+        });
+        expect(r.realTotalDeposited).toBeCloseTo(expected, 6);
+    });
+
+    it("REGRESSION: realGain ~ 0 quando rendimento nominale = inflazione", () => {
+        // Bug originale (in compound-interest-calculator.tsx, line 52):
+        //     const realGain = realFinalBalance - sim.totalDeposited;
+        //
+        // Mescolava un valore in euro REALI (saldo finale deflazionato) con un
+        // valore in euro NOMINALI (somma grezza dei versamenti). Risultato:
+        // ogni piano di accumulo veniva penalizzato con una falsa "perdita
+        // reale", anche quando il rendimento reale era esattamente 0%.
+        //
+        // Caso canonico: 10k iniziali, 100€/mese, 2% nominale, 2% inflazione,
+        // 20 anni. Rendimento reale (Fisher) = esattamente 0%, quindi:
+        //   - Buggy: realGain ≈ -€4.125 (FALSA perdita)
+        //   - Fix:   realGain ≈ €0 (corretto)
+        const initialCapital = 10_000;
+        const monthlyContribution = 100;
+        const annualRatePct = 2;
+        const inflationRatePct = 2;
+        const years = 20;
+
+        // Sanity: il rendimento reale e' esattamente 0%.
+        expect(computeRealReturn(annualRatePct, inflationRatePct)).toBeCloseTo(0, 10);
+
+        const sim = simulateCompoundInterest({
+            initialCapital,
+            monthlyContribution,
+            annualRatePct,
+            years,
+        });
+        const adjusted = computeInflationAdjustedTotals({
+            initialCapital,
+            monthlyContribution,
+            inflationRatePct,
+            years,
+        });
+
+        const inflationFactor = Math.pow(1 + inflationRatePct / 100, years);
+        const realFinalBalance = sim.finalBalance / inflationFactor;
+        const realGainFixed = realFinalBalance - adjusted.realTotalDeposited;
+        const realGainBuggy = realFinalBalance - sim.totalDeposited;
+
+        // Il fix produce un guadagno reale ~ 0 (tolleranza ±100€ su 20 anni di
+        // compounding mensile con timing leggermente differito tra interesse e
+        // contributo).
+        expect(Math.abs(realGainFixed)).toBeLessThan(100);
+        // La versione buggy invece riportava una falsa perdita di ~€4.125.
+        expect(realGainBuggy).toBeLessThan(-3_500);
+        // Il fix e' di magnitudine sensibile (>€3.5k di errore corretto).
+        expect(realGainFixed - realGainBuggy).toBeGreaterThan(3_500);
+    });
+
+    it("REGRESSION: realGain >= 0 quando rendimento reale > 0 (caso PAC tipico)", () => {
+        // 7% nominale, 2.5% inflazione, 20 anni: rendimento reale ~ 4.39% (Fisher).
+        // Il PAC accumula valore reale, quindi realGain deve essere positivo.
+        const initialCapital = 10_000;
+        const monthlyContribution = 300;
+        const annualRatePct = 7;
+        const inflationRatePct = 2.5;
+        const years = 20;
+
+        const sim = simulateCompoundInterest({
+            initialCapital,
+            monthlyContribution,
+            annualRatePct,
+            years,
+        });
+        const adjusted = computeInflationAdjustedTotals({
+            initialCapital,
+            monthlyContribution,
+            inflationRatePct,
+            years,
+        });
+
+        const realFinalBalance = sim.finalBalance / Math.pow(1 + inflationRatePct / 100, years);
+        const realGain = realFinalBalance - adjusted.realTotalDeposited;
+        expect(realGain).toBeGreaterThan(0);
+    });
+
+    it("REGRESSION: realGain < 0 quando rendimento reale < 0 (inflazione divora il rendimento)", () => {
+        const sim = simulateCompoundInterest({
+            initialCapital: 10_000,
+            monthlyContribution: 300,
+            annualRatePct: 2,
+            years: 20,
+        });
+        const adjusted = computeInflationAdjustedTotals({
+            initialCapital: 10_000,
+            monthlyContribution: 300,
+            inflationRatePct: 5,
+            years: 20,
+        });
+        const realFinalBalance = sim.finalBalance / Math.pow(1 + 5 / 100, 20);
+        const realGain = realFinalBalance - adjusted.realTotalDeposited;
+        expect(realGain).toBeLessThan(0);
     });
 });
 
