@@ -109,6 +109,19 @@ export interface InflationProjectionResult {
      * assoluto e' zero.
      */
     realInvestmentAdvantagePct: number;
+    /**
+     * Tempo (in anni) necessario perche' il valore REALE dell'investimento
+     * raddoppi rispetto al capitale iniziale (1 € investito oggi vale 2 € di
+     * potere d'acquisto odierno fra N anni). Formula esatta:
+     * ln(2) / ln(1 + realReturn) con realReturn = (1+nominal)/(1+inflation) - 1.
+     * E' la dualita' "carrot" della Regola del 72 applicata al rendimento
+     * REALE (non nominale): mostra in quanti anni il compounding batte
+     * davvero l'inflazione, complementando `purchasingPowerHalvingYears` che
+     * misura invece l'erosione del cash. `null` quando il rendimento reale e'
+     * <= 0 (l'investimento non raddoppia mai in termini reali) o quando i
+     * tassi sono non finiti.
+     */
+    realValueDoublingYears: number | null;
 }
 
 function sanitize(value: number, fallback = 0): number {
@@ -179,6 +192,17 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
     const realInvestmentAdvantagePct =
         amount > 0 && realInvestmentAdvantage > 0 ? (realInvestmentAdvantage / amount) * 100 : 0;
 
+    // Tempo di raddoppio reale: dualita' "carrot" della halving del cash.
+    // Calcolato sul rendimento REALE (Fisher esatto, gia' computato sopra) per
+    // garantire che il "raddoppio" sia in potere d'acquisto e non in valore
+    // nominale gonfiato dall'inflazione. Null quando real return <= 0 (caso in
+    // cui il valore reale non raddoppia mai) o non finito (input degenere).
+    const realReturnDecimal = realReturnPct / 100;
+    const realValueDoublingYears =
+        Number.isFinite(realReturnDecimal) && realReturnDecimal > 0
+            ? Math.log(2) / Math.log(1 + realReturnDecimal)
+            : null;
+
     return {
         points,
         realReturnPct,
@@ -194,6 +218,7 @@ export function projectInflation(params: InflationProjectionParams): InflationPr
         averageMonthlyPurchasingPowerLoss,
         realInvestmentAdvantage,
         realInvestmentAdvantagePct,
+        realValueDoublingYears,
     };
 }
 

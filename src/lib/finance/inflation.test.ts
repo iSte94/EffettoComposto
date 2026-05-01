@@ -349,4 +349,72 @@ describe("projectInflation", () => {
             expect(Number.isFinite(r.realInvestmentAdvantagePct)).toBe(true);
         });
     });
+
+    describe("realValueDoublingYears", () => {
+        it("rendimento reale del 5% (7% nominale, 2% inflazione): raddoppio in ~14.4 anni", () => {
+            // realReturn = 1.07 / 1.02 - 1 ≈ 4.902%; ln(2)/ln(1.04902) ≈ 14.493
+            const r = projectInflation({ amount: 100000, inflationRatePct: 2, years: 30, nominalReturnPct: 7 });
+            expect(r.realValueDoublingYears).not.toBeNull();
+            expect(r.realValueDoublingYears!).toBeCloseTo(14.493, 1);
+        });
+
+        it("inflazione zero: raddoppio reale = raddoppio nominale (es. 7% nominale -> ~10.24 anni)", () => {
+            // ln(2)/ln(1.07) ≈ 10.245
+            const r = projectInflation({ amount: 1000, inflationRatePct: 0, years: 20, nominalReturnPct: 7 });
+            expect(r.realValueDoublingYears!).toBeCloseTo(10.245, 1);
+        });
+
+        it("rendimento nominale = inflazione (rendimento reale = 0): null (no raddoppio)", () => {
+            const r = projectInflation({ amount: 50000, inflationRatePct: 3, years: 20, nominalReturnPct: 3 });
+            expect(r.realValueDoublingYears).toBeNull();
+        });
+
+        it("rendimento reale negativo (inflazione > nominale): null (mai)", () => {
+            // 5% inflazione, 2% nominale -> real ≈ -2.86%
+            const r = projectInflation({ amount: 100000, inflationRatePct: 5, years: 20, nominalReturnPct: 2 });
+            expect(r.realValueDoublingYears).toBeNull();
+        });
+
+        it("rendimento nominale = 0 con inflazione positiva: null", () => {
+            const r = projectInflation({ amount: 100000, inflationRatePct: 3, years: 20, nominalReturnPct: 0 });
+            expect(r.realValueDoublingYears).toBeNull();
+        });
+
+        it("coerenza algebrica: dopo N anni di raddoppio reale, realValue ~ 2 * amount", () => {
+            // Verifica indipendente: (1+real)^doubling = 2.
+            const inflationRatePct = 2;
+            const nominalReturnPct = 7;
+            const r = projectInflation({ amount: 10000, inflationRatePct, years: 0, nominalReturnPct });
+            const doubling = r.realValueDoublingYears!;
+            const realReturn = (1 + nominalReturnPct / 100) / (1 + inflationRatePct / 100) - 1;
+            expect(Math.pow(1 + realReturn, doubling)).toBeCloseTo(2, 6);
+        });
+
+        it("non dipende da amount ne' da years", () => {
+            const a = projectInflation({ amount: 100, inflationRatePct: 2, years: 5, nominalReturnPct: 7 });
+            const b = projectInflation({ amount: 999_999, inflationRatePct: 2, years: 50, nominalReturnPct: 7 });
+            expect(a.realValueDoublingYears!).toBeCloseTo(b.realValueDoublingYears!, 6);
+        });
+
+        it("rendimenti reali alti (es. 10% reale): raddoppio in ~7.27 anni", () => {
+            // ln(2)/ln(1.10) ≈ 7.273. Setup: inflazione = 0, nominale = 10.
+            const r = projectInflation({ amount: 1000, inflationRatePct: 0, years: 10, nominalReturnPct: 10 });
+            expect(r.realValueDoublingYears!).toBeCloseTo(7.273, 1);
+        });
+
+        it("input non finiti non producono NaN/Infinity ne' valori non-null spuri", () => {
+            const r = projectInflation({
+                amount: Number.NaN,
+                inflationRatePct: Number.POSITIVE_INFINITY,
+                years: Number.NaN,
+                nominalReturnPct: Number.NaN,
+            });
+            // Con NaN sanitizzati a 0 e Infinity non sanitizzato (sanitize non gestisce Infinity sui pct),
+            // il rendimento reale non e' positivo finito: il risultato deve essere null, non un numero spurio.
+            expect(r.realValueDoublingYears === null || Number.isFinite(r.realValueDoublingYears)).toBe(true);
+            if (r.realValueDoublingYears !== null) {
+                expect(r.realValueDoublingYears).toBeGreaterThan(0);
+            }
+        });
+    });
 });
