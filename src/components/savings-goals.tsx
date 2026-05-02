@@ -21,6 +21,10 @@ interface SavingsGoal {
     name: string;
     targetAmount: number;
     currentAmount: number;
+    // Saldo al momento della creazione: NON contato come "savings storici".
+    // Default 0 per goal legacy (creati prima di questa colonna): in quel
+    // caso la pace cade sulla formula precedente `current / mesi_trascorsi`.
+    initialAmount: number;
     deadline: string | null;
     category: string;
     createdAt: string;
@@ -108,17 +112,35 @@ function formatMonthsCompact(months: number): string {
     return `${yearsLabel} e ${monthsLabel}`;
 }
 
-function getEstimatedDate(current: number, target: number, createdAt: string): string | null {
+// Mesi minimi richiesti prima di considerare la pace storica significativa.
+// Coerente con MIN_MONTHS_FOR_PACE in savings-goals-completion.ts: un goal
+// brand-new non ha ancora storia di risparmio misurabile.
+const MIN_MONTHS_FOR_PACE = 1;
+
+function getEstimatedDate(
+    current: number,
+    target: number,
+    createdAt: string,
+    initialAmount: number,
+): string | null {
     if (current >= target) return "Raggiunto!";
     const created = new Date(createdAt);
+    if (!Number.isFinite(created.getTime())) return null;
     const now = new Date();
-    const monthsElapsed = Math.max(1, differenceInMonths(now, created));
-    const savingsPerMonth = current / monthsElapsed;
-    if (savingsPerMonth <= 0) return null;
+    const monthsElapsed = differenceInMonths(now, created);
+    if (!Number.isFinite(monthsElapsed) || monthsElapsed < MIN_MONTHS_FOR_PACE) return null;
+    // BUG FIX: NON contare il saldo iniziale come "savings". Prima del fix
+    // un goal creato con €5.000 di partenza generava una pace fittizia che
+    // anticipava il completamento di mesi/anni. Vedi savings-goals-completion.ts.
+    const savedSinceCreation = Math.max(0, current - Math.max(0, initialAmount));
+    const savingsPerMonth = savedSinceCreation / monthsElapsed;
+    if (!Number.isFinite(savingsPerMonth) || savingsPerMonth <= 0) return null;
     const remaining = target - current;
     const monthsToGo = Math.ceil(remaining / savingsPerMonth);
+    if (!Number.isFinite(monthsToGo)) return null;
     const estimated = new Date();
     estimated.setMonth(estimated.getMonth() + monthsToGo);
+    if (!Number.isFinite(estimated.getTime())) return null;
     return format(estimated, "MMM yyyy", { locale: it });
 }
 
@@ -131,6 +153,20 @@ interface DeadlinePacing {
     status: PacingStatus;
 }
 
+function computeHistoricalMonthly(goal: SavingsGoal, now: Date): number {
+    const created = new Date(goal.createdAt);
+    if (!Number.isFinite(created.getTime())) return 0;
+    const monthsElapsed = differenceInMonths(now, created);
+    if (!Number.isFinite(monthsElapsed) || monthsElapsed < MIN_MONTHS_FOR_PACE) return 0;
+    // BUG FIX: il saldo iniziale del goal NON e' "savings storici". Prima
+    // del fix `historicalMonthly = currentAmount / monthsElapsed` includeva
+    // il capitale di partenza, sovrastimando la pace per qualunque goal
+    // creato con un capitale > 0.
+    const savedSinceCreation = Math.max(0, goal.currentAmount - Math.max(0, goal.initialAmount ?? 0));
+    const pace = savedSinceCreation / monthsElapsed;
+    return Number.isFinite(pace) && pace > 0 ? pace : 0;
+}
+
 function getDeadlinePacing(goal: SavingsGoal): DeadlinePacing | null {
     if (!goal.deadline) return null;
     if (goal.currentAmount >= goal.targetAmount) return null;
@@ -141,18 +177,14 @@ function getDeadlinePacing(goal: SavingsGoal): DeadlinePacing | null {
     const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
 
     if (monthsLeft < 0) {
-        const created = new Date(goal.createdAt);
-        const monthsElapsed = Math.max(1, differenceInMonths(now, created));
-        const historical = goal.currentAmount / monthsElapsed;
+        const historical = computeHistoricalMonthly(goal, now);
         return { requiredMonthly: 0, monthsLeft, historicalMonthly: historical, status: "expired" };
     }
 
     const effectiveMonths = Math.max(1, monthsLeft);
     const requiredMonthly = remaining / effectiveMonths;
 
-    const created = new Date(goal.createdAt);
-    const monthsElapsed = Math.max(1, differenceInMonths(now, created));
-    const historicalMonthly = goal.currentAmount / monthsElapsed;
+    const historicalMonthly = computeHistoricalMonthly(goal, now);
 
     let status: PacingStatus = "behind";
     if (historicalMonthly >= requiredMonthly) status = "on-track";
@@ -632,7 +664,7 @@ export function SavingsGoals({ user }: SavingsGoalsProps) {
                         const category = getCategoryInfo(goal.category);
                         const progress = goal.targetAmount > 0 ? (goal.currentAmount / goal.targetAmount) * 100 : 0;
                         const isComplete = progress >= 100;
-                        const estimated = getEstimatedDate(goal.currentAmount, goal.targetAmount, goal.createdAt);
+                        const estimated = getEstimatedDate(goal.currentAmount, goal.targetAmount, goal.createdAt, goal.initialAmount ?? 0);
                         const remaining = Math.max(0, goal.targetAmount - goal.currentAmount);
                         const pacingBadge = pacing ? PACING_BADGE[pacing.status] : null;
 

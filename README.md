@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.30`
+**Versione corrente:** `v1.10.31`
 
 ---
 
@@ -113,6 +113,25 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.31 - 2 maggio 2026 (BUG FIX — il "ritmo storico" degli Obiettivi di Risparmio non conta piu' il saldo iniziale come "savings", correzione di una sovrastima sistematica del completamento)
+
+- **Falla logica scovata** — il modulo `src/lib/finance/savings-goals-completion.ts` (e i suoi consumatori `getEstimatedDate` / `getDeadlinePacing` in `src/components/savings-goals.tsx`) calcolava il ritmo di risparmio storico di ciascun obiettivo come `currentAmount / Math.max(1, mesi_trascorsi)`. La formula trattava l'INTERO saldo corrente come se fosse stato accumulato durante l'orizzonte del goal, contando il **capitale di partenza** (cioe' il valore iniziale che il goal aveva al momento della creazione) come "savings storici" — un errore di apples-to-oranges con conseguenze numeriche pesanti:
+  - Goal creato OGGI con €5.000 gia' presenti → `monthsElapsed` clampato a 1 → pace fittizia di **€5.000/mese**, completamento "stimato" a 1 mese.
+  - Goal creato 6 mesi fa con €5.000 di partenza, oggi €6.000 (cioe' €1.000 risparmiati in 6 mesi = €167/mese reali) → la formula riportava €6.000/6 = **€1.000/mese**, una sovrastima 6× che anticipava il completamento di anni.
+  Il bug era inoltre _cementato_ da un test esplicito (`clamps elapsed months to a minimum of 1`) che asseriva il comportamento sbagliato come "fix" della divisione per zero, garantendo regressione ad ogni refactor.
+- **Soluzione applicata** — nuovo campo `initialAmount` su `SavingsGoal` (Prisma + migrazione SQL `20260502072700_add_savings_goal_initial_amount`) che persiste il saldo iniziale al momento della creazione del goal. Sulla `POST /api/goals` il campo viene impostato automaticamente a `currentAmount` (il valore digitato dall'utente in fase di creazione), mentre la `PUT` lascia il campo immutabile (l'identita' "saldo di partenza" non deve mai essere riscritta a posteriori). Il calcolo della pace storica diventa `(currentAmount - initialAmount) / mesi_trascorsi` con tre invarianti aggiuntive:
+  1. **Soglia minima di significativita'**: goal con meno di 1 mese intero di storia non contribuiscono al ritmo aggregato (`MIN_MONTHS_FOR_PACE`). Prima del fix il clamp `Math.max(1, monthsElapsed)` mascherava da "media mensile" cio' che invece era "saldo iniziale spalmato su 1 mese fittizio". Adesso e' un "dati insufficienti" onesto.
+  2. **Pace non negativa**: se `currentAmount <= initialAmount` (utente non ha ancora risparmiato o ha prelevato dal goal), la pace di quel goal e' 0 — non un numero negativo che falserebbe la somma aggregata.
+  3. **Backward compatibility**: i goal storici creati prima della migrazione hanno `initialAmount = 0` per default, quindi la formula degenera al comportamento legacy `current / mesi`. Cosi' il fix non rompe la pace dei goal precedenti, mentre i goal creati post-fix calcolano la pace correttamente.
+- **Robustezza tecnica** — sanitizzazione dei nuovi input (`Math.max(0, sanitize(initialAmount ?? 0))`) per evitare propagazione di NaN/Infinity, validazione di `createdAt` con `Number.isFinite(getTime())` su `getEstimatedDate` (eliminato il rischio di `format(InvalidDate)` che lanciava `RangeError` con `createdAt` corrotto), guard espliciti su `setMonth(NaN)`. Estratto un helper `computeHistoricalMonthly(goal, now)` condiviso fra `getDeadlinePacing` (status on-track / stretch / behind) e `getEstimatedDate` (data prevista) per evitare drift fra le due implementazioni della stessa formula.
+- **Coverage di test** — quattro nuovi test in `savings-goals-completion.test.ts` certificano il fix:
+  1. `non produce pace per goal con meno di 1 mese di storico (BUG FIX)` — sostituisce il vecchio test buggy: oggi un goal nuovo restituisce `aggregateMonthlyPace = 0` e `monthsToCompletion = null` invece della pace fittizia.
+  2. `non conta il saldo iniziale come savings (BUG FIX core)` — verifica numericamente il caso canonico €5k → €6k in 6 mesi: pace ~€166.67/mese, completamento in 24 mesi (vs. 4 mesi del bug).
+  3. `currentAmount <= initialAmount produce pace zero` — copre il caso di prelievo dal goal.
+  4. `backward compatibility: initialAmount mancante (legacy)` — garantisce che goal senza il nuovo campo continuino a comportarsi come prima.
+  Tutti i test esistenti (594) restano verdi: la coverage totale sale a **598/598 passati**.
+- **Impatto utente** — l'`Obiettivi di Risparmio` mostra ora date di completamento e badge di pacing (in linea / da accelerare / in ritardo / scaduto) basati sul ritmo REALE di risparmio dell'utente, non su una pace gonfiata dal capitale di partenza. La metrica "Tempo stimato al completamento di TUTTI i goal" passa da una proiezione ottimisticamente fuorviante a una stima onesta, allineata al messaggio FIRE del prodotto: il composto si misura su quello che **versi**, non su quello che gia' avevi.
 
 ### v1.10.30 - 1 maggio 2026 (UX — nuovo chip "Tempo di Raddoppio Reale" nel Calcolatore Inflazione, dualita' "carrot" della Regola del 72 sul rendimento reale)
 

@@ -13,11 +13,49 @@
 //
 // Tutti gli importi sono in EURO; il tempo e' in mesi interi arrotondati
 // per eccesso (un'unita' frazionaria di mese non ha valore operativo).
+//
+// === BUG FIX (regressione "savings-pace-counts-initial-balance") ===
+//
+// La versione precedente calcolava il ritmo storico come
+// `currentAmount / mesi_trascorsi`, includendo erroneamente il SALDO
+// INIZIALE (capitale che il goal aveva al momento della creazione) come
+// se fosse stato risparmiato durante l'orizzonte. La sovrastima era
+// massima per i goal creati con un capitale di partenza > 0:
+//
+//   - Goal creato OGGI con €5.000 gia' presenti, target €10.000:
+//     vecchia stima -> ~€5.000/mese di pace, completamento in 1 mese.
+//     Realta' -> il goal e' nuovo, non c'e' pace storica misurabile.
+//
+//   - Goal creato 6 mesi fa con €5.000 di partenza, oggi €6.000 (cioe'
+//     €1.000 risparmiati in 6 mesi = €167/mese):
+//     vecchia stima -> €6.000 / 6 = €1.000/mese (sovrastima 6x).
+//     Realta' -> €1.000 / 6 = €167/mese (formula corretta).
+//
+// La fix usa il saldo iniziale persistito su `SavingsGoal.initialAmount`
+// (nuova colonna): il ritmo storico diventa
+// `(currentAmount - initialAmount) / mesi_trascorsi`. I goal storici che
+// non hanno il campo (legacy, default 0) mantengono il comportamento
+// precedente per backward compatibility, ma i nuovi goal calcolano la
+// pace correttamente.
 import { differenceInMonths } from "date-fns";
+
+/**
+ * Soglia minima di mesi trascorsi (interi) prima di considerare il ritmo
+ * storico statisticamente significativo. Un goal creato meno di un mese
+ * fa NON ha ancora una pace misurabile: qualunque valore prodotto sarebbe
+ * solo rumore amplificato (i.e. il bug originale clampava a 1 mese e
+ * spalmava l'INTERO saldo come pace).
+ */
+const MIN_MONTHS_FOR_PACE = 1;
 
 export interface CompletionGoalInput {
     targetAmount: number;
     currentAmount: number;
+    /**
+     * Saldo iniziale al momento della creazione del goal. Default 0 per
+     * compatibilita' con i goal storici (preservare comportamento legacy).
+     */
+    initialAmount?: number;
     createdAt: string;
 }
 
@@ -48,9 +86,15 @@ function sanitize(value: number, fallback = 0): number {
 /**
  * Tempo stimato per completare tutti gli obiettivi di risparmio attivi al
  * ritmo storico aggregato. Sanitizza input non finiti e clampa a >=0 i
- * valori monetari, ignora goal completati o con `targetAmount <= 0`, e
- * usa un minimo di 1 mese come "tempo trascorso" per evitare divisioni
- * per zero quando un goal e' stato creato da poco.
+ * valori monetari, ignora goal completati o con `targetAmount <= 0`.
+ *
+ * Il ritmo storico e' calcolato come `(currentAmount - initialAmount) /
+ * mesi_trascorsi`: il saldo iniziale del goal NON viene contato come
+ * "savings" (era il bug sovrastimante della versione precedente). Goal
+ * con meno di {@link MIN_MONTHS_FOR_PACE} mesi di storico non
+ * contribuiscono al ritmo aggregato (dati insufficienti). Se il saldo
+ * corrente e' <= saldo iniziale (utente non ha ancora risparmiato o ha
+ * prelevato), la pace di quel goal e' 0.
  */
 export function computeSavingsGoalsCompletion(
     goals: CompletionGoalInput[],
@@ -71,8 +115,12 @@ export function computeSavingsGoalsCompletion(
         const created = new Date(raw.createdAt);
         if (!Number.isFinite(created.getTime())) continue;
 
-        const monthsElapsed = Math.max(1, differenceInMonths(now, created));
-        const historicalMonthly = current / monthsElapsed;
+        const initial = Math.max(0, sanitize(raw.initialAmount ?? 0));
+        const savedSinceCreation = Math.max(0, current - initial);
+        const monthsElapsedRaw = differenceInMonths(now, created);
+        if (!Number.isFinite(monthsElapsedRaw) || monthsElapsedRaw < MIN_MONTHS_FOR_PACE) continue;
+
+        const historicalMonthly = savedSinceCreation / monthsElapsedRaw;
         if (Number.isFinite(historicalMonthly) && historicalMonthly > 0) {
             aggregateMonthlyPace += historicalMonthly;
         }
