@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
     computeDelayCost,
     computeInflationAdjustedTotals,
+    decomposeFinalBalance,
     effectiveAnnualRatePct,
     simulateCompoundInterest,
 } from "./compound-interest";
@@ -507,6 +508,133 @@ describe("computeInflationAdjustedTotals", () => {
         const realFinalBalance = sim.finalBalance / Math.pow(1 + 5 / 100, 20);
         const realGain = realFinalBalance - adjusted.realTotalDeposited;
         expect(realGain).toBeLessThan(0);
+    });
+});
+
+describe("decomposeFinalBalance", () => {
+    const baseParams = {
+        initialCapital: 10_000,
+        monthlyContribution: 300,
+        annualRatePct: 7,
+        years: 20,
+    };
+
+    it("la somma delle due componenti coincide con simulateCompoundInterest.finalBalance", () => {
+        // Proprieta' fondamentale: la decomposizione e' esatta perche' la
+        // ricorrenza e' lineare. Tolleranza minima per arrotondamenti float.
+        const decomp = decomposeFinalBalance(baseParams);
+        const sim = simulateCompoundInterest(baseParams);
+        expect(decomp.fromInitial + decomp.fromContributions).toBeCloseTo(sim.finalBalance, 4);
+    });
+
+    it("le quote sommano a 1 (niente arrotondamenti spuri)", () => {
+        const decomp = decomposeFinalBalance(baseParams);
+        expect(decomp.initialShare + decomp.contributionsShare).toBeCloseTo(1, 10);
+    });
+
+    it("forma chiusa: fromInitial = initialCapital * (1+m)^N", () => {
+        const decomp = decomposeFinalBalance(baseParams);
+        const m = 0.07 / 12;
+        const N = 20 * 12;
+        expect(decomp.fromInitial).toBeCloseTo(10_000 * Math.pow(1 + m, N), 4);
+    });
+
+    it("forma chiusa: fromContributions = C * ((1+m)^N - 1) / m", () => {
+        const decomp = decomposeFinalBalance(baseParams);
+        const m = 0.07 / 12;
+        const N = 20 * 12;
+        const expected = (300 * (Math.pow(1 + m, N) - 1)) / m;
+        expect(decomp.fromContributions).toBeCloseTo(expected, 4);
+    });
+
+    it("monthlyContribution = 0: tutto il saldo viene dal capitale iniziale", () => {
+        const decomp = decomposeFinalBalance({ ...baseParams, monthlyContribution: 0 });
+        expect(decomp.fromContributions).toBe(0);
+        expect(decomp.initialShare).toBe(1);
+        expect(decomp.contributionsShare).toBe(0);
+    });
+
+    it("initialCapital = 0: tutto il saldo viene dai contributi", () => {
+        const decomp = decomposeFinalBalance({ ...baseParams, initialCapital: 0 });
+        expect(decomp.fromInitial).toBe(0);
+        expect(decomp.initialShare).toBe(0);
+        expect(decomp.contributionsShare).toBe(1);
+    });
+
+    it("annualRatePct = 0: degenerazione lineare (no compound)", () => {
+        const decomp = decomposeFinalBalance({ ...baseParams, annualRatePct: 0 });
+        // Senza tasso il saldo e' la pura somma di iniziale + contributi.
+        expect(decomp.fromInitial).toBe(10_000);
+        expect(decomp.fromContributions).toBeCloseTo(300 * 240, 6);
+    });
+
+    it("years = 0: nessun PAC fatto, tutto il saldo e' il capitale iniziale", () => {
+        const decomp = decomposeFinalBalance({ ...baseParams, years: 0 });
+        expect(decomp.fromInitial).toBe(10_000);
+        expect(decomp.fromContributions).toBe(0);
+        expect(decomp.initialShare).toBe(1);
+    });
+
+    it("orizzonti lunghi: il PAC supera il lump sum (effetto del compound sui contributi)", () => {
+        // 10k iniziale vs 300/mese per 30 anni @ 7%: il PAC accumula molto di
+        // piu' del lump sum capitalizzato perche' i contributi totali (108k)
+        // superano largamente il capitale iniziale.
+        const decomp = decomposeFinalBalance({ ...baseParams, years: 30 });
+        expect(decomp.contributionsShare).toBeGreaterThan(decomp.initialShare);
+    });
+
+    it("orizzonti corti con grande lump sum: l'iniziale domina", () => {
+        // 100k iniziale + 100/mese per 5 anni: il lump sum capitalizzato
+        // supera nettamente il PAC accumulato.
+        const decomp = decomposeFinalBalance({
+            initialCapital: 100_000,
+            monthlyContribution: 100,
+            annualRatePct: 7,
+            years: 5,
+        });
+        expect(decomp.initialShare).toBeGreaterThan(0.9);
+    });
+
+    it("entrambi a zero: nessuna esplosione, tutte le quote a 0", () => {
+        const decomp = decomposeFinalBalance({
+            initialCapital: 0,
+            monthlyContribution: 0,
+            annualRatePct: 7,
+            years: 10,
+        });
+        expect(decomp.fromInitial).toBe(0);
+        expect(decomp.fromContributions).toBe(0);
+        expect(decomp.initialShare).toBe(0);
+        expect(decomp.contributionsShare).toBe(0);
+    });
+
+    it("input non finiti vengono sanificati a 0", () => {
+        const decomp = decomposeFinalBalance({
+            initialCapital: Number.NaN,
+            monthlyContribution: Number.POSITIVE_INFINITY,
+            annualRatePct: Number.NaN,
+            years: Number.NaN,
+        });
+        expect(decomp.fromInitial).toBe(0);
+        expect(decomp.fromContributions).toBe(0);
+        expect(decomp.initialShare).toBe(0);
+        expect(decomp.contributionsShare).toBe(0);
+    });
+
+    it("scala linearmente con initialCapital a parita' degli altri parametri", () => {
+        const small = decomposeFinalBalance({ ...baseParams, initialCapital: 1_000 });
+        const big = decomposeFinalBalance({ ...baseParams, initialCapital: 10_000 });
+        // fromInitial scala 10x, fromContributions e' invariante.
+        expect(big.fromInitial / small.fromInitial).toBeCloseTo(10, 6);
+        expect(big.fromContributions).toBeCloseTo(small.fromContributions, 4);
+    });
+
+    it("scala linearmente con monthlyContribution a parita' degli altri parametri", () => {
+        const small = decomposeFinalBalance({ ...baseParams, monthlyContribution: 100 });
+        const big = decomposeFinalBalance({ ...baseParams, monthlyContribution: 500 });
+        // fromContributions scala 5x, fromInitial e' invariante.
+        expect(big.fromContributions / small.fromContributions).toBeCloseTo(5, 4);
+        expect(big.fromInitial).toBeCloseTo(small.fromInitial, 4);
     });
 });
 

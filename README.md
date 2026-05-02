@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.31`
+**Versione corrente:** `v1.10.32`
 
 ---
 
@@ -113,6 +113,34 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.32 - 2 maggio 2026 (UX — nuova KPI "Composizione del Saldo Finale" nel Calcolatore Interesse Composto: scompone il saldo nelle due sorgenti additive — capitale iniziale capitalizzato vs contributi mensili capitalizzati)
+
+- **Problema iniziale** — il `Calcolatore Interesse Composto` (`src/components/compound-interest-calculator.tsx`) racconta gia' molto bene il "quanto" e il "quando" del piano di accumulo (saldo nominale, saldo reale, guadagno reale, punto di svolta interessi-vs-versamenti, multiplicatore del capitale, tempo di raddoppio nominale e reale, rendita FIRE, costo del ritardo, TAEG-equivalent), ma mancava una metrica che rispondesse a una domanda strutturale di un piano di accumulo: **"il mio saldo finale lo sta facendo soprattutto il capitale di partenza o il ritmo dei contributi?"**. La card `% da interessi composti` quantifica gli interessi totali sul saldo, ma sovrappone in un'unica voce il composto del lump iniziale e quello dei versamenti — due dinamiche con interpretazioni finanziarie diverse (un giovane senza patrimonio costruisce ricchezza con il "ritmo", un patrimonializzato con il "punto di partenza"). Senza questa scomposizione l'utente non aveva uno strumento per capire se il suo piano sta sfruttando di piu' la "leva" del lump sum (orizzonti corti / capitale iniziale grande) o l'effetto cumulativo del PAC (orizzonti lunghi / contributi consistenti), e quindi non poteva decidere consapevolmente se valesse la pena spostare un €1.000 dal mensile al lump iniziale (o viceversa).
+- **Soluzione applicata** — nuovo modulo puro `decomposeFinalBalance` in `src/lib/finance/compound-interest.ts` che decompone il saldo nominale finale nelle DUE traiettorie additive che la ricorrenza dell'interesse composto produce: `fromInitial = initialCapital * (1+m)^N` (lump sum capitalizzato per l'intero orizzonte, indipendente dai contributi) e `fromContributions = monthlyContribution * ((1+m)^N - 1) / m` (rendita posticipata mensile, indipendente dal lump sum). La decomposizione e' **esatta** perche' la ricorrenza `balance = balance * (1+m) + contribution` e' lineare nelle due sorgenti, quindi le due componenti sommano esattamente al saldo finale (verificato con tolleranza float a 4 cifre decimali sui parametri canonici 10k iniziale + 300/mese + 7% + 20 anni). La forma chiusa usa `Math.expm1(N * Math.log1p(m))` invece di `Math.pow(1+m, N) - 1` per non perdere precisione su tassi piccoli / orizzonti corti, e degenera correttamente a `monthlyContribution * N` quando il tasso mensile e' zero (no compound da estrarre). Esposte due quote `initialShare` e `contributionsShare` in [0, 1] che sommano a 1 quando il totale e' positivo.
+- **Robustezza tecnica** — sanitizzazione completa degli input (NaN/Infinity → 0 coerente con `simulateCompoundInterest`), guard espliciti su `fromContributions < 0` e `!Number.isFinite(fromContributions)`, gestione esplicita dei tre edge case finanziari: (1) `monthlyContribution = 0` → 100% lump iniziale, (2) `initialCapital = 0` → 100% contributi, (3) `years = 0` → solo lump (no PAC fatto). Quando entrambi sono zero le quote restano a 0 (no NaN da divisione). La card UI si nasconde silenziosamente quando il saldo finale e' zero (caso degenere) per non mostrare "0% / 0%" privo di significato.
+- **Coverage di test** — 14 nuovi test in `compound-interest.test.ts` certificano la decomposizione:
+  1. La somma `fromInitial + fromContributions` coincide con `simulateCompoundInterest.finalBalance` (proprieta' fondamentale: la decomposizione e' esatta perche' la ricorrenza e' lineare).
+  2. Le quote sommano esattamente a 1 (no arrotondamenti spuri nella visualizzazione).
+  3. Forma chiusa `fromInitial = initialCapital * (1+m)^N` verificata indipendentemente.
+  4. Forma chiusa `fromContributions = C * ((1+m)^N - 1) / m` verificata indipendentemente.
+  5. `monthlyContribution = 0` → `contributionsShare = 0`, `initialShare = 1`.
+  6. `initialCapital = 0` → `initialShare = 0`, `contributionsShare = 1`.
+  7. `annualRatePct = 0` → degenerazione lineare: `fromInitial = initial`, `fromContributions = C * N`.
+  8. `years = 0` → tutto lump iniziale, no PAC.
+  9. Orizzonti lunghi (30 anni @ 7%) → la quota PAC supera la quota lump (effetto del compound sui contributi).
+  10. Orizzonti corti con grande lump (100k + 100/mese + 5 anni) → l'iniziale domina con `initialShare > 90%`.
+  11. Entrambi a zero → tutte le quote a 0 (no esplosioni numeriche).
+  12. Input non finiti sanificati a 0.
+  13. Linearita' in `initialCapital`: 10× input → 10× `fromInitial`, `fromContributions` invariante.
+  14. Linearita' in `monthlyContribution`: 5× input → 5× `fromContributions`, `fromInitial` invariante.
+  Tutti i 598 test esistenti restano verdi: la coverage totale sale a **612/612 passati**.
+- **Impatto utente** — il `Calcolatore Interesse Composto` mostra ora una nuova card cyan/blu `Composizione del Saldo Finale` con:
+  - barra di progresso bicolore che visualizza il rapporto fra le due quote (cyan = capitale iniziale, blu = contributi);
+  - due tile percentuali con il valore assoluto in € sotto ognuna ("Da capitale iniziale: 33% / €52.150" e "Da contributi mensili: 67% / €106.030");
+  - tooltip educativo che spiega la matematica e collega le due dinamiche al profilo dell'utente (PAC dominante per orizzonti lunghi / lump iniziale piccolo, lump dominante per orizzonti corti / capitale grande);
+  - icona `PieChart` di lucide-react per coerenza visiva con le altre KPI strutturali (Multiplicatore del Capitale, Tempo di Raddoppio, Rendita FIRE).
+  La card si integra naturalmente nella colonna laterale fra "Multiplicatore del Capitale" e "Valore Reale", chiudendo il messaggio strutturale del calcolatore: dopo aver visto "quanto vale ogni €" (multiplicatore) e "quanto vale a fine piano" (saldo nominale + reale), l'utente ora vede anche **da dove proviene** quel saldo. E' la KPI piu' utile per decisioni "come distribuisco il mio risparmio fra lump sum iniziale e PAC mensile?", una domanda che fino ad oggi richiedeva di simulare manualmente due piani separati.
 
 ### v1.10.31 - 2 maggio 2026 (BUG FIX — il "ritmo storico" degli Obiettivi di Risparmio non conta piu' il saldo iniziale come "savings", correzione di una sovrastima sistematica del completamento)
 
