@@ -36,9 +36,9 @@ describe("computeSavingsGoalsCompletion", () => {
     });
 
     it("computes time-to-complete for a single goal from historical pace", () => {
-        // creato 4 mesi fa, risparmiati 400/1000 -> ritmo 100/mese, manca 600 -> 6 mesi
+        // creato 4 mesi fa con saldo iniziale 0, risparmiati 400/1000 -> ritmo 100/mese, manca 600 -> 6 mesi
         const r = computeSavingsGoalsCompletion(
-            [{ targetAmount: 1000, currentAmount: 400, createdAt: "2025-12-30" }],
+            [{ targetAmount: 1000, currentAmount: 400, initialAmount: 0, createdAt: "2025-12-30" }],
             NOW,
         );
         expect(r.activeGoals).toBe(1);
@@ -48,13 +48,13 @@ describe("computeSavingsGoalsCompletion", () => {
     });
 
     it("aggregates remaining and pace across multiple active goals", () => {
-        // A: 4 mesi fa, 400/1000 -> 100/mese, manca 600
-        // B: 2 mesi fa, 200/500  -> 100/mese, manca 300
+        // A: 4 mesi fa, init=0, 400/1000 -> 100/mese, manca 600
+        // B: 2 mesi fa, init=0, 200/500  -> 100/mese, manca 300
         // pace=200/mese, remaining=900 -> ceil(4.5)=5
         const r = computeSavingsGoalsCompletion(
             [
-                { targetAmount: 1000, currentAmount: 400, createdAt: "2025-12-30" },
-                { targetAmount: 500, currentAmount: 200, createdAt: "2026-02-28" },
+                { targetAmount: 1000, currentAmount: 400, initialAmount: 0, createdAt: "2025-12-30" },
+                { targetAmount: 500, currentAmount: 200, initialAmount: 0, createdAt: "2026-02-28" },
             ],
             NOW,
         );
@@ -76,14 +76,61 @@ describe("computeSavingsGoalsCompletion", () => {
         expect(r.estimatedCompletionDate).toBe(null);
     });
 
-    it("clamps elapsed months to a minimum of 1 (avoids division by zero)", () => {
-        // creato oggi: monthsElapsed forzato a 1 -> pace=500
+    it("non produce pace per goal con meno di 1 mese di storico (BUG FIX)", () => {
+        // Goal creato oggi: NON c'e' pace storica misurabile. Il bug fix
+        // sostituisce il vecchio comportamento (clamp a 1 mese -> pace fittizia
+        // pari all'INTERO saldo iniziale) con il piu' onesto "dati insufficienti".
         const r = computeSavingsGoalsCompletion(
-            [{ targetAmount: 1000, currentAmount: 500, createdAt: "2026-04-30" }],
+            [{ targetAmount: 1000, currentAmount: 500, initialAmount: 500, createdAt: "2026-04-30" }],
             NOW,
         );
-        expect(r.aggregateMonthlyPace).toBeCloseTo(500, 4);
-        expect(r.monthsToCompletion).toBe(1); // ceil(500/500)=1
+        expect(r.activeGoals).toBe(1);
+        expect(r.totalRemaining).toBe(500);
+        expect(r.aggregateMonthlyPace).toBe(0);
+        expect(r.monthsToCompletion).toBe(null);
+    });
+
+    it("non conta il saldo iniziale come savings (BUG FIX core)", () => {
+        // Goal creato 6 mesi fa con €5.000 di partenza, oggi €6.000:
+        //   - savings effettivi = 6.000 - 5.000 = 1.000 in 6 mesi -> €167/mese
+        //   - bug originale: 6.000 / 6 = 1.000/mese (sovrastima 6x)
+        // Manca 4.000 -> ceil(4.000 / 166.67) = 24 mesi al ritmo CORRETTO,
+        // mentre il bug avrebbe stimato ceil(4.000 / 1.000) = 4 mesi.
+        const r = computeSavingsGoalsCompletion(
+            [{ targetAmount: 10000, currentAmount: 6000, initialAmount: 5000, createdAt: "2025-10-30" }],
+            NOW,
+        );
+        expect(r.activeGoals).toBe(1);
+        expect(r.totalRemaining).toBe(4000);
+        // 1.000 risparmiati in 6 mesi -> ~166.67/mese.
+        expect(r.aggregateMonthlyPace).toBeCloseTo(1000 / 6, 2);
+        // ceil(4.000 / 166.67) = 24 mesi.
+        expect(r.monthsToCompletion).toBe(24);
+    });
+
+    it("currentAmount <= initialAmount produce pace zero (utente non ha risparmiato o ha prelevato)", () => {
+        // Goal creato 4 mesi fa con €5.000 di partenza, oggi €4.500 (prelievo
+        // di €500). Pace storica = 0 (nessun nuovo risparmio sul goal).
+        const r = computeSavingsGoalsCompletion(
+            [{ targetAmount: 10000, currentAmount: 4500, initialAmount: 5000, createdAt: "2025-12-30" }],
+            NOW,
+        );
+        expect(r.activeGoals).toBe(1);
+        expect(r.totalRemaining).toBe(5500);
+        expect(r.aggregateMonthlyPace).toBe(0);
+        expect(r.monthsToCompletion).toBe(null);
+    });
+
+    it("backward compatibility: initialAmount mancante (legacy) cade su comportamento precedente", () => {
+        // Senza initialAmount esplicito, default 0: pace = currentAmount / mesi.
+        // Goal legacy: 4 mesi fa, 400/1000 -> 100/mese.
+        const r = computeSavingsGoalsCompletion(
+            [{ targetAmount: 1000, currentAmount: 400, createdAt: "2025-12-30" }],
+            NOW,
+        );
+        expect(r.activeGoals).toBe(1);
+        expect(r.aggregateMonthlyPace).toBeCloseTo(100, 4);
+        expect(r.monthsToCompletion).toBe(6);
     });
 
     it("sanitizes NaN/Infinity in monetary inputs without propagating", () => {
@@ -104,9 +151,19 @@ describe("computeSavingsGoalsCompletion", () => {
         expect(Number.isFinite(r.aggregateMonthlyPace)).toBe(true);
     });
 
+    it("sanitizes NaN/Infinity in initialAmount", () => {
+        // initialAmount NaN -> sanitized a 0 (legacy fallback): pace = current/mesi.
+        const r = computeSavingsGoalsCompletion(
+            [{ targetAmount: 1000, currentAmount: 400, initialAmount: NaN, createdAt: "2025-12-30" }],
+            NOW,
+        );
+        expect(r.aggregateMonthlyPace).toBeCloseTo(100, 4);
+        expect(r.monthsToCompletion).toBe(6);
+    });
+
     it("estimatedCompletionDate equals now + monthsToCompletion months", () => {
         const r = computeSavingsGoalsCompletion(
-            [{ targetAmount: 1000, currentAmount: 400, createdAt: "2025-12-30" }],
+            [{ targetAmount: 1000, currentAmount: 400, initialAmount: 0, createdAt: "2025-12-30" }],
             NOW,
         );
         const expected = new Date(NOW);
@@ -129,9 +186,9 @@ describe("computeSavingsGoalsCompletion", () => {
         const r = computeSavingsGoalsCompletion(
             [
                 // completato: ignorato
-                { targetAmount: 500, currentAmount: 500, createdAt: "2025-10-30" },
-                // attivo: 4 mesi fa, 400/1000 -> 100/mo, manca 600
-                { targetAmount: 1000, currentAmount: 400, createdAt: "2025-12-30" },
+                { targetAmount: 500, currentAmount: 500, initialAmount: 0, createdAt: "2025-10-30" },
+                // attivo: 4 mesi fa, init 0, 400/1000 -> 100/mo, manca 600
+                { targetAmount: 1000, currentAmount: 400, initialAmount: 0, createdAt: "2025-12-30" },
             ],
             NOW,
         );

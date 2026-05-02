@@ -163,6 +163,13 @@ model SavingsGoal {
   name         String
   targetAmount Float
   currentAmount Float   @default(0)
+  // Saldo iniziale al momento della creazione del goal. Usato per calcolare
+  // il "ritmo storico" come (currentAmount - initialAmount) / mesi_trascorsi:
+  // senza questo campo, la pace sovrastimava sistematicamente il risparmio
+  // mensile per i goal creati con un capitale di partenza > 0 (perche'
+  // contava il saldo iniziale come "savings"). Default 0 per compatibilita'
+  // con goal storici (comportamento legacy invariato).
+  initialAmount Float   @default(0)
   deadline     String?  // YYYY-MM format
   category     String   @default("general") // general, emergency, house, investment, travel, other
   createdAt    DateTime @default(now())

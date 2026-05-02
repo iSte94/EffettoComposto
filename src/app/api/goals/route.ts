@@ -46,8 +46,17 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const data = createGoalSchema.parse(body);
 
+        // BUG FIX: persiste il saldo iniziale separatamente da `currentAmount`
+        // cosi' che la pace storica `(current - initial) / mesi` non conti
+        // il capitale di partenza come "savings". Vedi il commento di
+        // savings-goals-completion.ts per la regressione originale.
         const goal = await prisma.savingsGoal.create({
-            data: { ...data, deadline: data.deadline ?? null, userId },
+            data: {
+                ...data,
+                deadline: data.deadline ?? null,
+                initialAmount: data.currentAmount,
+                userId,
+            },
         });
         return NextResponse.json({ goal }, { status: 201 });
     } catch (e) {
