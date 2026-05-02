@@ -5,13 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass, Layers } from "lucide-react";
+import { Calculator, TrendingUp, Banknote, PiggyBank, Sparkles, TrendingDown, Repeat2, Flame, Hourglass, Layers, PieChart } from "lucide-react";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { formatEuro, formatEuroSigned } from "@/lib/format";
 import { computeRealReturn } from "@/lib/finance/fire-projection";
 import {
     computeDelayCost,
     computeInflationAdjustedTotals,
+    decomposeFinalBalance,
     effectiveAnnualRatePct,
     simulateCompoundInterest,
 } from "@/lib/finance/compound-interest";
@@ -105,6 +106,19 @@ export function CompoundInterestCalculator() {
             totalDeposited: sim.totalDeposited,
         });
 
+        // Composizione del Saldo Finale: decompone il saldo nominale nelle due
+        // sorgenti additive (lump iniziale capitalizzato vs PAC capitalizzato).
+        // Risponde a una domanda non coperta dalle altre KPI: "il mio capitale
+        // finale lo sta facendo soprattutto il punto di partenza o il ritmo
+        // costante?". Per neo-investitori (lump piccolo) la quota PAC domina;
+        // per chi parte gia' patrimonializzato e versa poco, vince l'iniziale.
+        const decomp = decomposeFinalBalance({
+            initialCapital,
+            monthlyContribution,
+            annualRatePct: annualRate,
+            years,
+        });
+
         // Costo del Ritardo (12 mesi): differenza fra "iniziare oggi" e
         // "iniziare fra 12 mesi" a PARITA' di orizzonte finale. Calcolato
         // dal modulo `compound-interest.ts` che simula esplicitamente lo
@@ -141,6 +155,10 @@ export function CompoundInterestCalculator() {
             compoundingSpreadPct,
             nominalMultiplier: multiplier.nominalMultiplier,
             realMultiplier: multiplier.realMultiplier,
+            decompFromInitial: decomp.fromInitial,
+            decompFromContributions: decomp.fromContributions,
+            decompInitialShare: decomp.initialShare,
+            decompContributionsShare: decomp.contributionsShare,
         };
     }, [initialCapital, monthlyContribution, annualRate, years, inflationRate]);
 
@@ -295,6 +313,50 @@ export function CompoundInterestCalculator() {
                                             )}
                                         </div>
                                     )}
+                                </div>
+                            </div>
+                        )}
+
+                        {result.finalBalance > 0 && (result.decompFromInitial > 0 || result.decompFromContributions > 0) && (
+                            <div
+                                className="rounded-3xl border border-cyan-200 bg-gradient-to-br from-cyan-50/80 to-sky-50/70 p-4 dark:border-cyan-900 dark:from-cyan-950/30 dark:to-sky-950/20"
+                                title={`Il saldo finale di ${formatEuro(result.finalBalance)} si scompone in ${formatEuro(result.decompFromInitial)} (${(result.decompInitialShare * 100).toFixed(0)}%) prodotti dal capitale iniziale capitalizzato e ${formatEuro(result.decompFromContributions)} (${(result.decompContributionsShare * 100).toFixed(0)}%) prodotti dai contributi mensili capitalizzati. La decomposizione e' esatta: la ricorrenza dell'interesse composto e' lineare nelle due sorgenti, quindi le due traiettorie sono indipendenti e sommano esattamente al saldo finale.`}
+                            >
+                                <div className="mb-2 flex items-center justify-center gap-1 text-[10px] font-bold uppercase tracking-widest text-cyan-600 dark:text-cyan-400">
+                                    <PieChart className="h-3 w-3" /> Composizione del Saldo Finale
+                                    <InfoTooltip iconClassName="w-3 h-3">Il saldo nominale finale ha due sorgenti additive: il capitale iniziale capitalizzato per l&apos;intero orizzonte e i contributi mensili, ciascuno capitalizzato dal mese del versamento alla fine del piano. Risponde a una domanda concreta: &quot;sto costruendo il mio capitale soprattutto grazie a quello che gia&apos; avevo o grazie a quello che continuo a versare?&quot;. Nei piani lunghi e nei PAC con piccolo lump iniziale vince la quota contributi; nei piani corti con grande capitale di partenza vince la quota iniziale.</InfoTooltip>
+                                </div>
+                                <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted/70">
+                                    {result.decompInitialShare > 0 && (
+                                        <div
+                                            className="h-full bg-cyan-500"
+                                            style={{ width: `${result.decompInitialShare * 100}%` }}
+                                            aria-label={`${(result.decompInitialShare * 100).toFixed(0)}% capitale iniziale`}
+                                        />
+                                    )}
+                                    {result.decompContributionsShare > 0 && (
+                                        <div
+                                            className="h-full bg-blue-500"
+                                            style={{ width: `${result.decompContributionsShare * 100}%` }}
+                                            aria-label={`${(result.decompContributionsShare * 100).toFixed(0)}% contributi mensili`}
+                                        />
+                                    )}
+                                </div>
+                                <div className="mt-2 grid grid-cols-2 gap-2">
+                                    <div className="text-center">
+                                        <div className="text-[10px] font-semibold uppercase tracking-wider text-cyan-600/80 dark:text-cyan-400/70">Da capitale iniziale</div>
+                                        <div className="text-lg font-extrabold text-cyan-700 dark:text-cyan-300">
+                                            {(result.decompInitialShare * 100).toFixed(0)}%
+                                        </div>
+                                        <div className="text-[10px] text-cyan-600/70 dark:text-cyan-400/60">{formatEuro(result.decompFromInitial)}</div>
+                                    </div>
+                                    <div className="text-center">
+                                        <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600/80 dark:text-blue-400/70">Da contributi mensili</div>
+                                        <div className="text-lg font-extrabold text-blue-700 dark:text-blue-300">
+                                            {(result.decompContributionsShare * 100).toFixed(0)}%
+                                        </div>
+                                        <div className="text-[10px] text-blue-600/70 dark:text-blue-400/60">{formatEuro(result.decompFromContributions)}</div>
+                                    </div>
                                 </div>
                             </div>
                         )}

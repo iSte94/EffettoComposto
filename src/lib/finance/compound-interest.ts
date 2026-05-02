@@ -363,3 +363,97 @@ export function computeInflationAdjustedTotals(
         nominalTotalDeposited: initialCapital + monthlyContribution * totalMonths,
     };
 }
+
+export interface FinalBalanceDecompositionResult {
+    /**
+     * Saldo finale nominale prodotto dal solo capitale iniziale, capitalizzato
+     * mensilmente per l'intero orizzonte:  initialCapital * (1 + m)^N.
+     * Indipendente dai contributi mensili: e' la traiettoria che il lump sum
+     * avrebbe avuto anche se non avessi versato un euro in piu'.
+     */
+    fromInitial: number;
+    /**
+     * Saldo finale nominale prodotto dai soli contributi mensili, ciascuno
+     * capitalizzato dal mese del versamento alla fine dell'orizzonte. Forma
+     * chiusa della rendita posticipata mensile:
+     *     monthlyContribution * ((1+m)^N - 1) / m       (per m > 0)
+     *     monthlyContribution * N                       (per m = 0)
+     * Indipendente dal capitale iniziale: e' quanto produrrebbe il PAC se
+     * partissi da zero.
+     */
+    fromContributions: number;
+    /**
+     * Quota del saldo finale imputabile al capitale iniziale, in [0, 1].
+     * Coincide con `fromInitial / (fromInitial + fromContributions)` quando
+     * la somma e' positiva; vale 0 negli scenari degeneri (entrambi a zero).
+     */
+    initialShare: number;
+    /**
+     * Quota del saldo finale imputabile ai contributi mensili, in [0, 1].
+     * Complementare a `initialShare` (somma esatta a 1 quando la somma totale
+     * e' positiva).
+     */
+    contributionsShare: number;
+}
+
+/**
+ * Decompone il saldo finale nominale nelle DUE componenti additive che lo
+ * generano: il capitale iniziale capitalizzato + i contributi mensili
+ * capitalizzati. La ricorrenza `balance = balance * (1+m) + contribution` e'
+ * lineare nelle due "sorgenti", quindi la decomposizione e' esatta:
+ *
+ *     finalBalance = initialCapital * (1+m)^N
+ *                  + monthlyContribution * ((1+m)^N - 1) / m
+ *
+ * (Per m = 0 il secondo termine degenera a `monthlyContribution * N`.) E'
+ * matematicamente identica al risultato di `simulateCompoundInterest` ma
+ * espone la struttura finanziaria del piano: quanta parte del saldo viene
+ * dal "punto di partenza" (lump sum + suo composto) e quanta dal "ritmo"
+ * (contributi + loro composto). Risponde a una domanda concreta che le
+ * altre KPI non coprono: "Sto costruendo il mio capitale soprattutto grazie
+ * a quello che gia' avevo, o grazie a quello che continuo a versare?".
+ *
+ * Edge case `years <= 0`: tutto il saldo viene dall'iniziale (no PAC fatto).
+ * Input non finiti: sanificati a 0 (coerente con `simulateCompoundInterest`).
+ * Forma chiusa stabile numericamente: usiamo `expm1` per `(1+m)^N - 1` cosi'
+ * da non perdere precisione su orizzonti corti / tassi piccoli.
+ */
+export function decomposeFinalBalance(
+    params: CompoundInterestParams,
+): FinalBalanceDecompositionResult {
+    const initialCapital = Math.max(0, sanitizeFinite(params.initialCapital));
+    const monthlyContribution = Math.max(0, sanitizeFinite(params.monthlyContribution));
+    const annualRatePct = sanitizeFinite(params.annualRatePct);
+    const years = Math.max(0, Math.floor(sanitizeFinite(params.years)));
+
+    const totalMonths = years * 12;
+    const monthlyRate = annualRatePct / 100 / 12;
+
+    const compoundFactor = Math.pow(1 + monthlyRate, totalMonths);
+    const fromInitial = initialCapital * compoundFactor;
+
+    let fromContributions: number;
+    if (totalMonths === 0) {
+        fromContributions = 0;
+    } else if (Math.abs(monthlyRate) < 1e-12) {
+        // Degenerazione lineare: senza tasso ogni versamento contribuisce 1:1.
+        fromContributions = monthlyContribution * totalMonths;
+    } else {
+        // expm1((N) * ln(1+m)) = (1+m)^N - 1, piu' stabile di sottrarre 1 a fattori grandi.
+        const annuityNumerator = Math.expm1(totalMonths * Math.log1p(monthlyRate));
+        fromContributions = (monthlyContribution * annuityNumerator) / monthlyRate;
+    }
+
+    if (!Number.isFinite(fromContributions) || fromContributions < 0) fromContributions = 0;
+
+    const total = fromInitial + fromContributions;
+    const initialShare = total > 0 ? fromInitial / total : 0;
+    const contributionsShare = total > 0 ? fromContributions / total : 0;
+
+    return {
+        fromInitial,
+        fromContributions,
+        initialShare,
+        contributionsShare,
+    };
+}
