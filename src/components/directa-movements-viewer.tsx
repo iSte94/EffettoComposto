@@ -709,7 +709,7 @@ export function DirectaMovementsViewer() {
         {/* Cumulative */}
         <ChartCard title="Andamento cumulativo" icon={TrendingUp}>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
               <AreaChart data={cumulativeData} margin={{ top: 12, right: 10, left: 0, bottom: 6 }}>
                 <defs>
                   <linearGradient id="gConf" x1="0" y1="0" x2="0" y2="1">
@@ -741,7 +741,7 @@ export function DirectaMovementsViewer() {
         {/* Monthly bar */}
         <ChartCard title="Flussi mensili" icon={CalendarDays}>
           <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
               <BarChart data={monthlyData} margin={{ top: 12, right: 10, left: 0, bottom: 6 }} barCategoryGap="26%">
                 <CartesianGrid {...CHART_GRID_PROPS} />
                 <XAxis dataKey="month" {...CHART_AXIS_PROPS} interval="preserveStartEnd" minTickGap={16} />
@@ -763,7 +763,7 @@ export function DirectaMovementsViewer() {
         {/* Category pie */}
         <ChartCard title="Distribuzione operazioni" icon={BarChart3}>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
               <PieChart>
                 <Pie
                   data={categoryPie}
@@ -787,7 +787,7 @@ export function DirectaMovementsViewer() {
         {/* Yearly summary */}
         <ChartCard title="Riepilogo annuale" icon={CalendarDays} className="lg:col-span-2">
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
               <ComposedChart data={yearlySummary} margin={{ top: 12, right: 10, left: 0, bottom: 6 }}>
                 <CartesianGrid {...CHART_GRID_PROPS} />
                 <XAxis dataKey="anno" {...CHART_AXIS_PROPS} />

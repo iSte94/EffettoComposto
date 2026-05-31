@@ -500,7 +500,7 @@ export function ProgressioneDashboard() {
                         </CardHeader>
                         <CardContent className="flex-grow p-4 sm:p-6 md:p-8">
                             <div className="mt-4 h-[320px] w-full sm:h-[380px] lg:h-[500px]">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                     <ComposedChart data={chartData} margin={{ top: 18, right: 18, left: 4, bottom: 12 }}>
                                         <defs>
                                             <linearGradient id="colorNominal" x1="0" y1="0" x2="0" y2="1">

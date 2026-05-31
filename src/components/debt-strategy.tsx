@@ -355,7 +355,7 @@ export function DebtStrategy() {
                     <CardContent className="p-6">
                         <h4 className="mb-4 text-sm font-bold text-foreground">Confronto Visuale</h4>
                         <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                 <BarChart data={comparisonData} margin={{ top: 18, right: 18, left: 4, bottom: 8 }} barCategoryGap="30%">
                                     <CartesianGrid {...CHART_GRID_PROPS} />
                                     <XAxis dataKey="name" {...CHART_AXIS_PROPS} />

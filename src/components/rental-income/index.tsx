@@ -20,6 +20,7 @@ import {
     Save, FolderOpen, Trash2, Download, Upload,
 } from "lucide-react";
 import { formatEuro, formatPercent } from "@/lib/format";
+import { CHART_COLORS } from "@/components/ui/chart-style";
 
 // ── Tipi ────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,11 @@ interface MonthScheduleEntry {
 }
 
 const MONTH_LABELS = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+const STRATEGY_COLORS = {
+    shortTerm: CHART_COLORS.target,
+    transitional: CHART_COLORS.opportunity,
+    residential: CHART_COLORS.wealth,
+} as const;
 
 function createDefaultSchedule(rent: number): MonthScheduleEntry[] {
     return Array.from({ length: 12 }, () => ({ rent, occupied: true }));
@@ -784,9 +790,9 @@ export function RentalIncomeAnalyzer() {
     // Confronto finale
     const comparison = useMemo(() => {
         const items = [
-            { name: "Breve Termine", net: stResults.netAnnual, yield: stResults.netYield, monthly: stResults.netMonthly, color: "amber" as const },
-            { name: "Transitorio", net: trResults.netAnnual, yield: trResults.netYield, monthly: trResults.netMonthly, color: "violet" as const },
-            { name: "Residenziale", net: resResults.netAnnual, yield: resResults.netYield, monthly: resResults.netMonthly, color: "emerald" as const },
+            { name: "Breve Termine", net: stResults.netAnnual, yield: stResults.netYield, monthly: stResults.netMonthly, color: STRATEGY_COLORS.shortTerm },
+            { name: "Transitorio", net: trResults.netAnnual, yield: trResults.netYield, monthly: trResults.netMonthly, color: STRATEGY_COLORS.transitional },
+            { name: "Residenziale", net: resResults.netAnnual, yield: resResults.netYield, monthly: resResults.netMonthly, color: STRATEGY_COLORS.residential },
         ];
         const best = items.reduce((a, b) => a.net > b.net ? a : b);
         return { items, best };
@@ -1009,17 +1015,16 @@ export function RentalIncomeAnalyzer() {
                                     {comparison.items.map((item) => {
                                         const maxNet = Math.max(...comparison.items.map(i => Math.abs(i.net)), 1);
                                         const width = Math.abs(item.net) / maxNet * 100;
-                                        const colorBar = {
-                                            amber: "bg-amber-500",
-                                            violet: "bg-violet-500",
-                                            emerald: "bg-emerald-500",
-                                        }[item.color];
+                                        const barColor = item.net >= 0 ? item.color : CHART_COLORS.negative;
                                         return (
                                             <div key={item.name} className="flex items-center gap-3">
                                                 <span className="text-xs font-medium text-slate-500 w-24 text-right">{item.name}</span>
-                                                <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                    <div className={`h-full rounded-full transition-all duration-700 ${colorBar}`}
-                                                        style={{ width: `${Math.max(width, 2)}%` }} />
+                                                <div className="flex-1 h-5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner ring-1 ring-slate-200/70 dark:ring-slate-700/70">
+                                                    <div
+                                                        className="h-full rounded-full transition-all duration-700"
+                                                        style={{ width: `${Math.max(width, 2)}%`, backgroundColor: barColor }}
+                                                        aria-label={`${item.name}: ${formatEuro(item.net)} annui`}
+                                                    />
                                                 </div>
                                                 <span className="text-xs font-bold tabular-nums text-slate-700 dark:text-slate-300 w-20">
                                                     {formatEuro(item.net)}

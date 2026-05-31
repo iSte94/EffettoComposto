@@ -292,7 +292,7 @@ export const NetWorthProjection = memo(function NetWorthProjection({
 
                 {/* Chart */}
                 <div className="h-64 sm:h-56">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                         <AreaChart data={data.chartData} margin={{ top: 12, right: 8, left: 0, bottom: 6 }}>
                             <CartesianGrid {...CHART_GRID_PROPS} />
                             <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={16} interval={Math.max(0, Math.floor(data.chartData.length / 8))} />

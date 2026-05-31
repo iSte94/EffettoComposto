@@ -111,7 +111,7 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
                         </div>
                     </div>
                     <div className="h-48">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                             <BarChart data={costBreakdown} layout="vertical" margin={{ top: 8, right: 10, left: 8, bottom: 6 }}>
                                 <CartesianGrid {...CHART_GRID_PROPS} />
                                 <XAxis type="number" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} />
@@ -151,7 +151,7 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
                         </div>
                     </div>
                     <div className="h-64">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                             <AreaChart data={amortizationData} margin={{ top: 12, right: 12, left: 0, bottom: 6 }}>
                                 <defs>
                                     <linearGradient id="gradCapitale" x1="0" y1="0" x2="0" y2="1">
@@ -180,7 +180,7 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
                 <CardContent className="p-4 sm:p-5">
                     <h3 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Composizione del Costo Totale</h3>
                     <div className="h-48">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                             <BarChart data={costBreakdown} layout="vertical" margin={{ top: 8, right: 10, left: 8, bottom: 6 }}>
                                 <CartesianGrid {...CHART_GRID_PROPS} />
                                 <XAxis type="number" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} />

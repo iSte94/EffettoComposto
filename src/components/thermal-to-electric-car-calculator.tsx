@@ -1274,7 +1274,7 @@ export function ThermalToElectricCarCalculator() {
                     </div>
 
                     <div className="h-[360px] md:h-[430px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                             <LineChart data={result.chartData} margin={{ top: 18, right: 18, left: 4, bottom: 8 }}>
                                 <CartesianGrid {...CHART_GRID_PROPS} />
                                 <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={18} />

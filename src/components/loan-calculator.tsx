@@ -1779,7 +1779,7 @@ export function LoanCalculator() {
                                 </div>
 
                                 <div className="h-72">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                         <ComposedChart data={aggregateResult.chartData} margin={{ top: 12, right: 8, left: 0, bottom: 6 }}>
                                             <CartesianGrid {...CHART_GRID_PROPS} />
                                             <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={16} />

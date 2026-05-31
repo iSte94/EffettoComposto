@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.33`
+**Versione corrente:** `v1.10.34`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.34 - 31 maggio 2026 (UX - rifinitura grafici custom fuori da Recharts)
+
+- **Problema iniziale** - l'audit post-release ha confermato che tutti i grafici Recharts usavano il sistema condiviso, ma alcune visualizzazioni custom erano ancora rimaste con colori locali: asset allocation nel Riepilogo, asset allocation nel report stampabile e confronto strategie nella rendita immobiliare.
+- **Soluzione applicata** - portate anche queste visualizzazioni su `CHART_COLORS`, con barre piu' moderne, legenda compatta, totale lordo visibile nel Riepilogo e stack di allocazione nel report export.
+- **Impatto utente** - l'esperienza grafica ora resta coerente anche dove non viene usato Recharts: stessi significati cromatici per immobili, investimenti, crypto, liquidita', rendimento positivo e scenari immobiliari.
+- **Verifica** - eseguiti lint, test, build e QA browser mirata prima del nuovo deploy.
 
 ### v1.10.33 - 31 maggio 2026 (UX - sistema grafico condiviso e restyling coerente di tutti i grafici)
 

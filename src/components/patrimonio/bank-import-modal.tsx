@@ -157,7 +157,7 @@ export function BankImportModal({ onImportBalance, onImportMonthlySavings }: Ban
                                 <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-800">
                                     <h4 className="text-xs font-bold text-slate-500 mb-3">Riepilogo Mensile</h4>
                                     <div className="h-48">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                             <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 6 }} barCategoryGap="28%">
                                                 <CartesianGrid {...CHART_GRID_PROPS} />
                                                 <XAxis dataKey="mese" {...CHART_AXIS_PROPS} minTickGap={12} />

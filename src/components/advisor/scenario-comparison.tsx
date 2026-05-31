@@ -175,7 +175,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 </div>
 
                 <div className="mb-4 h-56">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                         <BarChart data={chartData} margin={{ top: 24, right: 10, left: 0, bottom: 6 }} barCategoryGap="32%">
                             <CartesianGrid {...CHART_GRID_PROPS} />
                             <XAxis dataKey="name" {...CHART_AXIS_PROPS} />

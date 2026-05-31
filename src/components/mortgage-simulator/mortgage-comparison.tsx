@@ -245,7 +245,7 @@ export function MortgageComparison() {
                     <CardContent className="p-4 sm:p-5">
                         <h4 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Confronto Costi</h4>
                         <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                 <BarChart data={barData} margin={{ top: 14, right: 8, left: 0, bottom: 6 }} barCategoryGap="24%">
                                     <CartesianGrid {...CHART_GRID_PROPS} />
                                     <XAxis dataKey="name" {...CHART_AXIS_PROPS} />
@@ -265,7 +265,7 @@ export function MortgageComparison() {
                     <CardContent className="p-4 sm:p-5">
                         <h4 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Debito Residuo nel Tempo</h4>
                         <div className="h-64">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                 <LineChart data={debtOverTime} margin={{ top: 14, right: 8, left: 0, bottom: 6 }}>
                                     <CartesianGrid {...CHART_GRID_PROPS} />
                                     <XAxis dataKey="anno" {...CHART_AXIS_PROPS} interval={Math.max(0, Math.floor(maxYears / 6))} />

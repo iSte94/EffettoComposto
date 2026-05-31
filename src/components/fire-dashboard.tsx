@@ -1345,7 +1345,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                         </div>
                                     )}
                                     <div className="h-[400px] w-full">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                             <ComposedChart data={displayChartData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
                                                 <defs>
                                                     <linearGradient id="colorCapital" x1="0" y1="0" x2="0" y2="1">
@@ -1492,7 +1492,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                         Il grafico mostra l&apos;impatto mensile degli eventi futuri, l&apos;impatto cumulato sul FIRE e le rate mensili previste.
                                                     </p>
                                                     <div className="h-[430px] w-full">
-                                                        <ResponsiveContainer width="100%" height="100%">
+                                                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                                             <ComposedChart data={plannedEventsFireView.chartData} margin={{ top: 18, right: 18, left: 4, bottom: 16 }}>
                                                                 <defs>
                                                                     <linearGradient id="eventsCumulativeLine" x1="0" y1="0" x2="1" y2="0">
@@ -1658,7 +1658,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                             )}
 
                                             <div className={`h-[400px] w-full transition-opacity duration-300 ${mcIsCalculating && mcData.length < 50 ? 'opacity-50' : 'opacity-100'}`}>
-                                                <ResponsiveContainer width="100%" height="100%">
+                                                <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                                     <ComposedChart data={mcData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
                                                         <defs>
                                                             <linearGradient id="mcMedian" x1="0" y1="0" x2="0" y2="1">
@@ -1721,7 +1721,7 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                     </div>
 
                                     <div className="h-[350px] w-full mt-4">
-                                        <ResponsiveContainer width="100%" height="100%">
+                                        <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                             <ComposedChart data={stressData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
                                                 <CartesianGrid {...CHART_GRID_PROPS} />
                                                 <XAxis dataKey="age" {...CHART_AXIS_PROPS} dy={10} name="La tua età nel decennio" />

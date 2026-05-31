@@ -40,7 +40,7 @@ function BudgetComparisonChartComponent({ data, periodLabel }: BudgetComparisonC
                     <span className="text-[10px] text-muted-foreground">{periodLabel}</span>
                 </div>
                 <div className="h-72">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                         <BarChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 6 }} barCategoryGap="24%">
                             <CartesianGrid {...CHART_GRID_PROPS} />
                             <XAxis dataKey="name" {...CHART_AXIS_PROPS} interval={0} minTickGap={10} />

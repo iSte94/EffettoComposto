@@ -18,6 +18,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { WelcomeOnboarding } from "@/components/welcome-onboarding";
 import { exportPatrimonioCSV } from "@/lib/export/csv";
 import { computeFireMetricsFromSnapshot } from "@/lib/finance/fire-metrics";
+import { CHART_COLORS } from "@/components/ui/chart-style";
 import {
     buildPlannedEventsSummary,
     buildPlannedEventsTimeline,
@@ -254,6 +255,12 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
     }
 
     const isPositiveChange = metrics.netWorthChange >= 0;
+    const allocationSegments = [
+        { label: "Immobili", value: metrics.allocation.immobili, color: CHART_COLORS.realEstate },
+        { label: "Liquidità & ETF", value: metrics.allocation.liquidita, color: CHART_COLORS.investment },
+        { label: "Crypto", value: metrics.allocation.crypto, color: CHART_COLORS.bitcoin },
+        { label: "Altro", value: metrics.allocation.altro, color: CHART_COLORS.neutral },
+    ].filter((segment) => segment.value > 0);
 
     return (
         <div className="space-y-8">
@@ -513,30 +520,39 @@ export function OverviewDashboard({ user }: OverviewDashboardProps) {
 
             {/* Asset Allocation Bar */}
             <div className="bg-card/80 backdrop-blur-xl border border-border/70 rounded-3xl shadow-sm p-5 sm:p-6">
-                <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em] mb-4">Allocazione Asset</h3>
+                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <h3 className="text-[11px] sm:text-sm font-bold text-muted-foreground uppercase tracking-[0.24em]">Allocazione Asset</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">Peso lordo delle principali classi nel patrimonio.</p>
+                    </div>
+                    <span className="text-xs font-bold tabular-nums text-card-foreground">
+                        {formatEuro(metrics.realEstateValue + metrics.liquidValue + metrics.btcValue + metrics.otherAssets)}
+                    </span>
+                </div>
                 <div
-                    className="w-full h-6 bg-muted rounded-full overflow-hidden flex"
+                    className="flex h-8 w-full overflow-hidden rounded-full bg-muted/60 p-1 shadow-inner ring-1 ring-border/70"
                     role="img"
                     aria-label={`Allocazione asset: Immobili ${metrics.allocation.immobili.toFixed(1)}%, Liquidità & ETF ${metrics.allocation.liquidita.toFixed(1)}%, Crypto ${metrics.allocation.crypto.toFixed(1)}%, Altro ${metrics.allocation.altro.toFixed(1)}%`}
                 >
-                    {metrics.allocation.immobili > 0 && (
-                        <div className="bg-blue-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.immobili}%` }} />
-                    )}
-                    {metrics.allocation.liquidita > 0 && (
-                        <div className="bg-purple-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.liquidita}%` }} />
-                    )}
-                    {metrics.allocation.crypto > 0 && (
-                        <div className="bg-amber-500 h-full transition-all duration-700" style={{ width: `${metrics.allocation.crypto}%` }} />
-                    )}
-                    {metrics.allocation.altro > 0 && (
-                        <div className="bg-slate-400 h-full transition-all duration-700" style={{ width: `${metrics.allocation.altro}%` }} />
-                    )}
+                    {allocationSegments.map((segment, index) => (
+                        <div
+                            key={segment.label}
+                            className={`h-full min-w-[2px] transition-all duration-700 ${index === 0 ? "rounded-l-full" : ""} ${index === allocationSegments.length - 1 ? "rounded-r-full" : ""}`}
+                            style={{ width: `${segment.value}%`, backgroundColor: segment.color }}
+                            title={`${segment.label}: ${segment.value.toFixed(1)}%`}
+                        />
+                    ))}
                 </div>
-                <div className="flex flex-wrap gap-3 sm:gap-4 mt-3 text-xs font-medium text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Immobili <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.immobili.toFixed(1)}%</span></span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Liquidità & ETF <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.liquidita.toFixed(1)}%</span></span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-500" /> Crypto <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.crypto.toFixed(1)}%</span></span>
-                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Altro <span className="tabular-nums font-bold text-card-foreground">{metrics.allocation.altro.toFixed(1)}%</span></span>
+                <div className="mt-4 grid gap-2 text-xs font-medium text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                    {allocationSegments.map((segment) => (
+                        <span key={segment.label} className="flex items-center justify-between gap-2 rounded-2xl border border-border/60 bg-background/55 px-3 py-2">
+                            <span className="flex min-w-0 items-center gap-1.5">
+                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: segment.color }} />
+                                <span className="truncate">{segment.label}</span>
+                            </span>
+                            <span className="tabular-nums font-bold text-card-foreground">{segment.value.toFixed(1)}%</span>
+                        </span>
+                    ))}
                 </div>
             </div>
 

@@ -1376,7 +1376,7 @@ export function PatrimonioDashboard({ user }: PatrimonioDashboardProps) {
                                     <>
                                         <p className="sr-only">Grafico storico del patrimonio con serie dedicate a patrimonio totale, debiti, immobili, liquidita, altre attivita e bitcoin.</p>
                                         <div className="h-[320px] w-full rounded-2xl bg-slate-50/70 p-2 sm:h-[450px] sm:bg-transparent sm:p-0">
-                                            <ResponsiveContainer width="100%" height="100%">
+                                            <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 1, height: 1 }}>
                                                 <ComposedChart data={chartData} margin={isCompactHistoryChart ? { top: 12, right: 8, left: 0, bottom: 8 } : { top: 22, right: 18, left: 4, bottom: 16 }}>
                                                     <defs>
                                                         <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={CHART_COLORS.wealth} stopOpacity={0.22} /><stop offset="95%" stopColor={CHART_COLORS.wealth} stopOpacity={0} /></linearGradient>

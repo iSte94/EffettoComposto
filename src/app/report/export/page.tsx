@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { formatEuro, formatPercentSigned } from "@/lib/format";
+import { CHART_COLORS } from "@/components/ui/chart-style";
 import { Printer, TrendingUp, Wallet, PieChart as PieChartIcon, Flame, Building2, Gift, FileText } from "lucide-react";
 
 interface AssetRecordLite {
@@ -143,12 +144,12 @@ function ReportContent() {
         const r = latestSnapshot;
         const crypto = (r.bitcoinAmount || 0) * (r.bitcoinPrice || 0);
         return [
-            { label: "Immobili", value: r.realEstateValue || 0, color: "#3b82f6" },
-            { label: "Azioni/ETF", value: (r.liquidStockValue || 0) + (r.stocksSnapshotValue || 0), color: "#8b5cf6" },
-            { label: "Beni Rifugio", value: r.safeHavens || 0, color: "#f59e0b" },
-            { label: "Fondo Emergenza", value: r.emergencyFund || 0, color: "#10b981" },
-            { label: "Fondo Pensione", value: r.pensionFund || 0, color: "#ec4899" },
-            { label: "Bitcoin", value: crypto, color: "#f97316" },
+            { label: "Immobili", value: r.realEstateValue || 0, color: CHART_COLORS.realEstate },
+            { label: "Azioni/ETF", value: (r.liquidStockValue || 0) + (r.stocksSnapshotValue || 0), color: CHART_COLORS.investment },
+            { label: "Beni Rifugio", value: r.safeHavens || 0, color: CHART_COLORS.target },
+            { label: "Fondo Emergenza", value: r.emergencyFund || 0, color: CHART_COLORS.liquidity },
+            { label: "Fondo Pensione", value: r.pensionFund || 0, color: CHART_COLORS.wealth },
+            { label: "Bitcoin", value: crypto, color: CHART_COLORS.bitcoin },
         ].filter((x) => x.value > 0).sort((a, b) => b.value - a.value);
     }, [latestSnapshot]);
 
@@ -194,10 +195,14 @@ function ReportContent() {
                 .report-container .positive { color: #059669; }
                 .report-container .negative { color: #dc2626; }
                 .report-container .muted { color: #64748b; }
-                .report-container .alloc-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+                .report-container .alloc-stack { display: flex; height: 18px; overflow: hidden; border-radius: 999px; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 2px; margin: 8px 0 14px; }
+                .report-container .alloc-stack-segment { min-width: 2px; height: 100%; }
+                .report-container .alloc-stack-segment:first-child { border-radius: 999px 0 0 999px; }
+                .report-container .alloc-stack-segment:last-child { border-radius: 0 999px 999px 0; }
+                .report-container .alloc-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
                 .report-container .alloc-label { flex: 0 0 140px; font-weight: 600; }
-                .report-container .alloc-bar-bg { flex: 1; height: 10px; background: #e2e8f0; border-radius: 5px; overflow: hidden; }
-                .report-container .alloc-bar { height: 100%; border-radius: 5px; }
+                .report-container .alloc-bar-bg { flex: 1; height: 11px; background: #f1f5f9; border-radius: 999px; overflow: hidden; border: 1px solid #e2e8f0; }
+                .report-container .alloc-bar { height: 100%; border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.32); }
                 .report-container .alloc-value { flex: 0 0 110px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
                 .report-container .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: center; }
                 .print-button {
@@ -280,6 +285,19 @@ function ReportContent() {
                     {sections.includes("allocazione") && assetBreakdown.length > 0 && (
                         <section className="avoid-break">
                             <h2><PieChartIcon size={20} /> Asset Allocation</h2>
+                            <div className="alloc-stack" aria-label="Distribuzione totale asset">
+                                {assetBreakdown.map((a) => {
+                                    const pct = totalGross > 0 ? (a.value / totalGross) * 100 : 0;
+                                    return (
+                                        <div
+                                            key={`${a.label}-stack`}
+                                            className="alloc-stack-segment"
+                                            style={{ width: `${pct}%`, background: a.color }}
+                                            title={`${a.label}: ${pct.toFixed(1)}%`}
+                                        />
+                                    );
+                                })}
+                            </div>
                             {assetBreakdown.map((a) => {
                                 const pct = totalGross > 0 ? (a.value / totalGross) * 100 : 0;
                                 return (
