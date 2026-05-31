@@ -51,7 +51,18 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { formatEuro, formatEuroCompact } from "@/lib/format";
+import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 import {
     compareThermalToElectricCar,
     TESLA_MODEL_3_LONG_RANGE_RWD_2026_CONSUMPTION_KWH_PER_100KM,
@@ -1264,23 +1275,19 @@ export function ThermalToElectricCarCalculator() {
 
                     <div className="h-[360px] md:h-[430px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={result.chartData} margin={{ top: 16, right: 20, left: 8, bottom: 8 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+                            <LineChart data={result.chartData} margin={{ top: 18, right: 18, left: 4, bottom: 8 }}>
+                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={18} />
                                 <YAxis
-                                    tickLine={false}
-                                    axisLine={false}
-                                    tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-                                    tickFormatter={(value: number) => formatEuroCompact(value)}
+                                    {...CHART_AXIS_PROPS}
+                                    tickFormatter={formatCompactEuroAxis}
+                                    width={64}
                                 />
                                 <Tooltip
-                                    contentStyle={{
-                                        borderRadius: "16px",
-                                        border: "1px solid var(--border)",
-                                        backgroundColor: "var(--popover)",
-                                        color: "var(--popover-foreground)",
-                                        boxShadow: "0 20px 45px -20px rgba(15, 23, 42, 0.45)",
-                                    }}
+                                    contentStyle={CHART_TOOLTIP_STYLE}
+                                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                    itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                    cursor={CHART_CURSOR}
                                     formatter={(value: number | string | undefined, name) => {
                                         const label =
                                             name === "thermalCumulativeCost"
@@ -1292,7 +1299,8 @@ export function ThermalToElectricCarCalculator() {
                                     }}
                                 />
                                 <Legend
-                                    wrapperStyle={{ fontSize: "12px", color: "var(--muted-foreground)", paddingTop: "8px" }}
+                                    wrapperStyle={CHART_LEGEND_STYLE}
+                                    iconType="circle"
                                     formatter={(value) =>
                                         value === "thermalCumulativeCost"
                                             ? "Tenere la termica"
@@ -1301,9 +1309,9 @@ export function ThermalToElectricCarCalculator() {
                                             : "Vantaggio Tesla"
                                     }
                                 />
-                                <Line type="monotone" dataKey="thermalCumulativeCost" stroke="#f59e0b" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
-                                <Line type="monotone" dataKey="evCumulativeCost" stroke="#14b8a6" strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
-                                <Line type="monotone" dataKey="advantage" stroke="#6366f1" strokeWidth={2} dot={false} strokeDasharray="6 6" />
+                                <Line type="monotone" dataKey="thermalCumulativeCost" stroke={CHART_COLORS.target} strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                                <Line type="monotone" dataKey="evCumulativeCost" stroke={CHART_COLORS.liquidity} strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
+                                <Line type="monotone" dataKey="advantage" stroke={CHART_COLORS.investment} strokeWidth={2.5} dot={false} strokeDasharray="6 6" />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>

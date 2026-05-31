@@ -13,7 +13,7 @@
 
 **[effettocomposto.it](https://effettocomposto.it)**
 
-**Versione corrente:** `v1.10.32`
+**Versione corrente:** `v1.10.33`
 
 ---
 
@@ -113,6 +113,13 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 ---
 
 ## Changelog
+
+### v1.10.33 - 31 maggio 2026 (UX - sistema grafico condiviso e restyling coerente di tutti i grafici)
+
+- **Problema iniziale** - i grafici dell'app rispondevano a domande finanziarie diverse, ma usavano stili non sempre coerenti: palette locali, assi densi, tooltip disomogenei e alcuni colori poco legati al significato economico della serie. Questo rendeva piu' faticoso confrontare patrimonio, debiti, FIRE, budget, inflazione, mutui, Directa, acquisti e performance.
+- **Soluzione applicata** - introdotto `src/components/ui/chart-style.tsx`, un layer condiviso per palette semantica, griglie leggere, assi compatti, tooltip moderni, cursori, legende e raggi delle barre. Tutti i grafici Recharts principali sono stati aggiornati per usare token coerenti, formattazione compatta in euro e colori legati alla logica della metrica (crescita, debito, interessi, target, rendimento, rischio, spese, capitale, liquidita').
+- **Impatto utente** - i grafici sono piu' leggibili su desktop e mobile, hanno meno rumore visivo, tooltip piu' chiari e una gerarchia cromatica piu' prevedibile. La heatmap dei rendimenti mensili e' stata resa piu' accessibile con contenitore dedicato e istruzione anche da tastiera.
+- **Verifica** - eseguiti lint, test unitari, controllo migrazioni, build Next.js e QA browser su desktop/mobile per confermare assenza di overflow orizzontale e rendering corretto dei grafici.
 
 ### v1.10.32 - 2 maggio 2026 (UX — nuova KPI "Composizione del Saldo Finale" nel Calcolatore Interesse Composto: scompone il saldo nelle due sorgenti additive — capitale iniziale capitalizzato vs contributi mensili capitalizzati)
 

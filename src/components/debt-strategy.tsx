@@ -17,6 +17,18 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend, Cell,
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 // `simulatePayoff` cappa l'orizzonte massimo a 600 mesi (50 anni): se l'estinzione
 // richiede esattamente quel valore, il budget non basta a chiudere i debiti e una
@@ -344,30 +356,30 @@ export function DebtStrategy() {
                         <h4 className="mb-4 text-sm font-bold text-foreground">Confronto Visuale</h4>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={comparisonData} margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 12, fontWeight: 600 }} />
-                                    <YAxis yAxisId="left" tickFormatter={(value: number) => `${value}m`} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
-                                    <YAxis yAxisId="right" orientation="right" tickFormatter={(value: number) => `€${(value / 1000).toFixed(0)}k`} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+                                <BarChart data={comparisonData} margin={{ top: 18, right: 18, left: 4, bottom: 8 }} barCategoryGap="30%">
+                                    <CartesianGrid {...CHART_GRID_PROPS} />
+                                    <XAxis dataKey="name" {...CHART_AXIS_PROPS} />
+                                    <YAxis yAxisId="left" {...CHART_AXIS_PROPS} tickFormatter={(value: number) => `${value}m`} width={46} />
+                                    <YAxis yAxisId="right" orientation="right" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                                     <Tooltip
-                                        contentStyle={{
-                                            borderRadius: "12px",
-                                            border: "1px solid var(--border)",
-                                            boxShadow: "0 10px 40px -10px rgba(15,23,42,0.35)",
-                                            backgroundColor: "var(--popover)",
-                                            color: "var(--popover-foreground)",
-                                        }}
-                                        formatter={(value: number | string | undefined) => [typeof value === "number" && value < 1000 ? `${value} mesi` : formatEuro(Number(value ?? 0)), undefined]}
+                                        contentStyle={CHART_TOOLTIP_STYLE}
+                                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                        itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                        cursor={CHART_CURSOR}
+                                        formatter={(value: number | string | undefined, name?: string) => [
+                                            name === "Mesi" ? `${Number(value ?? 0)} mesi` : formatEuro(Number(value ?? 0)),
+                                            name ?? "Valore",
+                                        ]}
                                     />
-                                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: "11px", fontWeight: 600 }} />
-                                    <Bar yAxisId="left" dataKey="Mesi" radius={[8, 8, 0, 0]}>
+                                    <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={CHART_LEGEND_STYLE} />
+                                    <Bar yAxisId="left" dataKey="Mesi" radius={CHART_BAR_RADIUS}>
                                         {comparisonData.map((_, index) => (
-                                            <Cell key={index} fill={index === 0 ? "#3b82f6" : "#f97316"} />
+                                            <Cell key={index} fill={index === 0 ? CHART_COLORS.capital : CHART_COLORS.target} />
                                         ))}
                                     </Bar>
-                                    <Bar yAxisId="right" dataKey="Interessi Totali" radius={[8, 8, 0, 0]}>
+                                    <Bar yAxisId="right" dataKey="Interessi Totali" radius={CHART_BAR_RADIUS}>
                                         {comparisonData.map((_, index) => (
-                                            <Cell key={index} fill={index === 0 ? "#93c5fd" : "#fdba74"} />
+                                            <Cell key={index} fill={index === 0 ? "#93c5fd" : "#fed7aa"} />
                                         ))}
                                     </Bar>
                                 </BarChart>

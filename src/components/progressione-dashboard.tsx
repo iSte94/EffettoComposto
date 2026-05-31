@@ -10,6 +10,21 @@ import { ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, 
 import { Briefcase, TrendingUp, Plus, Trash2, Save, ArrowUpRight, Scale } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    DARK_CHART_LEGEND_STYLE,
+    DARK_CHART_TOOLTIP_ITEM_STYLE,
+    DARK_CHART_TOOLTIP_LABEL_STYLE,
+    DARK_CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useAuth } from "@/contexts/auth-context";
@@ -486,42 +501,43 @@ export function ProgressioneDashboard() {
                         <CardContent className="flex-grow p-4 sm:p-6 md:p-8">
                             <div className="mt-4 h-[320px] w-full sm:h-[380px] lg:h-[500px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <ComposedChart data={chartData} margin={{ top: 18, right: 18, left: 4, bottom: 12 }}>
                                         <defs>
                                             <linearGradient id="colorNominal" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={CHART_COLORS.investment} stopOpacity={0.28} />
+                                                <stop offset="95%" stopColor={CHART_COLORS.investment} stopOpacity={0} />
                                             </linearGradient>
                                             <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.2} />
-                                                <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={CHART_COLORS.target} stopOpacity={0.2} />
+                                                <stop offset="95%" stopColor={CHART_COLORS.target} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
 
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "rgba(148,163,184,0.16)" : "rgba(15,23,42,0.06)"} />
-                                        <XAxis dataKey="year" tickLine={false} axisLine={false} tick={{ fill: isDark ? "#cbd5e1" : "#64748b", fontSize: 12, fontWeight: 600 }} dy={10} minTickGap={20} />
-                                        <YAxis tickFormatter={(val) => `€${Math.round(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-10} width={60} />
+                                        <CartesianGrid {...CHART_GRID_PROPS} />
+                                        <XAxis dataKey="year" {...CHART_AXIS_PROPS} dy={10} minTickGap={20} />
+                                        <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={64} />
                                         
                                         <Tooltip
-                                            contentStyle={{ backgroundColor: isDark ? "rgba(15, 23, 42, 0.96)" : "rgba(255, 255, 255, 0.96)", backdropFilter: "blur(16px)", borderRadius: "1rem", border: isDark ? "1px solid rgba(51, 65, 85, 0.9)" : "1px solid rgba(148, 163, 184, 0.24)", boxShadow: "0 20px 40px -10px rgba(0,0,0,0.15)" }}
-                                            labelStyle={{ fontWeight: "bold", color: isDark ? "#f8fafc" : "#0f172a", marginBottom: "8px", borderBottom: `1px solid ${isDark ? "rgba(148,163,184,0.18)" : "rgba(15,23,42,0.06)"}`, paddingBottom: "4px" }}
-                                            itemStyle={{ color: isDark ? "#cbd5e1" : "#334155", border: "none", fontWeight: 600, fontSize: "13px" }}
+                                            contentStyle={isDark ? DARK_CHART_TOOLTIP_STYLE : CHART_TOOLTIP_STYLE}
+                                            labelStyle={isDark ? DARK_CHART_TOOLTIP_LABEL_STYLE : CHART_TOOLTIP_LABEL_STYLE}
+                                            itemStyle={isDark ? DARK_CHART_TOOLTIP_ITEM_STYLE : CHART_TOOLTIP_ITEM_STYLE}
+                                            cursor={CHART_CURSOR}
                                             formatter={(value: string | number | undefined, name: string | number | undefined) => [formatEuro(Number(value ?? 0)), name]}
                                         />
-                                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: isDark ? "#cbd5e1" : "#475569", paddingBottom: "10px" }} />
+                                        <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={isDark ? DARK_CHART_LEGEND_STYLE : CHART_LEGEND_STYLE} />
 
-                                        <Area type="monotone" dataKey="Totale Nominale Famiglia" name="Reddito Nominale Famiglia" stroke="#8b5cf6" strokeWidth={4} fillOpacity={1} fill="url(#colorNominal)" activeDot={{ r: 6, strokeWidth: 0, fill: '#8b5cf6' }} />
-                                        <Area type="monotone" dataKey="Totale Reale Famiglia" name="P. Acq. Reale Famiglia" stroke="#f59e0b" strokeWidth={3} strokeDasharray="5 5" fillOpacity={showScenarios ? 0 : 1} fill="url(#colorReal)" activeDot={false} />
+                                        <Area type="monotone" dataKey="Totale Nominale Famiglia" name="Reddito Nominale Famiglia" stroke={CHART_COLORS.investment} strokeWidth={4} fillOpacity={1} fill="url(#colorNominal)" activeDot={{ r: 6, strokeWidth: 0, fill: CHART_COLORS.investment }} />
+                                        <Area type="monotone" dataKey="Totale Reale Famiglia" name="P. Acq. Reale Famiglia" stroke={CHART_COLORS.target} strokeWidth={3} strokeDasharray="6 6" fillOpacity={showScenarios ? 0 : 1} fill="url(#colorReal)" activeDot={false} />
                                         
                                         {showScenarios ? (
                                             <>
-                                                <Area type="monotone" dataKey="Top Reale Famiglia" name="Scenario Top (Reale)" stroke="#10b981" strokeWidth={3} strokeDasharray="3 3" fillOpacity={0} activeDot={{ r: 6, fill: '#10b981' }} />
-                                                <Area type="monotone" dataKey="Pes Reale Famiglia" name="Scenario Cigno Nero (Reale)" stroke="#ef4444" strokeWidth={3} strokeDasharray="3 3" fillOpacity={0} activeDot={{ r: 6, fill: '#ef4444' }} />
+                                                <Area type="monotone" dataKey="Top Reale Famiglia" name="Scenario Top (Reale)" stroke={CHART_COLORS.wealth} strokeWidth={3} strokeDasharray="3 3" fillOpacity={0} activeDot={{ r: 6, fill: CHART_COLORS.wealth }} />
+                                                <Area type="monotone" dataKey="Pes Reale Famiglia" name="Scenario Cigno Nero (Reale)" stroke={CHART_COLORS.expense} strokeWidth={3} strokeDasharray="3 3" fillOpacity={0} activeDot={{ r: 6, fill: CHART_COLORS.expense }} />
                                             </>
                                         ) : (
                                             <>
-                                                {person1Income > 0 && <Line type="monotone" dataKey="Nominale P1" name={`Nominale (${person1Name})`} stroke="#3b82f6" strokeWidth={2} dot={false} strokeOpacity={0.6} />}
-                                                {person2Income > 0 && <Line type="monotone" dataKey="Nominale P2" name={`Nominale (${person2Name})`} stroke="#10b981" strokeWidth={2} dot={false} strokeOpacity={0.6} />}
+                                                {person1Income > 0 && <Line type="monotone" dataKey="Nominale P1" name={`Nominale (${person1Name})`} stroke={CHART_COLORS.capital} strokeWidth={2.4} dot={false} strokeOpacity={0.72} />}
+                                                {person2Income > 0 && <Line type="monotone" dataKey="Nominale P2" name={`Nominale (${person2Name})`} stroke={CHART_COLORS.wealth} strokeWidth={2.4} dot={false} strokeOpacity={0.72} />}
                                             </>
                                         )}
                                     </ComposedChart>

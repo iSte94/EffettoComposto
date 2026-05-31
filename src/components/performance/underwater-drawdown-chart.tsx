@@ -4,6 +4,15 @@ import { memo, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceDot, ReferenceLine } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Activity, ArrowDownRight } from "lucide-react";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+} from "@/components/ui/chart-style";
 
 export interface UnderwaterPoint {
     date: string;       // ISO YYYY-MM-DD
@@ -124,64 +133,55 @@ export const UnderwaterDrawdownChart = memo(function UnderwaterDrawdownChart({
                 ) : (
                     <div className="h-[300px] sm:h-[360px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                            <AreaChart data={chartData} margin={{ top: 14, right: 18, left: 0, bottom: 6 }}>
                                 <defs>
                                     <linearGradient id="underwaterGradient" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#f43f5e" stopOpacity={0.05} />
-                                        <stop offset="50%" stopColor="#f43f5e" stopOpacity={0.25} />
-                                        <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.55} />
+                                        <stop offset="0%" stopColor={CHART_COLORS.negative} stopOpacity={0.05} />
+                                        <stop offset="50%" stopColor={CHART_COLORS.negative} stopOpacity={0.22} />
+                                        <stop offset="100%" stopColor={CHART_COLORS.negative} stopOpacity={0.5} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.16)" />
+                                <CartesianGrid {...CHART_GRID_PROPS} />
                                 <XAxis
                                     dataKey="date"
-                                    tickLine={false}
-                                    axisLine={false}
+                                    {...CHART_AXIS_PROPS}
                                     tickFormatter={formatMonthLabel}
-                                    tick={{ fill: "#64748b", fontSize: 11, fontWeight: 600 }}
                                     minTickGap={30}
                                     dy={6}
                                 />
                                 <YAxis
                                     tickFormatter={(v) => `${v.toFixed(0)}%`}
-                                    tickLine={false}
-                                    axisLine={false}
+                                    {...CHART_AXIS_PROPS}
                                     domain={[yDomainMin, 0]}
-                                    tick={{ fill: "#64748b", fontSize: 11 }}
                                     width={50}
                                 />
                                 <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: "rgba(255, 255, 255, 0.96)",
-                                        backdropFilter: "blur(16px)",
-                                        borderRadius: "1rem",
-                                        border: "1px solid rgba(148, 163, 184, 0.24)",
-                                        boxShadow: "0 20px 40px -10px rgba(0,0,0,0.15)",
-                                    }}
-                                    labelStyle={{ fontWeight: "bold", color: "#0f172a", marginBottom: "6px" }}
-                                    itemStyle={{ color: "#e11d48", fontWeight: 700, fontSize: "13px" }}
+                                    contentStyle={CHART_TOOLTIP_STYLE}
+                                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                    itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                    cursor={CHART_CURSOR}
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     formatter={(value: any) => [`${Number(value).toFixed(2)}%`, "Drawdown"]}
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     labelFormatter={(label: any) => formatFullDate(String(label))}
                                 />
-                                <ReferenceLine y={0} stroke="#10b981" strokeDasharray="4 4" strokeWidth={1.5} />
+                                <ReferenceLine y={0} stroke={CHART_COLORS.wealth} strokeDasharray="4 4" strokeWidth={1.5} />
                                 <Area
                                     type="monotone"
                                     dataKey="drawdown"
-                                    stroke="#e11d48"
+                                    stroke={CHART_COLORS.debt}
                                     strokeWidth={2.5}
                                     fill="url(#underwaterGradient)"
                                     isAnimationActive
                                     animationDuration={900}
-                                    activeDot={{ r: 5, strokeWidth: 0, fill: "#e11d48" }}
+                                    activeDot={{ r: 5, strokeWidth: 0, fill: CHART_COLORS.debt }}
                                 />
                                 {troughPoint && troughPoint.drawdown < -0.5 && (
                                     <ReferenceDot
                                         x={troughPoint.date}
                                         y={troughPoint.drawdown}
                                         r={6}
-                                        fill="#e11d48"
+                                        fill={CHART_COLORS.debt}
                                         stroke="#fff"
                                         strokeWidth={2}
                                         ifOverflow="extendDomain"

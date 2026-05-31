@@ -145,8 +145,8 @@ export const MonthlyReturnsHeatmap = memo(function MonthlyReturnsHeatmap({ data,
                 ) : (
                     <div className="space-y-4">
                         {/* Grid */}
-                        <div className="overflow-x-auto">
-                            <div className="min-w-[480px]">
+                        <div className="overflow-x-auto rounded-2xl border border-border/60 bg-background/40 p-3">
+                            <div className="min-w-[480px]" role="img" aria-label="Heatmap dei rendimenti mensili del portafoglio">
                                 {/* Headers */}
                                 <div className="grid grid-cols-[48px_repeat(12,minmax(0,1fr))] gap-1 mb-2">
                                     <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground" />
@@ -189,10 +189,10 @@ export const MonthlyReturnsHeatmap = memo(function MonthlyReturnsHeatmap({ data,
                                                     onBlur={() => setHoveredCell(null)}
                                                     aria-label={pct == null ? `${MONTHS_FULL[m]} ${year}: nessun dato` : `${MONTHS_FULL[m]} ${year}: ${formatPct(pct)}`}
                                                     className={`
-                                                        relative aspect-square rounded-md ${colors.bg} ${colors.text}
+                                                        relative aspect-square rounded-lg ${colors.bg} ${colors.text}
                                                         flex items-center justify-center
                                                         text-[9px] sm:text-[10px] md:text-[11px] font-bold tabular-nums
-                                                        transition-all duration-200
+                                                        shadow-sm shadow-slate-950/5 transition-all duration-200
                                                         hover:scale-110 hover:z-10 hover:ring-2 ${colors.ring}
                                                         focus:outline-none focus:ring-2 focus:ring-violet-500 focus:z-10
                                                         ${pct == null ? 'cursor-default' : 'cursor-pointer'}
@@ -234,7 +234,7 @@ export const MonthlyReturnsHeatmap = memo(function MonthlyReturnsHeatmap({ data,
                                 </>
                             ) : (
                                 <span className="text-xs text-muted-foreground italic">
-                                    Passa il mouse su una cella per vedere il dettaglio.
+                                    Passa il mouse o usa Tab su una cella per vedere il dettaglio.
                                 </span>
                             )}
                         </div>

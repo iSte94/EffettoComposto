@@ -19,6 +19,12 @@ import { formatEuro } from "@/lib/format";
 import { formatDelay } from "@/lib/finance/fire-projection";
 import { computeAdvisorFireComparison, getAdvisorOwnershipMonthlyDelta, hasAdvisorFireContext } from "@/lib/finance/advisor-fire";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
+import {
+    CHART_COLORS,
+    DARK_CHART_TOOLTIP_STYLE,
+    DARK_CHART_TOOLTIP_LABEL_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface FireImpactChartProps {
     sim: PurchaseSimulation;
@@ -109,8 +115,8 @@ function FireTooltipContent({
     if (!point) return null;
 
     return (
-        <div className="rounded-2xl border border-slate-700 bg-slate-950/95 p-3 text-xs text-slate-200 shadow-2xl">
-            <div className="mb-2 font-semibold text-slate-50">Eta&apos; {Math.round(Number(label))} anni</div>
+        <div className="rounded-2xl p-3 text-xs shadow-2xl" style={DARK_CHART_TOOLTIP_STYLE}>
+            <div className="mb-2 font-semibold" style={DARK_CHART_TOOLTIP_LABEL_STYLE}>Eta&apos; {Math.round(Number(label))} anni</div>
             <div className="space-y-1.5">
                 {payload.map((entry) => (
                     <div key={entry.name} className="flex items-center justify-between gap-3">
@@ -208,7 +214,7 @@ export const FireImpactChart = memo(function FireImpactChart({
         : delay > 0
             ? "bg-amber-500/15 text-amber-100 ring-1 ring-inset ring-amber-400/30"
             : "bg-emerald-500/15 text-emerald-100 ring-1 ring-inset ring-emerald-400/30";
-    const highlightFill = delay > 0 ? "#f59e0b" : "#10b981";
+    const highlightFill = delay > 0 ? CHART_COLORS.target : CHART_COLORS.wealth;
     const fireAgeBase = baseline.ageAtFire > 0 ? `${baseline.ageAtFire.toFixed(1)} anni` : "non raggiunto";
     const fireAgeWith = withPurchase.ageAtFire > 0 ? `${withPurchase.ageAtFire.toFixed(1)} anni` : "non raggiunto";
     const timingBase = baseline.yearsToFire > 0 ? `fra ${baseline.yearsToFire.toFixed(1)}a` : baseline.alreadyFire ? "gia' raggiunto" : "non raggiunto";
@@ -332,11 +338,11 @@ export const FireImpactChart = memo(function FireImpactChart({
 
                             <div className="h-[340px] sm:h-[380px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={data} margin={{ top: 18, right: 20, left: -8, bottom: 8 }}>
+                                    <ComposedChart data={data} margin={{ top: 20, right: 20, left: 0, bottom: 10 }}>
                                         <defs>
                                             <linearGradient id="gradFireSenza" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#34d399" stopOpacity={0.35} />
-                                                <stop offset="100%" stopColor="#34d399" stopOpacity={0.02} />
+                                                <stop offset="0%" stopColor={CHART_COLORS.wealthSoft} stopOpacity={0.35} />
+                                                <stop offset="100%" stopColor={CHART_COLORS.wealthSoft} stopOpacity={0.02} />
                                             </linearGradient>
                                             <linearGradient id="gradFireCon" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="0%" stopColor="#818cf8" stopOpacity={0.35} />
@@ -344,7 +350,7 @@ export const FireImpactChart = memo(function FireImpactChart({
                                             </linearGradient>
                                         </defs>
 
-                                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.14)" vertical={false} />
+                                        <CartesianGrid strokeDasharray="4 8" stroke="rgba(148,163,184,0.18)" vertical={false} />
 
                                         {baseline.yearsToFire > 0 && withPurchase.yearsToFire > 0 && Math.abs(delay) >= 1 && (
                                             <ReferenceArea
@@ -367,7 +373,8 @@ export const FireImpactChart = memo(function FireImpactChart({
                                             tick={{ fontSize: 10, fill: "#cbd5e1" }}
                                             tickLine={false}
                                             axisLine={false}
-                                            tickFormatter={(value: number) => `${Math.round(value / 1000)}k`}
+                                            tickFormatter={formatCompactEuroAxis}
+                                            width={64}
                                         />
 
                                         <Tooltip
@@ -377,9 +384,9 @@ export const FireImpactChart = memo(function FireImpactChart({
 
                                         <ReferenceLine
                                             y={baseline.fireTarget}
-                                            stroke="#fbbf24"
+                                            stroke={CHART_COLORS.target}
                                             strokeDasharray="5 5"
-                                            label={{ value: "Target base", fontSize: 10, fill: "#fbbf24", position: "insideTopRight" }}
+                                            label={{ value: "Target base", fontSize: 10, fill: CHART_COLORS.target, fontWeight: 700, position: "insideTopRight" }}
                                         />
 
                                         {hasDynamicTargetChange && (
@@ -395,11 +402,11 @@ export const FireImpactChart = memo(function FireImpactChart({
                                             type="monotone"
                                             dataKey="senza"
                                             name="Senza acquisto"
-                                            stroke="#34d399"
+                                            stroke={CHART_COLORS.wealthSoft}
                                             fill="url(#gradFireSenza)"
                                             strokeWidth={3}
                                             dot={false}
-                                            activeDot={{ r: 5, fill: "#34d399", stroke: "#ecfdf5", strokeWidth: 2 }}
+                                            activeDot={{ r: 5, fill: CHART_COLORS.wealthSoft, stroke: "#ecfdf5", strokeWidth: 2 }}
                                         />
                                         <Area
                                             type="monotone"
@@ -414,8 +421,8 @@ export const FireImpactChart = memo(function FireImpactChart({
 
                                         {baseline.yearsToFire > 0 && (
                                             <>
-                                                <ReferenceLine x={baseline.ageAtFire} stroke="#34d399" strokeDasharray="3 4" />
-                                                <ReferenceDot x={baseline.ageAtFire} y={baseline.fireTarget} r={5} fill="#34d399" stroke="#ecfdf5" strokeWidth={2} />
+                                                <ReferenceLine x={baseline.ageAtFire} stroke={CHART_COLORS.wealthSoft} strokeDasharray="3 4" />
+                                                <ReferenceDot x={baseline.ageAtFire} y={baseline.fireTarget} r={5} fill={CHART_COLORS.wealthSoft} stroke="#ecfdf5" strokeWidth={2} />
                                             </>
                                         )}
 

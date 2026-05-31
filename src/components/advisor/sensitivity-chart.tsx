@@ -11,6 +11,19 @@ import { formatEuro } from "@/lib/format";
 import { fireDelayMonths, projectFire } from "@/lib/finance/fire-projection";
 import { buildAdvisorFireBaseParams, buildAdvisorFireWithPurchaseParams, hasAdvisorFireContext } from "@/lib/finance/advisor-fire";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
+import {
+    CHART_AXIS_PROPS,
+    CHART_AXIS_TICK,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface SensitivityChartProps {
     sim: PurchaseSimulation;
@@ -178,28 +191,29 @@ export const SensitivityChart = memo(function SensitivityChart({
 
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" />
-                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#64748b" }} />
+                        <ComposedChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 6 }}>
+                            <CartesianGrid {...CHART_GRID_PROPS} />
+                            <XAxis dataKey="label" {...CHART_AXIS_PROPS} />
                             <YAxis
                                 yAxisId="left"
-                                tick={{ fontSize: 9, fill: "#64748b" }}
-                                tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
+                                {...CHART_AXIS_PROPS}
+                                tickFormatter={formatCompactEuroAxis}
+                                width={56}
                             />
                             <YAxis
                                 yAxisId="right"
                                 orientation="right"
-                                tick={{ fontSize: 9, fill: "#64748b" }}
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ ...CHART_AXIS_TICK, fill: CHART_COLORS.target }}
                                 tickFormatter={(v: number) => `${v.toFixed(1)}a`}
+                                width={48}
                             />
                             <Tooltip
-                                contentStyle={{
-                                    borderRadius: "12px",
-                                    border: "1px solid rgba(148,163,184,0.18)",
-                                    boxShadow: "0 12px 30px rgba(0,0,0,.12)",
-                                    backgroundColor: "rgba(15, 23, 42, 0.96)",
-                                    color: "#e2e8f0",
-                                }}
+                                contentStyle={CHART_TOOLTIP_STYLE}
+                                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                cursor={CHART_CURSOR}
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 formatter={(value: any, name: any) => {
                                     if (name === "Ritardo FIRE") {
@@ -208,17 +222,17 @@ export const SensitivityChart = memo(function SensitivityChart({
                                     return [formatEuro(Number(value)), name];
                                 }}
                             />
-                            <Legend wrapperStyle={{ fontSize: "11px", color: "#64748b" }} />
-                            <Bar yAxisId="left" dataKey="tco" name="TCO" fill="#6366f1" radius={[6, 6, 0, 0]} />
-                            <Bar yAxisId="left" dataKey="interessi" name="Interessi" fill="#ef4444" radius={[6, 6, 0, 0]} />
-                            <Line yAxisId="right" type="monotone" dataKey="fireDelay" name="Ritardo FIRE" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3 }} />
+                            <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
+                            <Bar yAxisId="left" dataKey="tco" name="TCO" fill={CHART_COLORS.investment} fillOpacity={0.88} radius={CHART_BAR_RADIUS} />
+                            <Bar yAxisId="left" dataKey="interessi" name="Interessi" fill={CHART_COLORS.expense} fillOpacity={0.82} radius={CHART_BAR_RADIUS} />
+                            <Line yAxisId="right" type="monotone" dataKey="fireDelay" name="Ritardo FIRE" stroke={CHART_COLORS.target} strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                             {currentPoint && (
                                 <ReferenceDot
                                     yAxisId="left"
                                     x={currentPoint.label}
                                     y={currentPoint.tco}
                                     r={6}
-                                    fill="#10b981"
+                                    fill={CHART_COLORS.wealth}
                                     stroke="#fff"
                                     strokeWidth={2}
                                 />

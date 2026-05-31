@@ -5,10 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Switch } from "@/components/ui/switch";
 import { Wallet, Plus, Trash2, ShieldCheck, TrendingUp, Loader2, Banknote, HelpCircle, Receipt, CalendarClock } from "lucide-react";
 import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 import { AssetPacModal } from "@/components/patrimonio/asset-pac-modal";
 import { OwnerFilterBar, OwnerBadgeSelect, type OwnerFilter } from "@/components/patrimonio/owner-filter";
 import { SaleTaxModal } from "@/components/patrimonio/sale-tax-modal";
@@ -432,23 +442,26 @@ export const StockPortfolioSection = memo(function StockPortfolioSection({
                     <CardContent className="h-64 p-3 sm:h-72 sm:p-6">
                         {portfolioHistory.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={portfolioHistory} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
+                                <AreaChart data={portfolioHistory} margin={{ top: 12, right: 10, left: 0, bottom: 6 }}>
                                     <defs>
                                         <linearGradient id="colorValore" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                                            <stop offset="5%" stopColor={CHART_COLORS.investment} stopOpacity={0.26} />
+                                            <stop offset="95%" stopColor={CHART_COLORS.investment} stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 10, fontWeight: 600 }} tickMargin={8} interval="preserveStartEnd" minTickGap={16} />
-                                    <YAxis tickFormatter={(value) => `€${(value / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 11, fontWeight: 600 }} dx={-10} />
+                                    <CartesianGrid {...CHART_GRID_PROPS} />
+                                    <XAxis dataKey="label" {...CHART_AXIS_PROPS} tickMargin={8} interval="preserveStartEnd" minTickGap={16} />
+                                    <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                                     <Tooltip
-                                        contentStyle={{ borderRadius: "14px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 10px 40px -10px rgba(15,23,42,0.18)", backgroundColor: "rgba(255,255,255,0.96)", backdropFilter: "blur(10px)", padding: "12px", color: "#334155" }}
+                                        contentStyle={CHART_TOOLTIP_STYLE}
+                                        labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                        itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                        cursor={CHART_CURSOR}
                                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        formatter={(value: any) => [<span key="value" className="font-extrabold text-purple-600">{formatEuro(Number(value || 0))}</span>, "Valore Virtuale"]}
-                                        labelStyle={{ color: "#475569", fontWeight: 700, marginBottom: "8px", fontSize: "11px", textTransform: "uppercase", letterSpacing: "1px" }}
+                                        formatter={(value: any) => [<span key="value" className="font-extrabold text-indigo-600">{formatEuro(Number(value || 0))}</span>, "Valore Virtuale"]}
                                         labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate || label}
                                     />
-                                    <Area type="monotone" dataKey="Valore" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorValore)" className="drop-shadow-[0_4px_12px_rgba(168,85,247,0.3)]" />
+                                    <Area type="monotone" dataKey="Valore" stroke={CHART_COLORS.investment} strokeWidth={3} fillOpacity={1} fill="url(#colorValore)" className="drop-shadow-[0_4px_12px_rgba(79,70,229,0.26)]" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (

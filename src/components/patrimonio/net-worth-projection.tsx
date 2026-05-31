@@ -13,6 +13,16 @@ import {
 } from "recharts";
 import { buildPlannedEventsTimeline } from "@/lib/finance/planned-events";
 import type { PlannedFinancialEvent } from "@/types";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface HistoryPoint {
     date: string;
@@ -283,20 +293,23 @@ export const NetWorthProjection = memo(function NetWorthProjection({
                 {/* Chart */}
                 <div className="h-64 sm:h-56">
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={data.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis dataKey="label" tick={{ fontSize: 10 }} minTickGap={16} interval={Math.max(0, Math.floor(data.chartData.length / 8))} />
-                            <YAxis width={44} tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
+                        <AreaChart data={data.chartData} margin={{ top: 12, right: 8, left: 0, bottom: 6 }}>
+                            <CartesianGrid {...CHART_GRID_PROPS} />
+                            <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={16} interval={Math.max(0, Math.floor(data.chartData.length / 8))} />
+                            <YAxis width={56} {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} />
                             <Tooltip
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 formatter={(value: any) => formatEuro(Number(value))}
-                                contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 8px 24px rgba(15,23,42,0.12)", backgroundColor: "rgba(255,255,255,0.96)" }}
+                                contentStyle={CHART_TOOLTIP_STYLE}
+                                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                cursor={CHART_CURSOR}
                             />
-                            <ReferenceLine x={data.bridgeLabel} stroke="#94a3b8" strokeDasharray="4 4" label={{ value: "Oggi", fontSize: 10, fill: "#94a3b8" }} />
-                            <Area type="monotone" dataKey="Caso Ottimista" stroke="transparent" fill="#10b981" fillOpacity={0.08} />
-                            <Area type="monotone" dataKey="Caso Pessimista" stroke="transparent" fill="#ef4444" fillOpacity={0.05} />
-                            <Area type="monotone" dataKey="Storico" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} strokeWidth={2} />
-                            <Area type="monotone" dataKey="Proiezione" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} strokeWidth={2} strokeDasharray="6 3" />
+                            <ReferenceLine x={data.bridgeLabel} stroke={CHART_COLORS.muted} strokeDasharray="4 4" label={{ value: "Oggi", fontSize: 10, fill: CHART_COLORS.muted, fontWeight: 700 }} />
+                            <Area type="monotone" dataKey="Caso Ottimista" stroke="transparent" fill={CHART_COLORS.wealth} fillOpacity={0.09} />
+                            <Area type="monotone" dataKey="Caso Pessimista" stroke="transparent" fill={CHART_COLORS.expense} fillOpacity={0.06} />
+                            <Area type="monotone" dataKey="Storico" stroke={CHART_COLORS.capital} fill={CHART_COLORS.capital} fillOpacity={0.15} strokeWidth={2.5} />
+                            <Area type="monotone" dataKey="Proiezione" stroke={CHART_COLORS.capital} fill={CHART_COLORS.capital} fillOpacity={0.08} strokeWidth={2.5} strokeDasharray="6 3" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

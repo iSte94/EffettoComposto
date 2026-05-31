@@ -9,9 +9,21 @@ import { Plus, Trash2, Scale } from "lucide-react";
 import { formatEuro } from "@/lib/format";
 import { calculateMortgagePayment } from "@/lib/finance/loans";
 import {
-    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
     LineChart, Line
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface MortgageScenario {
     id: number;
@@ -29,7 +41,7 @@ interface ScenarioResult extends MortgageScenario {
     totalInterest: number;
 }
 
-const COLORS = ["#3b82f6", "#10b981", "#f59e0b"];
+const COLORS = [CHART_COLORS.capital, CHART_COLORS.wealth, CHART_COLORS.target];
 const LABELS = ["Offerta A", "Offerta B", "Offerta C"];
 
 function createDefaultScenario(id: number): MortgageScenario {
@@ -234,13 +246,14 @@ export function MortgageComparison() {
                         <h4 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Confronto Costi</h4>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={barData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} />
-                                    <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                                    <Tooltip formatter={(value: string | number | undefined) => formatEuro(Number(value ?? 0))} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
-                                    <Legend wrapperStyle={{ fontSize: 11, color: "#64748b" }} />
+                                <BarChart data={barData} margin={{ top: 14, right: 8, left: 0, bottom: 6 }} barCategoryGap="24%">
+                                    <CartesianGrid {...CHART_GRID_PROPS} />
+                                    <XAxis dataKey="name" {...CHART_AXIS_PROPS} />
+                                    <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
+                                    <Tooltip formatter={(value: string | number | undefined) => formatEuro(Number(value ?? 0))} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} cursor={CHART_CURSOR} />
+                                    <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
                                     {results.map((r, i) => (
-                                        <Bar key={r.label} dataKey={r.label} fill={COLORS[i]} radius={[4, 4, 0, 0]} />
+                                        <Bar key={r.label} dataKey={r.label} fill={COLORS[i]} radius={CHART_BAR_RADIUS} />
                                     ))}
                                 </BarChart>
                             </ResponsiveContainer>
@@ -253,13 +266,14 @@ export function MortgageComparison() {
                         <h4 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Debito Residuo nel Tempo</h4>
                         <div className="h-64">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={debtOverTime} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                    <XAxis dataKey="anno" tick={{ fontSize: 10, fill: "#64748b" }} interval={Math.max(0, Math.floor(maxYears / 6))} />
-                                    <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v: number) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                                    <Tooltip formatter={(value: string | number | undefined) => formatEuro(Number(value ?? 0))} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
-                                    <Legend wrapperStyle={{ fontSize: 11, color: "#64748b" }} />
+                                <LineChart data={debtOverTime} margin={{ top: 14, right: 8, left: 0, bottom: 6 }}>
+                                    <CartesianGrid {...CHART_GRID_PROPS} />
+                                    <XAxis dataKey="anno" {...CHART_AXIS_PROPS} interval={Math.max(0, Math.floor(maxYears / 6))} />
+                                    <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
+                                    <Tooltip formatter={(value: string | number | undefined) => formatEuro(Number(value ?? 0))} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} cursor={CHART_CURSOR} />
+                                    <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
                                     {results.map((r, i) => (
-                                        <Line key={r.label} type="monotone" dataKey={r.label} stroke={COLORS[i]} strokeWidth={2.5} dot={false} />
+                                        <Line key={r.label} type="monotone" dataKey={r.label} stroke={COLORS[i]} strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
                                     ))}
                                 </LineChart>
                             </ResponsiveContainer>

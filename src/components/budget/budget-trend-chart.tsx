@@ -6,6 +6,18 @@ import {
     ComposedChart, Line, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine,
 } from "recharts";
 import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 export interface TrendRow {
     month: string;          // YYYY-MM
@@ -28,26 +40,23 @@ function BudgetTrendChartComponent({ data, budgetTotal }: BudgetTrendChartProps)
                 <h3 className="mb-4 text-sm font-bold text-muted-foreground">Andamento Mensile</h3>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-                            <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                        <ComposedChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 6 }}>
+                            <CartesianGrid {...CHART_GRID_PROPS} />
+                            <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={18} />
+                            <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                             <Tooltip
                                 formatter={(value: number | string | undefined) => formatEuro(Number(value ?? 0))}
-                                contentStyle={{
-                                    borderRadius: "16px",
-                                    border: "1px solid var(--border)",
-                                    backgroundColor: "var(--popover)",
-                                    color: "var(--popover-foreground)",
-                                    boxShadow: "0 16px 40px -16px rgba(15, 23, 42, 0.45)",
-                                }}
+                                contentStyle={CHART_TOOLTIP_STYLE}
+                                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                cursor={CHART_CURSOR}
                             />
-                            <Legend wrapperStyle={{ fontSize: 11 }} />
-                            <Bar dataKey="Entrate" fill="#10b981" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="Spese" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                            <Line type="monotone" dataKey="Risparmio" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} />
+                            <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
+                            <Bar dataKey="Entrate" fill={CHART_COLORS.income} radius={CHART_BAR_RADIUS} />
+                            <Bar dataKey="Spese" fill={CHART_COLORS.expense} radius={CHART_BAR_RADIUS} />
+                            <Line type="monotone" dataKey="Risparmio" stroke={CHART_COLORS.investment} strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
                             {budgetTotal > 0 && (
-                                <ReferenceLine y={budgetTotal} stroke="#a855f7" strokeDasharray="4 4" label={{ value: `Budget ${formatEuro(budgetTotal)}`, fill: "#a855f7", fontSize: 10, position: "insideTopRight" }} />
+                                <ReferenceLine y={budgetTotal} stroke={CHART_COLORS.target} strokeDasharray="5 5" label={{ value: `Budget ${formatEuro(budgetTotal)}`, fill: CHART_COLORS.target, fontSize: 11, fontWeight: 700, position: "insideTopRight" }} />
                             )}
                         </ComposedChart>
                     </ResponsiveContainer>

@@ -6,6 +6,17 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell,
 } from "recharts";
 import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 export interface ComparisonRow {
     name: string;
@@ -30,24 +41,21 @@ function BudgetComparisonChartComponent({ data, periodLabel }: BudgetComparisonC
                 </div>
                 <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                            <XAxis dataKey="name" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
-                            <YAxis tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                        <BarChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 6 }} barCategoryGap="24%">
+                            <CartesianGrid {...CHART_GRID_PROPS} />
+                            <XAxis dataKey="name" {...CHART_AXIS_PROPS} interval={0} minTickGap={10} />
+                            <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                             <Tooltip
                                 formatter={(value: number | string | undefined) => formatEuro(Number(value ?? 0))}
-                                contentStyle={{
-                                    borderRadius: "16px",
-                                    border: "1px solid var(--border)",
-                                    backgroundColor: "var(--popover)",
-                                    color: "var(--popover-foreground)",
-                                    boxShadow: "0 16px 40px -16px rgba(15, 23, 42, 0.45)",
-                                }}
+                                contentStyle={CHART_TOOLTIP_STYLE}
+                                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                cursor={CHART_CURSOR}
                             />
-                            <Bar dataKey="Budget" fill="#c4b5fd" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="Speso" radius={[4, 4, 0, 0]}>
+                            <Bar dataKey="Budget" fill={CHART_COLORS.capital} fillOpacity={0.38} radius={CHART_BAR_RADIUS} />
+                            <Bar dataKey="Speso" radius={CHART_BAR_RADIUS}>
                                 {data.map((entry, index) => (
-                                    <Cell key={index} fill={entry.overBudget ? "#ef4444" : "#10b981"} />
+                                    <Cell key={index} fill={entry.overBudget ? CHART_COLORS.expense : CHART_COLORS.income} />
                                 ))}
                             </Bar>
                         </BarChart>

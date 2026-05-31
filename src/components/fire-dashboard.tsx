@@ -39,6 +39,18 @@ import type {
     RealEstateProperty,
 } from "@/types";
 import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_AXIS_TICK,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    DARK_CHART_TOOLTIP_ITEM_STYLE,
+    DARK_CHART_TOOLTIP_LABEL_STYLE,
+    DARK_CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 import { FireSettingsPanel } from "@/components/fire/fire-settings-panel";
 import { CoastFireScenarios } from "@/components/fire/coast-fire-scenarios";
 import { SensitivityMatrix } from "@/components/fire/sensitivity-matrix";
@@ -1334,25 +1346,25 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                     )}
                                     <div className="h-[400px] w-full">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={displayChartData} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
+                                            <ComposedChart data={displayChartData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
                                                 <defs>
                                                     <linearGradient id="colorCapital" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.5} />
-                                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                                        <stop offset="5%" stopColor={CHART_COLORS.wealth} stopOpacity={0.45} />
+                                                        <stop offset="95%" stopColor={CHART_COLORS.wealth} stopOpacity={0} />
                                                     </linearGradient>
                                                     <linearGradient id="colorDebt" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.6} />
-                                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.1} />
+                                                        <stop offset="5%" stopColor={CHART_COLORS.debt} stopOpacity={0.48} />
+                                                        <stop offset="95%" stopColor={CHART_COLORS.debt} stopOpacity={0.08} />
                                                     </linearGradient>
                                                     <linearGradient id="colorPlannedEvents" x1="0" y1="0" x2="1" y2="0">
-                                                        <stop offset="0%" stopColor="#2563eb" stopOpacity={0.9} />
-                                                        <stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.9} />
+                                                        <stop offset="0%" stopColor={CHART_COLORS.capital} stopOpacity={0.95} />
+                                                        <stop offset="100%" stopColor={CHART_COLORS.liquidity} stopOpacity={0.95} />
                                                     </linearGradient>
                                                 </defs>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                                <XAxis dataKey="age" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} name="Età" />
-                                                <YAxis yAxisId="left" tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-5} />
-                                                <YAxis yAxisId="right" orientation="right" tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#2563eb', fontSize: 12 }} dx={5} />
+                                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                                <XAxis dataKey="age" {...CHART_AXIS_PROPS} dy={10} name="Età" />
+                                                <YAxis yAxisId="left" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={64} />
+                                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ ...CHART_AXIS_TICK, fill: CHART_COLORS.capital }} tickFormatter={formatCompactEuroAxis} width={64} />
                                                 <Tooltip
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any, name: any) => {
@@ -1363,17 +1375,19 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                         return [formatEuro(Number(value)), 'Capitale Stimato'];
                                                     }}
                                                     labelFormatter={(label) => `Età: ${label} anni`}
-                                                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
-                                                    labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
+                                                    contentStyle={DARK_CHART_TOOLTIP_STYLE}
+                                                    labelStyle={DARK_CHART_TOOLTIP_LABEL_STYLE}
+                                                    itemStyle={DARK_CHART_TOOLTIP_ITEM_STYLE}
+                                                    cursor={CHART_CURSOR}
                                                 />
                                                 {plannedEventsFireView.hasEvents && (
-                                                    <ReferenceLine yAxisId="right" y={0} stroke="#94a3b8" strokeOpacity={0.35} strokeDasharray="2 4" />
+                                                    <ReferenceLine yAxisId="right" y={0} stroke={CHART_COLORS.muted} strokeOpacity={0.35} strokeDasharray="2 4" />
                                                 )}
-                                                <Line yAxisId="left" type="monotone" dataKey="Target" stroke="#f97316" strokeDasharray="5 5" strokeWidth={2} dot={false} activeDot={false} />
-                                                <Area yAxisId="left" type="monotone" dataKey="Capital" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorCapital)" activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981', style: { filter: 'drop-shadow(0px 0px 8px rgba(16,185,129,0.5))' } }} />
-                                                <Area yAxisId="right" type="stepAfter" dataKey="ActiveDebtAnnual" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorDebt)" activeDot={{ r: 4, strokeWidth: 0, fill: '#ef4444', style: { filter: 'drop-shadow(0px 0px 6px rgba(239,68,68,0.5))' } }} />
+                                                <Line yAxisId="left" type="monotone" dataKey="Target" stroke={CHART_COLORS.target} strokeDasharray="6 6" strokeWidth={2.5} dot={false} activeDot={false} />
+                                                <Area yAxisId="left" type="monotone" dataKey="Capital" stroke={CHART_COLORS.wealth} strokeWidth={4} fillOpacity={1} fill="url(#colorCapital)" activeDot={{ r: 7, strokeWidth: 0, fill: CHART_COLORS.wealth, style: { filter: 'drop-shadow(0px 0px 8px rgba(16,185,129,0.45))' } }} />
+                                                <Area yAxisId="right" type="stepAfter" dataKey="ActiveDebtAnnual" stroke={CHART_COLORS.debt} strokeWidth={2.5} fillOpacity={1} fill="url(#colorDebt)" activeDot={{ r: 4, strokeWidth: 0, fill: CHART_COLORS.debt, style: { filter: 'drop-shadow(0px 0px 6px rgba(225,29,72,0.45))' } }} />
                                                 {plannedEventsFireView.hasEvents && (
-                                                    <Line yAxisId="right" type="monotone" dataKey="PlannedEventsCumulative" stroke="url(#colorPlannedEvents)" strokeDasharray="4 6" strokeWidth={3} dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#ffffff', stroke: '#2563eb' }} />
+                                                    <Line yAxisId="right" type="monotone" dataKey="PlannedEventsCumulative" stroke="url(#colorPlannedEvents)" strokeDasharray="4 6" strokeWidth={3} dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#ffffff', stroke: CHART_COLORS.capital }} />
                                                 )}
                                             </ComposedChart>
                                         </ResponsiveContainer>
@@ -1479,25 +1493,23 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                     </p>
                                                     <div className="h-[430px] w-full">
                                                         <ResponsiveContainer width="100%" height="100%">
-                                                            <ComposedChart data={plannedEventsFireView.chartData} margin={{ top: 16, right: 18, left: 6, bottom: 18 }}>
+                                                            <ComposedChart data={plannedEventsFireView.chartData} margin={{ top: 18, right: 18, left: 4, bottom: 16 }}>
                                                                 <defs>
                                                                     <linearGradient id="eventsCumulativeLine" x1="0" y1="0" x2="1" y2="0">
-                                                                        <stop offset="0%" stopColor="#2563eb" stopOpacity={1} />
-                                                                        <stop offset="100%" stopColor="#38bdf8" stopOpacity={1} />
+                                                                        <stop offset="0%" stopColor={CHART_COLORS.capital} stopOpacity={1} />
+                                                                        <stop offset="100%" stopColor={CHART_COLORS.liquidity} stopOpacity={1} />
                                                                     </linearGradient>
                                                                 </defs>
-                                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(148,163,184,0.18)" />
+                                                                <CartesianGrid {...CHART_GRID_PROPS} />
                                                                 <XAxis
                                                                     dataKey="label"
                                                                     interval={Math.max(0, Math.floor(plannedEventsFireView.chartData.length / 9))}
-                                                                    tickLine={false}
-                                                                    axisLine={false}
-                                                                    tick={{ fill: '#64748b', fontSize: 11 }}
+                                                                    {...CHART_AXIS_PROPS}
                                                                     dy={10}
                                                                 />
-                                                                <YAxis yAxisId="left" tickFormatter={(val) => `€${Math.round(Number(val) / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 11 }} dx={-4} />
-                                                                <YAxis yAxisId="right" orientation="right" tickFormatter={(val) => `€${Math.round(Number(val) / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#2563eb', fontSize: 11 }} dx={4} />
-                                                                <ReferenceLine yAxisId="left" y={0} stroke="#94a3b8" strokeOpacity={0.5} strokeDasharray="2 4" />
+                                                                <YAxis yAxisId="left" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={62} />
+                                                                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ ...CHART_AXIS_TICK, fill: CHART_COLORS.capital }} tickFormatter={formatCompactEuroAxis} width={62} />
+                                                                <ReferenceLine yAxisId="left" y={0} stroke={CHART_COLORS.muted} strokeOpacity={0.5} strokeDasharray="2 4" />
                                                                 <Tooltip
                                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                                     content={({ active, payload }: any) => {
@@ -1536,13 +1548,13 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                                     {plannedEventsFireView.chartData.map((entry) => (
                                                                         <Cell
                                                                             key={`planned-impact-${entry.month}`}
-                                                                            fill={entry.netImpact >= 0 ? '#10b981' : '#f43f5e'}
+                                                                            fill={entry.netImpact >= 0 ? CHART_COLORS.positive : CHART_COLORS.negative}
                                                                             fillOpacity={Math.abs(entry.netImpact) > 0.5 ? 0.9 : 0.18}
                                                                         />
                                                                     ))}
                                                                 </Bar>
-                                                                <Line yAxisId="right" type="monotone" dataKey="cumulativeImpact" stroke="url(#eventsCumulativeLine)" strokeWidth={4} dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#ffffff', stroke: '#2563eb' }} />
-                                                                <Line yAxisId="left" type="monotone" dataKey="debtService" stroke="#f97316" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: '#ffffff', stroke: '#f97316' }} />
+                                                                <Line yAxisId="right" type="monotone" dataKey="cumulativeImpact" stroke="url(#eventsCumulativeLine)" strokeWidth={4} dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#ffffff', stroke: CHART_COLORS.capital }} />
+                                                                <Line yAxisId="left" type="monotone" dataKey="debtService" stroke={CHART_COLORS.interest} strokeWidth={2.5} strokeDasharray="6 6" dot={false} activeDot={{ r: 4, strokeWidth: 2, fill: '#ffffff', stroke: CHART_COLORS.interest }} />
                                                             </ComposedChart>
                                                         </ResponsiveContainer>
                                                     </div>
@@ -1647,16 +1659,16 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
                                             <div className={`h-[400px] w-full transition-opacity duration-300 ${mcIsCalculating && mcData.length < 50 ? 'opacity-50' : 'opacity-100'}`}>
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <ComposedChart data={mcData} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
+                                                    <ComposedChart data={mcData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
                                                         <defs>
                                                             <linearGradient id="mcMedian" x1="0" y1="0" x2="0" y2="1">
-                                                                <stop offset="5%" stopColor="#9333ea" stopOpacity={0.2} />
-                                                                <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
+                                                                <stop offset="5%" stopColor={CHART_COLORS.investment} stopOpacity={0.22} />
+                                                                <stop offset="95%" stopColor={CHART_COLORS.investment} stopOpacity={0} />
                                                             </linearGradient>
                                                         </defs>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                                        <XAxis dataKey="age" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} name="Età" />
-                                                        <YAxis tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-5} />
+                                                        <CartesianGrid {...CHART_GRID_PROPS} />
+                                                        <XAxis dataKey="age" {...CHART_AXIS_PROPS} dy={10} name="Età" />
+                                                        <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={64} />
                                                         {(!mcIsCalculating || mcData.length > 50) && (
                                                             <Tooltip
                                                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1665,16 +1677,18 @@ export function FireDashboard({ user }: FireDashboardProps) {
                                                                     return [formatEuro(Number(value)), labelMap[name] || name];
                                                                 }}
                                                                 labelFormatter={(label) => `Età: ${label} anni`}
-                                                                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
-                                                                labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
+                                                                contentStyle={DARK_CHART_TOOLTIP_STYLE}
+                                                                labelStyle={DARK_CHART_TOOLTIP_LABEL_STYLE}
+                                                                itemStyle={DARK_CHART_TOOLTIP_ITEM_STYLE}
+                                                                cursor={CHART_CURSOR}
                                                             />
                                                         )}
                                                         {mcData.length > 0 && (
                                                             <>
-                                                                <Line type="monotone" dataKey="Target" stroke="#f97316" strokeDasharray="5 5" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                                                <Line type="monotone" dataKey="p90" stroke="#d8b4fe" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                                                <Line type="monotone" dataKey="p10" stroke="#f43f5e" strokeWidth={2} dot={false} isAnimationActive={false} />
-                                                                <Area type="monotone" dataKey="p50" stroke="#9333ea" strokeWidth={4} fillOpacity={1} fill="url(#mcMedian)" activeDot={!mcIsCalculating ? { r: 8, strokeWidth: 0, fill: '#9333ea', style: { filter: 'drop-shadow(0px 0px 10px rgba(147,51,234,0.8))' } } : false} isAnimationActive={false} />
+                                                                <Line type="monotone" dataKey="Target" stroke={CHART_COLORS.target} strokeDasharray="6 6" strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                                                                <Line type="monotone" dataKey="p90" stroke={CHART_COLORS.wealthSoft} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                                                                <Line type="monotone" dataKey="p10" stroke={CHART_COLORS.negative} strokeWidth={2.5} dot={false} isAnimationActive={false} />
+                                                                <Area type="monotone" dataKey="p50" stroke={CHART_COLORS.investment} strokeWidth={4} fillOpacity={1} fill="url(#mcMedian)" activeDot={!mcIsCalculating ? { r: 7, strokeWidth: 0, fill: CHART_COLORS.investment, style: { filter: 'drop-shadow(0px 0px 10px rgba(79,70,229,0.55))' } } : false} isAnimationActive={false} />
                                                             </>
                                                         )}
                                                     </ComposedChart>
@@ -1708,28 +1722,30 @@ export function FireDashboard({ user }: FireDashboardProps) {
 
                                     <div className="h-[350px] w-full mt-4">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={stressData} margin={{ top: 20, right: 20, left: 10, bottom: 20 }}>
-                                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                                <XAxis dataKey="age" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} name="La tua età nel decennio" />
-                                                <YAxis yAxisId="left" tickFormatter={(val) => `€${(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-5} />
+                                            <ComposedChart data={stressData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
+                                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                                <XAxis dataKey="age" {...CHART_AXIS_PROPS} dy={10} name="La tua età nel decennio" />
+                                                <YAxis yAxisId="left" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={64} />
                                                 <YAxis yAxisId="right" orientation="right" hide />
 
                                                 <Tooltip
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any, name: any) => [name === 'Capital' ? formatEuro(Number(value)) : `${value}%`, name === 'Capital' ? 'Capitale Residuo' : 'Crac di Mercato']}
                                                     labelFormatter={(label, data) => `Età: ${label} (Simula un ${data[0]?.payload?.year})`}
-                                                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.96)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(148,163,184,0.18)', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.12)', color: '#e2e8f0' }}
-                                                    labelStyle={{ fontWeight: 'bold', color: '#e2e8f0', marginBottom: '8px' }}
+                                                    contentStyle={DARK_CHART_TOOLTIP_STYLE}
+                                                    labelStyle={DARK_CHART_TOOLTIP_LABEL_STYLE}
+                                                    itemStyle={DARK_CHART_TOOLTIP_ITEM_STYLE}
+                                                    cursor={CHART_CURSOR}
                                                 />
 
                                                 {/* Bar per mostrare i crolli o rialzi annuali (S&P500) */}
-                                                <Bar yAxisId="right" dataKey="ReturnValue" radius={[4, 4, 4, 4]} barSize={15}>
+                                                <Bar yAxisId="right" dataKey="ReturnValue" radius={CHART_BAR_RADIUS} barSize={15}>
                                                     {stressData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.ReturnValue < 0 ? '#f43f5e' : '#10b981'} fillOpacity={0.6} />
+                                                        <Cell key={`cell-${index}`} fill={entry.ReturnValue < 0 ? CHART_COLORS.negative : CHART_COLORS.positive} fillOpacity={0.68} />
                                                     ))}
                                                 </Bar>
 
-                                                <Line yAxisId="left" type="stepAfter" dataKey="Capital" stroke="#0f172a" strokeWidth={4} dot={{ r: 4, fill: "#ffffff", strokeWidth: 2, stroke: "#38bdf8" }} activeDot={{ r: 6, fill: '#ffffff', strokeWidth: 3, stroke: '#38bdf8', style: { filter: 'drop-shadow(0px 0px 6px rgba(56,189,248,0.5))' } }} />
+                                                <Line yAxisId="left" type="stepAfter" dataKey="Capital" stroke={CHART_COLORS.neutral} strokeWidth={4} dot={{ r: 4, fill: "#ffffff", strokeWidth: 2, stroke: CHART_COLORS.liquidity }} activeDot={{ r: 6, fill: '#ffffff', strokeWidth: 3, stroke: CHART_COLORS.liquidity, style: { filter: 'drop-shadow(0px 0px 6px rgba(6,182,212,0.5))' } }} />
                                             </ComposedChart>
                                         </ResponsiveContainer>
                                     </div>

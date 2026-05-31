@@ -65,6 +65,18 @@ import {
     XAxis,
     YAxis,
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface AmortizationRow {
     mese: number;
@@ -1768,37 +1780,36 @@ export function LoanCalculator() {
 
                                 <div className="h-72">
                                     <ResponsiveContainer width="100%" height="100%">
-                                        <ComposedChart data={aggregateResult.chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                                            <XAxis dataKey="label" tick={{ fontSize: 10, fill: "var(--muted-foreground)" }} />
+                                        <ComposedChart data={aggregateResult.chartData} margin={{ top: 12, right: 8, left: 0, bottom: 6 }}>
+                                            <CartesianGrid {...CHART_GRID_PROPS} />
+                                            <XAxis dataKey="label" {...CHART_AXIS_PROPS} minTickGap={16} />
                                             <YAxis
                                                 yAxisId="bars"
-                                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                                tickFormatter={(value: number) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(value))}
+                                                {...CHART_AXIS_PROPS}
+                                                tickFormatter={formatCompactEuroAxis}
+                                                width={58}
                                             />
                                             <YAxis
                                                 yAxisId="line"
                                                 orientation="right"
-                                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                                tickFormatter={(value: number) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(value))}
+                                                {...CHART_AXIS_PROPS}
+                                                tickFormatter={formatCompactEuroAxis}
+                                                width={58}
                                             />
                                             <Tooltip
                                                 formatter={(value: number | string | undefined, name?: string) => [
                                                     formatEuro(Number(value ?? 0)),
                                                     name ?? "Valore",
                                                 ]}
-                                                contentStyle={{
-                                                    borderRadius: "16px",
-                                                    border: "1px solid var(--border)",
-                                                    backgroundColor: "var(--popover)",
-                                                    color: "var(--popover-foreground)",
-                                                    boxShadow: "0 16px 40px -16px rgba(15,23,42,0.45)",
-                                                }}
+                                                contentStyle={CHART_TOOLTIP_STYLE}
+                                                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                                cursor={CHART_CURSOR}
                                             />
-                                            <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted-foreground)" }} />
-                                            <Bar yAxisId="bars" dataKey="Capitale" stackId="a" fill="#3b82f6" fillOpacity={0.85} radius={[0, 0, 4, 4]} />
-                                            <Bar yAxisId="bars" dataKey="Interessi" stackId="a" fill="#ef4444" fillOpacity={0.75} radius={[4, 4, 0, 0]} />
-                                            <Line yAxisId="line" type="monotone" dataKey="Debito Residuo" stroke="#f97316" strokeWidth={2} dot={false} />
+                                            <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
+                                            <Bar yAxisId="bars" dataKey="Capitale" stackId="a" fill={CHART_COLORS.capital} fillOpacity={0.88} radius={[0, 0, 6, 6]} />
+                                            <Bar yAxisId="bars" dataKey="Interessi" stackId="a" fill={CHART_COLORS.expense} fillOpacity={0.78} radius={CHART_BAR_RADIUS} />
+                                            <Line yAxisId="line" type="monotone" dataKey="Debito Residuo" stroke={CHART_COLORS.target} strokeWidth={3} dot={false} activeDot={{ r: 5 }} />
                                         </ComposedChart>
                                     </ResponsiveContainer>
                                 </div>

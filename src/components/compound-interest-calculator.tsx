@@ -21,6 +21,17 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
     CartesianGrid, Legend, ReferenceLine,
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 // SWR (Safe Withdrawal Rate) di default usato nel resto dell'app per calcoli
 // FIRE (vedi DEFAULT_FIRE_WITHDRAWAL_RATE in fire-metrics.ts). Piu' conservativo
@@ -502,45 +513,41 @@ export function CompoundInterestCalculator() {
                             </h3>
                             <div className="h-[380px] md:h-[450px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={result.chartData} margin={{ top: 10, right: 20, left: 20, bottom: 20 }}>
+                                    <AreaChart data={result.chartData} margin={{ top: 14, right: 18, left: 4, bottom: 12 }}>
                                         <defs>
                                             <linearGradient id="colorVersato" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={CHART_COLORS.contribution} stopOpacity={0.28} />
+                                                <stop offset="95%" stopColor={CHART_COLORS.contribution} stopOpacity={0} />
                                             </linearGradient>
                                             <linearGradient id="colorInteressi" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={CHART_COLORS.wealth} stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor={CHART_COLORS.wealth} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                                        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dy={10} interval="preserveStartEnd" />
-                                        <YAxis tickFormatter={(value) => `€${Math.round(value / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} dx={-10} />
+                                        <CartesianGrid {...CHART_GRID_PROPS} />
+                                        <XAxis dataKey="label" {...CHART_AXIS_PROPS} dy={10} interval="preserveStartEnd" />
+                                        <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={64} />
                                         <Tooltip
-                                            contentStyle={{
-                                                backgroundColor: "var(--popover)",
-                                                backdropFilter: "blur(16px)",
-                                                borderRadius: "1rem",
-                                                border: "1px solid var(--border)",
-                                                boxShadow: "0 20px 40px -10px rgba(15,23,42,0.35)",
-                                                color: "var(--popover-foreground)",
-                                            }}
+                                            contentStyle={CHART_TOOLTIP_STYLE}
+                                            labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                            itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                            cursor={CHART_CURSOR}
                                             formatter={(value: number | string | undefined) => [formatEuro(Number(value ?? 0)), undefined]}
                                         />
-                                        <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: "12px", fontWeight: 600, color: "var(--muted-foreground)" }} />
-                                        <Area type="monotone" dataKey="Versato" stackId="1" stroke="#3b82f6" strokeWidth={2} fillOpacity={1} fill="url(#colorVersato)" />
-                                        <Area type="monotone" dataKey="Interessi" stackId="1" stroke="#a855f7" strokeWidth={2} fillOpacity={1} fill="url(#colorInteressi)" />
+                                        <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={CHART_LEGEND_STYLE} />
+                                        <Area type="monotone" dataKey="Versato" stackId="1" stroke={CHART_COLORS.contribution} strokeWidth={2.5} fillOpacity={1} fill="url(#colorVersato)" />
+                                        <Area type="monotone" dataKey="Interessi" stackId="1" stroke={CHART_COLORS.wealth} strokeWidth={2.5} fillOpacity={1} fill="url(#colorInteressi)" />
                                         {result.crossoverYear !== null && (
                                             <ReferenceLine
                                                 x={`Anno ${result.crossoverYear}`}
-                                                stroke="#f59e0b"
+                                                stroke={CHART_COLORS.target}
                                                 strokeDasharray="4 4"
                                                 strokeWidth={1.5}
                                                 ifOverflow="extendDomain"
                                                 label={{
-                                                    value: `Punto di Svolta · Anno ${result.crossoverYear}`,
+                                                    value: `Punto di svolta: anno ${result.crossoverYear}`,
                                                     position: "insideTopRight",
-                                                    fill: "#b45309",
+                                                    fill: CHART_COLORS.target,
                                                     fontSize: 10,
                                                     fontWeight: 700,
                                                 }}

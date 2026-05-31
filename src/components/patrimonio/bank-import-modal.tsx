@@ -9,6 +9,18 @@ import { formatEuro } from "@/lib/format";
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface BankImportModalProps {
     onImportBalance?: (balance: number) => void;
@@ -146,18 +158,21 @@ export function BankImportModal({ onImportBalance, onImportMonthlySavings }: Ban
                                     <h4 className="text-xs font-bold text-slate-500 mb-3">Riepilogo Mensile</h4>
                                     <div className="h-48">
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                                <XAxis dataKey="mese" tick={{ fontSize: 10 }} />
-                                                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
+                                            <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 6 }} barCategoryGap="28%">
+                                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                                <XAxis dataKey="mese" {...CHART_AXIS_PROPS} minTickGap={12} />
+                                                <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={54} />
                                                 <Tooltip
                                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any) => formatEuro(Number(value))}
-                                                    contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 4px 20px rgba(0,0,0,.1)" }}
+                                                    contentStyle={CHART_TOOLTIP_STYLE}
+                                                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                                    itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                                    cursor={CHART_CURSOR}
                                                 />
-                                                <Legend wrapperStyle={{ fontSize: 10 }} />
-                                                <Bar dataKey="Entrate" fill="#10b981" radius={[3, 3, 0, 0]} />
-                                                <Bar dataKey="Uscite" fill="#ef4444" radius={[3, 3, 0, 0]} />
+                                                <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
+                                                <Bar dataKey="Entrate" fill={CHART_COLORS.income} radius={CHART_BAR_RADIUS} />
+                                                <Bar dataKey="Uscite" fill={CHART_COLORS.expense} radius={CHART_BAR_RADIUS} />
                                             </BarChart>
                                         </ResponsiveContainer>
                                     </div>

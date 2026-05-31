@@ -6,6 +6,17 @@ import { ComposedChart, Line, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, 
 import { LineChart as LineChartIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatEuro } from "@/lib/format";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface ChartDataPoint {
     name: string;
@@ -47,36 +58,37 @@ export const NetWorthChart = memo(function NetWorthChart({ chartData, loading, i
                 ) : (
                     <div className="h-[450px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 20 }}>
+                            <ComposedChart data={chartData} margin={{ top: 22, right: 18, left: 4, bottom: 16 }}>
                                 <defs>
                                     <linearGradient id="colorPatrimonio" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                        <stop offset="5%" stopColor={CHART_COLORS.wealth} stopOpacity={0.22} />
+                                        <stop offset="95%" stopColor={CHART_COLORS.wealth} stopOpacity={0} />
                                     </linearGradient>
                                     <linearGradient id="colorDebiti" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0} />
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.2} />
+                                        <stop offset="5%" stopColor={CHART_COLORS.debt} stopOpacity={0} />
+                                        <stop offset="95%" stopColor={CHART_COLORS.debt} stopOpacity={0.18} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                                <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dy={10} />
-                                <YAxis tickFormatter={(val) => `\u20AC${Math.round(val / 1000)}k`} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontSize: 12 }} dx={-10} />
+                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                <XAxis dataKey="name" {...CHART_AXIS_PROPS} dy={10} minTickGap={22} />
+                                <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={66} />
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(16px)', borderRadius: '1rem', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)' }}
-                                    labelStyle={{ fontWeight: 'bold', color: '#0f172a', marginBottom: '8px' }}
-                                    itemStyle={{ color: '#334155', border: 'none' }}
+                                    contentStyle={CHART_TOOLTIP_STYLE}
+                                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                    itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                    cursor={CHART_CURSOR}
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     formatter={(value: any) => [formatEuro(Number(value)), undefined]}
                                     labelFormatter={(label, payload) => payload?.[0]?.payload?.fullDate || label}
                                 />
-                                <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', paddingBottom: '20px' }} />
+                                <Legend verticalAlign="top" height={40} iconType="circle" wrapperStyle={CHART_LEGEND_STYLE} />
 
-                                <Area type="monotone" dataKey="Patrimonio" stroke="#10b981" strokeWidth={4} fillOpacity={1} fill="url(#colorPatrimonio)" activeDot={{ r: 8, strokeWidth: 0, fill: '#10b981', filter: 'drop-shadow(0 0 10px rgba(16,185,129,0.4))' }} />
-                                <Area type="monotone" dataKey="Debiti" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#colorDebiti)" activeDot={false} />
-                                <Line type="monotone" dataKey="Immobili" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="Liquidità" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="Altre Attività" stroke="#64748b" strokeWidth={2} dot={false} />
-                                <Line type="monotone" dataKey="Bitcoin" stroke="#f59e0b" strokeWidth={2} dot={false} />
+                                <Area type="monotone" dataKey="Patrimonio" stroke={CHART_COLORS.wealth} strokeWidth={4} fillOpacity={1} fill="url(#colorPatrimonio)" activeDot={{ r: 7, strokeWidth: 0, fill: CHART_COLORS.wealth, filter: 'drop-shadow(0 0 10px rgba(16,185,129,0.35))' }} />
+                                <Area type="monotone" dataKey="Debiti" stroke={CHART_COLORS.debt} strokeWidth={2.5} fillOpacity={1} fill="url(#colorDebiti)" activeDot={false} />
+                                <Line type="monotone" dataKey="Immobili" stroke={CHART_COLORS.realEstate} strokeWidth={2.4} dot={false} />
+                                <Line type="monotone" dataKey="Liquidità" stroke={CHART_COLORS.liquidity} strokeWidth={2.4} dot={false} />
+                                <Line type="monotone" dataKey="Altre Attività" stroke={CHART_COLORS.neutral} strokeWidth={2.4} dot={false} />
+                                <Line type="monotone" dataKey="Bitcoin" stroke={CHART_COLORS.bitcoin} strokeWidth={2.4} dot={false} />
                             </ComposedChart>
                         </ResponsiveContainer>
                     </div>

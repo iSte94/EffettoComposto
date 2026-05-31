@@ -17,6 +17,15 @@ import {
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
   Legend, ComposedChart, Line,
 } from "recharts";
+import {
+  CHART_AXIS_PROPS,
+  CHART_BAR_RADIUS,
+  CHART_COLORS,
+  CHART_GRID_PROPS,
+  CHART_LEGEND_STYLE,
+  CHART_TOOLTIP_STYLE,
+  formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 // ---------- Types ----------
 
@@ -204,9 +213,9 @@ function computeXIRR(cashFlows: CashFlow[], guess = 0.1, maxIter = 200, tol = 1e
 }
 
 const PIE_COLORS = [
-  "#10b981", "#6366f1", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#14b8a6",
-  "#a855f7", "#64748b",
+  CHART_COLORS.wealth, CHART_COLORS.investment, CHART_COLORS.target, CHART_COLORS.expense,
+  CHART_COLORS.liquidity, CHART_COLORS.opportunity, "#ec4899", "#84cc16",
+  CHART_COLORS.interest, "#14b8a6", "#a855f7", CHART_COLORS.neutral,
 ];
 
 const fmtEuro = (v: number) => formatEuro(Math.round(v));
@@ -255,7 +264,7 @@ function ChartCard({ title, icon: Icon, children, className = "" }: {
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-border/80 bg-popover/95 p-3 shadow-lg backdrop-blur-sm text-xs">
+    <div className="text-xs" style={CHART_TOOLTIP_STYLE}>
       <p className="font-semibold mb-1.5">{label}</p>
       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {payload.map((p: any, i: number) => (
@@ -701,29 +710,29 @@ export function DirectaMovementsViewer() {
         <ChartCard title="Andamento cumulativo" icon={TrendingUp}>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={cumulativeData}>
+              <AreaChart data={cumulativeData} margin={{ top: 12, right: 10, left: 0, bottom: 6 }}>
                 <defs>
                   <linearGradient id="gConf" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.wealth} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.wealth} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gInv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.investment} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.investment} stopOpacity={0} />
                   </linearGradient>
                   <linearGradient id="gDiv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
+                    <stop offset="5%" stopColor={CHART_COLORS.target} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={CHART_COLORS.target} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={45} />
+                <CartesianGrid {...CHART_GRID_PROPS} />
+                <XAxis dataKey="month" {...CHART_AXIS_PROPS} interval="preserveStartEnd" minTickGap={16} />
+                <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="conferimenti" name="Conf. netti" stroke="#10b981" fill="url(#gConf)" strokeWidth={2} />
-                <Area type="monotone" dataKey="investito" name="Investito cum." stroke="#6366f1" fill="url(#gInv)" strokeWidth={2} />
-                <Area type="monotone" dataKey="dividendi" name="Dividendi cum." stroke="#f59e0b" fill="url(#gDiv)" strokeWidth={2} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={CHART_LEGEND_STYLE} />
+                <Area type="monotone" dataKey="conferimenti" name="Conf. netti" stroke={CHART_COLORS.wealth} fill="url(#gConf)" strokeWidth={2.5} />
+                <Area type="monotone" dataKey="investito" name="Investito cum." stroke={CHART_COLORS.investment} fill="url(#gInv)" strokeWidth={2.5} />
+                <Area type="monotone" dataKey="dividendi" name="Dividendi cum." stroke={CHART_COLORS.target} fill="url(#gDiv)" strokeWidth={2.5} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -733,16 +742,16 @@ export function DirectaMovementsViewer() {
         <ChartCard title="Flussi mensili" icon={CalendarDays}>
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={45} />
+              <BarChart data={monthlyData} margin={{ top: 12, right: 10, left: 0, bottom: 6 }} barCategoryGap="26%">
+                <CartesianGrid {...CHART_GRID_PROPS} />
+                <XAxis dataKey="month" {...CHART_AXIS_PROPS} interval="preserveStartEnd" minTickGap={16} />
+                <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="conferimenti" name="Conferimenti" fill="#10b981" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="vendite" name="Vendite" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="acquisti" name="Acquisti" fill="#6366f1" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="prelievi" name="Prelievi" fill="#ef4444" radius={[2, 2, 0, 0]} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={CHART_LEGEND_STYLE} />
+                <Bar dataKey="conferimenti" name="Conferimenti" fill={CHART_COLORS.wealth} radius={CHART_BAR_RADIUS} />
+                <Bar dataKey="vendite" name="Vendite" fill={CHART_COLORS.opportunity} radius={CHART_BAR_RADIUS} />
+                <Bar dataKey="acquisti" name="Acquisti" fill={CHART_COLORS.investment} radius={CHART_BAR_RADIUS} />
+                <Bar dataKey="prelievi" name="Prelievi" fill={CHART_COLORS.expense} radius={CHART_BAR_RADIUS} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -768,8 +777,8 @@ export function DirectaMovementsViewer() {
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v) => fmtEuro(v as number)} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => fmtEuro(v as number)} contentStyle={CHART_TOOLTIP_STYLE} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={CHART_LEGEND_STYLE} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -779,16 +788,16 @@ export function DirectaMovementsViewer() {
         <ChartCard title="Riepilogo annuale" icon={CalendarDays} className="lg:col-span-2">
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={yearlySummary}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.5} />
-                <XAxis dataKey="anno" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={45} />
+              <ComposedChart data={yearlySummary} margin={{ top: 12, right: 10, left: 0, bottom: 6 }}>
+                <CartesianGrid {...CHART_GRID_PROPS} />
+                <XAxis dataKey="anno" {...CHART_AXIS_PROPS} />
+                <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                 <Tooltip content={<CustomTooltip />} />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="conferimenti" name="Conf. netti" fill="#10b981" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="acquisti" name="Acquisti" fill="#6366f1" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="vendite" name="Vendite" fill="#8b5cf6" radius={[2, 2, 0, 0]} />
-                <Line type="monotone" dataKey="dividendi" name="Dividendi" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={CHART_LEGEND_STYLE} />
+                <Bar dataKey="conferimenti" name="Conf. netti" fill={CHART_COLORS.wealth} radius={CHART_BAR_RADIUS} />
+                <Bar dataKey="acquisti" name="Acquisti" fill={CHART_COLORS.investment} radius={CHART_BAR_RADIUS} />
+                <Bar dataKey="vendite" name="Vendite" fill={CHART_COLORS.opportunity} radius={CHART_BAR_RADIUS} />
+                <Line type="monotone" dataKey="dividendi" name="Dividendi" stroke={CHART_COLORS.target} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} />
               </ComposedChart>
             </ResponsiveContainer>
           </div>

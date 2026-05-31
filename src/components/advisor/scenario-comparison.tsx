@@ -11,6 +11,17 @@ import { formatEuro } from "@/lib/format";
 import type { PurchaseSimulation, FinancialSnapshot } from "@/types";
 import { computeRealReturn, projectFire } from "@/lib/finance/fire-projection";
 import { buildAdvisorFireBaseParams, buildAdvisorFireWithPurchaseParams, getAdvisorOwnershipMonthlyDelta, hasAdvisorFireContext } from "@/lib/finance/advisor-fire";
+import {
+    CHART_AXIS_PROPS,
+    CHART_BAR_RADIUS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface ScenarioComparisonProps {
     sim: PurchaseSimulation;
@@ -107,7 +118,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 key: "cash",
                 label: "Cash",
                 icon: <Wallet className="h-4 w-4" />,
-                color: "#6366f1",
+                color: CHART_COLORS.investment,
                 description: "Paghi tutto subito, zero interessi",
                 wealthAtEnd: Math.max(0, cashWealth),
                 liquidityNow: Math.max(0, startLiquidity - sim.totalPrice),
@@ -118,7 +129,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 key: "financed",
                 label: sim.isFinanced ? "Finanziato" : "Finanziato*",
                 icon: <CreditCard className="h-4 w-4" />,
-                color: "#f59e0b",
+                color: CHART_COLORS.target,
                 description: `Anticipo + ${sim.financingYears}a di rate al ${sim.financingRate}%`,
                 wealthAtEnd: Math.max(0, financedWealth),
                 liquidityNow: Math.max(0, startLiquidity - sim.downPayment),
@@ -129,7 +140,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                 key: "invest",
                 label: "Non compri",
                 icon: <TrendingUp className="h-4 w-4" />,
-                color: "#10b981",
+                color: CHART_COLORS.wealth,
                 description: "Investi tutto, rinunci all'acquisto",
                 wealthAtEnd: Math.max(0, investWealth),
                 liquidityNow: startLiquidity,
@@ -165,22 +176,19 @@ export const ScenarioComparison = memo(function ScenarioComparison({
 
                 <div className="mb-4 h-56">
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 20, right: 10, left: 5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" />
-                            <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} />
-                            <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
+                        <BarChart data={chartData} margin={{ top: 24, right: 10, left: 0, bottom: 6 }} barCategoryGap="32%">
+                            <CartesianGrid {...CHART_GRID_PROPS} />
+                            <XAxis dataKey="name" {...CHART_AXIS_PROPS} />
+                            <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
                             <Tooltip
                                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 formatter={(v: any) => [formatEuro(Number(v)), "Patrimonio"]}
-                                contentStyle={{
-                                    borderRadius: "12px",
-                                    border: "1px solid rgba(148,163,184,0.18)",
-                                    boxShadow: "0 12px 30px rgba(0,0,0,.12)",
-                                    backgroundColor: "rgba(15, 23, 42, 0.96)",
-                                    color: "#e2e8f0",
-                                }}
+                                contentStyle={CHART_TOOLTIP_STYLE}
+                                labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                cursor={CHART_CURSOR}
                             />
-                            <Bar dataKey="Patrimonio" radius={[8, 8, 0, 0]}>
+                            <Bar dataKey="Patrimonio" radius={CHART_BAR_RADIUS}>
                                 {chartData.map((entry, index) => (
                                     <Cell key={index} fill={entry.color} />
                                 ))}
@@ -189,7 +197,7 @@ export const ScenarioComparison = memo(function ScenarioComparison({
                                     position="top"
                                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     formatter={(v: any) => formatEuro(Number(v))}
-                                    style={{ fontSize: 10, fill: "#64748b", fontWeight: 700 }}
+                                    style={{ fontSize: 11, fill: "var(--muted-foreground)", fontWeight: 800 }}
                                 />
                             </Bar>
                         </BarChart>

@@ -10,6 +10,17 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
     BarChart, Bar, Cell,
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_HORIZONTAL_BAR_RADIUS,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 interface PurchaseImpactChartProps {
     sim: PurchaseSimulation;
@@ -65,19 +76,19 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
     const costBreakdown = useMemo(() => {
         const items: { name: string; valore: number; color: string }[] = [];
         if (sim.isFinanced) {
-            items.push({ name: "Anticipo", valore: sim.downPayment, color: "#6366f1" });
-            items.push({ name: "Interessi", valore: calculations.totalInterest, color: "#ef4444" });
+            items.push({ name: "Anticipo", valore: sim.downPayment, color: CHART_COLORS.capital });
+            items.push({ name: "Interessi", valore: calculations.totalInterest, color: CHART_COLORS.expense });
         } else {
-            items.push({ name: "Prezzo", valore: sim.totalPrice, color: "#6366f1" });
+            items.push({ name: "Prezzo", valore: sim.totalPrice, color: CHART_COLORS.investment });
         }
         if (calculations.annualRecurringCosts > 0) {
-            items.push({ name: `Costi Ricorrenti (${calculations.tcoYears}a)`, valore: calculations.annualRecurringCosts * calculations.tcoYears, color: "#f59e0b" });
+            items.push({ name: `Costi Ricorrenti (${calculations.tcoYears}a)`, valore: calculations.annualRecurringCosts * calculations.tcoYears, color: CHART_COLORS.target });
         }
         const realRet = Math.max(0, computeRealReturn(snapshot.fireExpectedReturn, snapshot.expectedInflation));
         items.push({
             name: "Costo Opportunita",
             valore: calculations.cashOutlay * Math.pow(1 + realRet, calculations.tcoYears) - calculations.cashOutlay,
-            color: "#8b5cf6",
+            color: CHART_COLORS.opportunity,
         });
         return items;
     }, [sim, calculations, snapshot]);
@@ -101,12 +112,12 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
                     </div>
                     <div className="h-48">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={costBreakdown} layout="vertical" margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" />
-                                <XAxis type="number" tick={{ fontSize: 9, fill: "#64748b" }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
-                                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} width={140} />
-                                <Tooltip formatter={euroFormatter} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
-                                <Bar dataKey="valore" name="Importo" radius={[0, 6, 6, 0]}>
+                            <BarChart data={costBreakdown} layout="vertical" margin={{ top: 8, right: 10, left: 8, bottom: 6 }}>
+                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                <XAxis type="number" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} />
+                                <YAxis type="category" dataKey="name" {...CHART_AXIS_PROPS} width={150} />
+                                <Tooltip formatter={euroFormatter} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} cursor={CHART_CURSOR} />
+                                <Bar dataKey="valore" name="Importo" radius={CHART_HORIZONTAL_BAR_RADIUS}>
                                     {costBreakdown.map((entry, index) => (
                                         <Cell key={index} fill={entry.color} />
                                     ))}
@@ -134,31 +145,31 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-4 text-xs">
-                            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-indigo-500" /> Capitale</span>
-                            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-500" /> Interessi</span>
+                            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" /> Capitale</span>
+                            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Interessi</span>
                             <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-400" /> Debito Residuo</span>
                         </div>
                     </div>
                     <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={amortizationData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                            <AreaChart data={amortizationData} margin={{ top: 12, right: 12, left: 0, bottom: 6 }}>
                                 <defs>
                                     <linearGradient id="gradCapitale" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                        <stop offset="5%" stopColor={CHART_COLORS.investment} stopOpacity={0.38} />
+                                        <stop offset="95%" stopColor={CHART_COLORS.investment} stopOpacity={0} />
                                     </linearGradient>
                                     <linearGradient id="gradInteressi" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.4} />
-                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                                        <stop offset="5%" stopColor={CHART_COLORS.expense} stopOpacity={0.34} />
+                                        <stop offset="95%" stopColor={CHART_COLORS.expense} stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" />
-                                <XAxis dataKey="year" tick={{ fontSize: 9, fill: "#64748b" }} />
-                                <YAxis tick={{ fontSize: 9, fill: "#64748b" }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
-                                <Tooltip formatter={euroFormatter} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
-                                <Area type="monotone" dataKey="capitalePagato" name="Capitale Pagato" stroke="#6366f1" fill="url(#gradCapitale)" strokeWidth={2} />
-                                <Area type="monotone" dataKey="interessiPagati" name="Interessi Pagati" stroke="#ef4444" fill="url(#gradInteressi)" strokeWidth={2} />
-                                <Area type="monotone" dataKey="debitoResiduo" name="Debito Residuo" stroke="#94a3b8" fill="none" strokeWidth={2} strokeDasharray="5 5" />
+                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                <XAxis dataKey="year" {...CHART_AXIS_PROPS} minTickGap={16} />
+                                <YAxis {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} width={58} />
+                                <Tooltip formatter={euroFormatter} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} cursor={CHART_CURSOR} />
+                                <Area type="monotone" dataKey="capitalePagato" name="Capitale Pagato" stroke={CHART_COLORS.investment} fill="url(#gradCapitale)" strokeWidth={2.5} />
+                                <Area type="monotone" dataKey="interessiPagati" name="Interessi Pagati" stroke={CHART_COLORS.expense} fill="url(#gradInteressi)" strokeWidth={2.5} />
+                                <Area type="monotone" dataKey="debitoResiduo" name="Debito Residuo" stroke={CHART_COLORS.neutral} fill="none" strokeWidth={2.5} strokeDasharray="6 6" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
@@ -170,12 +181,12 @@ export const PurchaseImpactChart = memo(function PurchaseImpactChart({
                     <h3 className="mb-4 text-sm font-bold text-slate-600 dark:text-slate-400">Composizione del Costo Totale</h3>
                     <div className="h-48">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={costBreakdown} layout="vertical" margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.22)" />
-                                <XAxis type="number" tick={{ fontSize: 9, fill: "#64748b" }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
-                                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} width={140} />
-                                <Tooltip formatter={euroFormatter} contentStyle={{ borderRadius: "12px", border: "1px solid rgba(148,163,184,0.18)", boxShadow: "0 12px 30px rgba(0,0,0,.12)", backgroundColor: "rgba(15, 23, 42, 0.96)", color: "#e2e8f0" }} />
-                                <Bar dataKey="valore" name="Importo" radius={[0, 6, 6, 0]}>
+                            <BarChart data={costBreakdown} layout="vertical" margin={{ top: 8, right: 10, left: 8, bottom: 6 }}>
+                                <CartesianGrid {...CHART_GRID_PROPS} />
+                                <XAxis type="number" {...CHART_AXIS_PROPS} tickFormatter={formatCompactEuroAxis} />
+                                <YAxis type="category" dataKey="name" {...CHART_AXIS_PROPS} width={150} />
+                                <Tooltip formatter={euroFormatter} contentStyle={CHART_TOOLTIP_STYLE} labelStyle={CHART_TOOLTIP_LABEL_STYLE} itemStyle={CHART_TOOLTIP_ITEM_STYLE} cursor={CHART_CURSOR} />
+                                <Bar dataKey="valore" name="Importo" radius={CHART_HORIZONTAL_BAR_RADIUS}>
                                     {costBreakdown.map((entry, index) => (
                                         <Cell key={index} fill={entry.color} />
                                     ))}

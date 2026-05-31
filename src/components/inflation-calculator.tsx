@@ -11,6 +11,17 @@ import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
     CartesianGrid,
 } from "recharts";
+import {
+    CHART_AXIS_PROPS,
+    CHART_COLORS,
+    CHART_CURSOR,
+    CHART_GRID_PROPS,
+    CHART_LEGEND_STYLE,
+    CHART_TOOLTIP_ITEM_STYLE,
+    CHART_TOOLTIP_LABEL_STYLE,
+    CHART_TOOLTIP_STYLE,
+    formatCompactEuroAxis,
+} from "@/components/ui/chart-style";
 
 export function InflationCalculator() {
     const [amount, setAmount] = useState(100000);
@@ -318,53 +329,51 @@ export function InflationCalculator() {
                     <h3 className="mb-4 text-sm font-bold text-muted-foreground">Evoluzione nel Tempo</h3>
                     <div className="h-72">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartPoints} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                            <AreaChart data={chartPoints} margin={{ top: 12, right: 10, left: 0, bottom: 6 }}>
+                                <CartesianGrid {...CHART_GRID_PROPS} />
                                 <XAxis
                                     dataKey="anno"
-                                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                    {...CHART_AXIS_PROPS}
                                     tickFormatter={(value: number) => `${value}a`}
                                 />
                                 <YAxis
-                                    tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                    tickFormatter={(value: number) => (value >= 1000 ? `${Math.round(value / 1000)}k` : String(value))}
+                                    {...CHART_AXIS_PROPS}
+                                    tickFormatter={formatCompactEuroAxis}
+                                    width={58}
                                 />
                                 <Tooltip
                                     formatter={(value: number | string | undefined) => formatEuro(Number(value ?? 0))}
                                     labelFormatter={(label) => `Anno ${String(label ?? 0)}`}
-                                    contentStyle={{
-                                        borderRadius: "16px",
-                                        border: "1px solid var(--border)",
-                                        backgroundColor: "var(--popover)",
-                                        color: "var(--popover-foreground)",
-                                        boxShadow: "0 16px 40px -16px rgba(15, 23, 42, 0.45)",
-                                    }}
+                                    contentStyle={CHART_TOOLTIP_STYLE}
+                                    labelStyle={CHART_TOOLTIP_LABEL_STYLE}
+                                    itemStyle={CHART_TOOLTIP_ITEM_STYLE}
+                                    cursor={CHART_CURSOR}
                                 />
-                                <Legend wrapperStyle={{ fontSize: 11, color: "var(--muted-foreground)" }} />
+                                <Legend wrapperStyle={CHART_LEGEND_STYLE} iconType="circle" />
                                 <Area
                                     type="monotone"
                                     dataKey="Valore Nominale Investito"
-                                    stroke="#3b82f6"
-                                    fill="#3b82f6"
+                                    stroke={CHART_COLORS.capital}
+                                    fill={CHART_COLORS.capital}
                                     fillOpacity={0.1}
-                                    strokeWidth={2}
+                                    strokeWidth={2.5}
                                 />
                                 <Area
                                     type="monotone"
                                     dataKey="Valore Reale Investito"
-                                    stroke="#10b981"
-                                    fill="#10b981"
+                                    stroke={CHART_COLORS.wealth}
+                                    fill={CHART_COLORS.wealth}
                                     fillOpacity={0.15}
-                                    strokeWidth={2}
+                                    strokeWidth={2.5}
                                 />
                                 <Area
                                     type="monotone"
                                     dataKey="Potere d'Acquisto"
-                                    stroke="#ef4444"
-                                    fill="#ef4444"
+                                    stroke={CHART_COLORS.expense}
+                                    fill={CHART_COLORS.expense}
                                     fillOpacity={0.1}
-                                    strokeWidth={2}
-                                    strokeDasharray="5 5"
+                                    strokeWidth={2.5}
+                                    strokeDasharray="6 6"
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
