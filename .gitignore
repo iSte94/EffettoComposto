@@ -1,5 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# local research
+lazy portfolio/
+
 # dependencies
 /node_modules
 /stipendee_tester/node_modules/

@@ -114,6 +114,15 @@ Deploy         Docker + Traefik (HTTPS automatico via Let's Encrypt)
 
 ## Changelog
 
+### v1.11.0 - 10 giugno 2026 (nuova tab "Lazy Portfolios" — esplora, confronta e simula portafogli passivi storici)
+
+- **Nuova tab "Lazy Portfolios"** — 16 portafogli passivi celebri (Golden Butterfly, All Weather, Permanent, Buffett, Bogleheads, Couch Potato, Talmud, Swensen, Ivy, Coffee House, Dedalo Four, ecc.) con allocazione, ETF reali (USD + EUR UCITS armonizzati), statistiche storiche su 3 periodi (1985-2020, 2000-2020, 2010-2020) in tre valute (USD, USD→EUR, EUR puro).
+- **Simulatore Monte Carlo interattivo** — proiezione decumulo/SWR con 2000 run, tasso di successo, SWR ottimale al 95%, grafico percentili (10°, 50°, 90°), parametri personalizzabili (capitale, prelievo, orizzonte, inflazione, entrate extra).
+- **Confronto rischio di cambio** — evidenza educativa USD vs USD→EUR vs EUR per mostrare l'impatto reale del rischio valutario per investitori europei.
+- **Dati ETF completi** — ticker, ISIN, TER, peso e ruolo per ogni costituente, con toggle EUR/USD.
+- **Test di integrita' dati** — test Vitest su allocazioni, pesi ETF e validita' statistiche.
+- **Nessuna modifica al database** — nessuna migrazione Prisma necessaria.
+
 ### v1.10.34 - 31 maggio 2026 (UX - rifinitura grafici custom fuori da Recharts)
 
 - **Problema iniziale** - l'audit post-release ha confermato che tutti i grafici Recharts usavano il sistema condiviso, ma alcune visualizzazioni custom erano ancora rimaste con colori locali: asset allocation nel Riepilogo, asset allocation nel report stampabile e confronto strategie nella rendita immobiliare.

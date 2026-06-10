@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense, useState } from "react";
-import { BarChart3, Bot, Briefcase, Building2, Flame, Github, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
+import { BarChart3, Bot, Briefcase, Building2, Compass, Flame, Github, LineChart, ShieldCheck, TrendingUp, Wallet, Wrench } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuthModal } from "@/components/auth-modal";
 import { AppVersionLabel } from "@/components/app-version-label";
@@ -22,6 +22,7 @@ const CalculatorsDashboard = lazy(() => import("@/components/calculators-dashboa
 const BudgetingDashboard = lazy(() => import("@/components/budgeting-dashboard").then((m) => ({ default: m.BudgetingDashboard })));
 const AiDashboard = lazy(() => import("@/components/ai-dashboard").then((m) => ({ default: m.AiDashboard })));
 const PerformanceDashboard = lazy(() => import("@/components/performance-dashboard").then((m) => ({ default: m.PerformanceDashboard })));
+const LazyPortfoliosDashboard = lazy(() => import("@/components/lazy-portfolios-dashboard").then((m) => ({ default: m.LazyPortfoliosDashboard })));
 
 function TabFallback() {
   return (
@@ -93,7 +94,7 @@ export default function CalculatorPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         <div className="flex justify-center">
-          <TabsList className="grid w-full max-w-7xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-10">
+          <TabsList className="grid w-full max-w-7xl grid-cols-2 gap-1 rounded-2xl border border-border/70 bg-card/80 p-1 shadow-sm backdrop-blur-xl sm:grid-cols-3 md:grid-cols-6 lg:grid-cols-11">
             <TabsTrigger value="overview" className={triggerClass}>
               <BarChart3 className="size-4 text-teal-500" />
               <span>Riepilogo</span>
@@ -121,6 +122,10 @@ export default function CalculatorPage() {
             <TabsTrigger value="fire" className={triggerClass}>
               <Flame className="size-4 text-orange-500" />
               <span>FIRE</span>
+            </TabsTrigger>
+            <TabsTrigger value="lazy-portfolios" className={triggerClass}>
+              <Compass className="size-4 text-emerald-500" />
+              <span>Lazy Portfolios</span>
             </TabsTrigger>
             <TabsTrigger value="budgeting" className={triggerClass}>
               <Wallet className="size-4 text-violet-500" />
@@ -164,6 +169,10 @@ export default function CalculatorPage() {
 
           <TabsContent value="fire">
             <FireDashboard user={user} />
+          </TabsContent>
+
+          <TabsContent value="lazy-portfolios">
+            <LazyPortfoliosDashboard />
           </TabsContent>
 
           <TabsContent value="budgeting">
